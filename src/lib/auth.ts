@@ -26,6 +26,32 @@ type SignInInput = {
   password: string
 }
 
+function maskEmail(email: string | undefined) {
+  if (!email) {
+    return "unknown"
+  }
+
+  const [name, domain] = email.split("@")
+  if (!domain) {
+    return "invalid"
+  }
+
+  if (name.length <= 2) {
+    return `${name[0] ?? "*"}*@${domain}`
+  }
+
+  return `${name.slice(0, 2)}***@${domain}`
+}
+
+function authDebug(message: string, details?: Record<string, unknown>) {
+  if (details) {
+    console.info(`[auth] ${message}`, details)
+    return
+  }
+
+  console.info(`[auth] ${message}`)
+}
+
 function getEmailRedirectTo() {
   const configured = import.meta.env.VITE_AUTH_REDIRECT_URL as string | undefined
   if (configured && configured.trim()) {
@@ -68,6 +94,12 @@ async function saveProfile(profile: UserProfile): Promise<string | undefined> {
     return "Supabase auth is not configured."
   }
 
+  authDebug("saveProfile started", {
+    userId: profile.id,
+    email: maskEmail(profile.email),
+    role: profile.role,
+  })
+
   const { error } = await supabase.from("profiles").upsert(
     {
       id: profile.id,
@@ -81,7 +113,16 @@ async function saveProfile(profile: UserProfile): Promise<string | undefined> {
     { onConflict: "id" }
   )
 
-  return error?.message
+  if (error) {
+    authDebug("saveProfile failed", {
+      userId: profile.id,
+      error: error.message,
+    })
+    return error.message
+  }
+
+  authDebug("saveProfile succeeded", { userId: profile.id })
+  return undefined
 }
 
 export async function fetchProfile(user: User): Promise<UserProfile | null> {
@@ -96,11 +137,20 @@ export async function fetchProfile(user: User): Promise<UserProfile | null> {
     .maybeSingle()
 
   if (error) {
+    authDebug("fetchProfile query failed, using metadata fallback", {
+      userId: user.id,
+      email: maskEmail(user.email),
+      error: error.message,
+    })
     console.error("Failed to load profile", error)
     return buildProfileFromMetadata(user)
   }
 
   if (!data) {
+    authDebug("fetchProfile no row found, attempting backfill", {
+      userId: user.id,
+      email: maskEmail(user.email),
+    })
     const fallback = buildProfileFromMetadata(user)
     const saveError = await saveProfile(fallback)
     if (saveError) {
@@ -150,6 +200,11 @@ export async function signUpCustomer(input: SignUpInput): Promise<AuthResult> {
     return { user: null, profile: null, error: "Supabase auth is not configured." }
   }
 
+  authDebug("signUpCustomer started", {
+    email: maskEmail(input.email),
+    redirectTo: getEmailRedirectTo() ?? "none",
+  })
+
   const { data, error } = await supabase.auth.signUp({
     email: input.email,
     password: input.password,
@@ -166,11 +221,19 @@ export async function signUpCustomer(input: SignUpInput): Promise<AuthResult> {
   })
 
   if (error) {
+    authDebug("signUpCustomer failed", {
+      email: maskEmail(input.email),
+      error: error.message,
+    })
     return { user: null, profile: null, error: error.message }
   }
 
   const user = data.user
   if (!user) {
+    authDebug("signUpCustomer returned no user", {
+      email: maskEmail(input.email),
+      sessionReturned: Boolean(data.session),
+    })
     return {
       user: null,
       profile: null,
@@ -179,6 +242,10 @@ export async function signUpCustomer(input: SignUpInput): Promise<AuthResult> {
   }
 
   if (!data.session) {
+    authDebug("signUpCustomer requires email confirmation", {
+      userId: user.id,
+      email: maskEmail(user.email ?? input.email),
+    })
     return {
       user,
       profile: null,
@@ -199,8 +266,17 @@ export async function signUpCustomer(input: SignUpInput): Promise<AuthResult> {
 
   const saveError = await saveProfile(profile)
   if (saveError) {
+    authDebug("signUpCustomer completed with profile sync error", {
+      userId: user.id,
+      error: saveError,
+    })
     return { user, profile, error: `Account created but profile sync failed: ${saveError}` }
   }
+
+  authDebug("signUpCustomer succeeded with active session", {
+    userId: user.id,
+    email: maskEmail(user.email ?? input.email),
+  })
 
   return { user, profile }
 }
@@ -210,15 +286,31 @@ export async function signInCustomer(input: SignInInput): Promise<AuthResult> {
     return { user: null, profile: null, error: "Supabase auth is not configured." }
   }
 
+  authDebug("signInCustomer started", {
+    email: maskEmail(input.email),
+  })
+
   const { data, error } = await supabase.auth.signInWithPassword(input)
   if (error) {
+    authDebug("signInCustomer failed", {
+      email: maskEmail(input.email),
+      error: error.message,
+    })
     return { user: null, profile: null, error: error.message }
   }
 
   const user = data.user
   if (!user) {
+    authDebug("signInCustomer returned no user", {
+      email: maskEmail(input.email),
+    })
     return { user: null, profile: null, error: "Sign in completed without an active user." }
   }
+
+  authDebug("signInCustomer succeeded", {
+    userId: user.id,
+    email: maskEmail(user.email ?? input.email),
+  })
 
   return {
     user,
@@ -249,7 +341,9 @@ export async function signOutUser() {
     return
   }
 
+  authDebug("signOutUser started")
   await supabase.auth.signOut()
+  authDebug("signOutUser completed")
 }
 
 export async function resendSignupConfirmation(email: string): Promise<string | undefined> {
@@ -262,6 +356,11 @@ export async function resendSignupConfirmation(email: string): Promise<string | 
     return "Please enter an email address first."
   }
 
+  authDebug("resendSignupConfirmation started", {
+    email: maskEmail(trimmedEmail),
+    redirectTo: getEmailRedirectTo() ?? "none",
+  })
+
   const { error } = await supabase.auth.resend({
     type: "signup",
     email: trimmedEmail,
@@ -270,5 +369,16 @@ export async function resendSignupConfirmation(email: string): Promise<string | 
     },
   })
 
-  return error?.message
+  if (error) {
+    authDebug("resendSignupConfirmation failed", {
+      email: maskEmail(trimmedEmail),
+      error: error.message,
+    })
+    return error.message
+  }
+
+  authDebug("resendSignupConfirmation succeeded", {
+    email: maskEmail(trimmedEmail),
+  })
+  return undefined
 }
