@@ -116,56 +116,61 @@ const defaultImages: Record<string, string> = {
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400">
       <defs>
         <linearGradient id="chatBg" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" style="stop-color:#4A1F0B;stop-opacity:1" />
-          <stop offset="50%" style="stop-color:#6B2C10;stop-opacity:1" />
-          <stop offset="100%" style="stop-color:#3D1808;stop-opacity:1" />
+          <stop offset="0%" style="stop-color:#8B6914;stop-opacity:1" />
+          <stop offset="50%" style="stop-color:#9B7925;stop-opacity:1" />
+          <stop offset="100%" style="stop-color:#6B5410;stop-opacity:1" />
         </linearGradient>
-        <radialGradient id="chatGlow" cx="35%" cy="30%" r="60%">
-          <stop offset="0%" style="stop-color:#8B4513;stop-opacity:0.6" />
-          <stop offset="100%" style="stop-color:#3D1808;stop-opacity:0" />
+        <radialGradient id="chatGlow" cx="40%" cy="30%" r="65%">
+          <stop offset="0%" style="stop-color:#C8A850;stop-opacity:0.5" />
+          <stop offset="100%" style="stop-color:#6B5410;stop-opacity:0" />
         </radialGradient>
-        <filter id="chatGrain">
-          <feTurbulence type="fractalNoise" baseFrequency="1.2" numOctaves="2" seed="5"/>
-          <feColorMatrix type="saturate" values="0.2"/>
+        <filter id="chatTexture">
+          <feTurbulence type="fractalNoise" baseFrequency="0.95" numOctaves="3" seed="8"/>
+          <feColorMatrix type="saturate" values="0.35"/>
           <feBlend mode="overlay" in2="SourceGraphic"/>
         </filter>
       </defs>
       <rect width="400" height="400" fill="url(#chatBg)"/>
       <ellipse cx="200" cy="200" rx="180" ry="185" fill="url(#chatGlow)"/>
-      <g opacity="0.25" filter="url(#chatGrain)">
-        <circle cx="200" cy="200" r="145" fill="#6B2C10"/>
+      <g opacity="0.25" filter="url(#chatTexture)">
+        <circle cx="200" cy="200" r="145" fill="#9B7925"/>
       </g>
       <g>
-        <circle cx="145" cy="155" r="4" fill="#2D1810" opacity="0.95"/>
-        <circle cx="255" cy="165" r="5" fill="#3A1F12" opacity="0.95"/>
-        <circle cx="175" cy="180" r="3" fill="#2D1810" opacity="0.95"/>
-        <circle cx="230" cy="175" r="4" fill="#4A2515" opacity="0.95"/>
-        <circle cx="160" cy="210" r="5" fill="#3A1F12" opacity="0.95"/>
-        <circle cx="245" cy="205" r="4" fill="#2D1810" opacity="0.95"/>
-        <circle cx="200" cy="230" r="3" fill="#4A2515" opacity="0.95"/>
-        <circle cx="180" cy="250" r="4" fill="#2D1810" opacity="0.95"/>
-        <circle cx="220" cy="245" r="5" fill="#3A1F12" opacity="0.95"/>
-        <ellipse cx="195" cy="165" rx="3" ry="4" fill="#5C3D2E" opacity="0.8"/>
-        <ellipse cx="215" cy="190" rx="4" ry="3" fill="#6B4423" opacity="0.8"/>
-        <ellipse cx="185" cy="200" rx="3" ry="5" fill="#7A5230" opacity="0.8"/>
-        <ellipse cx="225" cy="220" rx="5" ry="3" fill="#5C3D2E" opacity="0.8"/>
-        <circle cx="155" cy="185" r="2" fill="#8B5A3C" opacity="0.7"/>
-        <circle cx="240" cy="180" r="2" fill="#9B6B47" opacity="0.7"/>
-        <circle cx="170" cy="235" r="3" fill="#7A5230" opacity="0.7"/>
-        <circle cx="235" cy="230" r="2" fill="#8B5A3C" opacity="0.7"/>
-        <path d="M 142,140 L 145,150 L 148,140" stroke="#5C3D2E" stroke-width="1" fill="none" opacity="0.5"/>
-        <path d="M 252,155 L 255,165 L 258,155" stroke="#6B4423" stroke-width="1" fill="none" opacity="0.5"/>
-        <ellipse cx="205" cy="210" rx="6" ry="5" fill="#4A2515" opacity="0.75"/>
-        <ellipse cx="207" cy="208" rx="4" ry="3" fill="#3A1F12" opacity="0.85"/>
+        <circle cx="150" cy="145" r="5" fill="#2F2520" opacity="0.9"/>
+        <circle cx="250" cy="155" r="6" fill="#3A2C24" opacity="0.9"/>
+        <circle cx="175" cy="175" r="4" fill="#2F2520" opacity="0.9"/>
+        <circle cx="230" cy="170" r="5" fill="#443530" opacity="0.9"/>
+        <circle cx="165" cy="205" r="6" fill="#3A2C24" opacity="0.9"/>
+        <circle cx="240" cy="200" r="5" fill="#2F2520" opacity="0.9"/>
+        <circle cx="195" cy="230" r="4" fill="#443530" opacity="0.9"/>
+        <ellipse cx="185" cy="160" rx="3" ry="5" fill="#D4AF37" opacity="0.85"/>
+        <ellipse cx="220" cy="180" rx="5" ry="3" fill="#DAA520" opacity="0.85"/>
+        <ellipse cx="160" cy="185" rx="4" ry="6" fill="#E6C35C" opacity="0.85"/>
+        <ellipse cx="245" cy="175" rx="3" ry="4" fill="#D4AF37" opacity="0.85"/>
+        <ellipse cx="200" cy="210" rx="5" ry="4" fill="#DAA520" opacity="0.85"/>
+        <ellipse cx="175" cy="245" rx="4" ry="3" fill="#E6C35C" opacity="0.85"/>
+        <circle cx="140" cy="170" r="3" fill="#DC143C" opacity="0.8"/>
+        <circle cx="260" cy="185" r="4" fill="#B22222" opacity="0.8"/>
+        <circle cx="155" cy="225" r="3" fill="#DC143C" opacity="0.8"/>
+        <circle cx="235" cy="235" r="3" fill="#C41E3A" opacity="0.8"/>
+        <circle cx="210" cy="165" r="2" fill="#8FBC8F" opacity="0.75"/>
+        <circle cx="190" cy="195" r="3" fill="#98D98E" opacity="0.75"/>
+        <circle cx="225" cy="210" r="2" fill="#90C695" opacity="0.75"/>
+        <rect x="145" y="190" width="2" height="7" fill="#8B7355" opacity="0.7" transform="rotate(30 146 193.5)"/>
+        <rect x="250" y="215" width="2" height="6" fill="#9B8467" opacity="0.7" transform="rotate(-25 251 218)"/>
+        <ellipse cx="205" cy="250" rx="7" ry="6" fill="#B8860B" opacity="0.8"/>
+        <ellipse cx="207" cy="248" rx="5" ry="4" fill="#A87D0F" opacity="0.85"/>
+        <path d="M 148,130 Q 150,135 152,130" stroke="#F4E4BC" stroke-width="1" fill="none" opacity="0.5"/>
+        <path d="M 248,145 Q 250,150 252,145" stroke="#F4E4BC" stroke-width="1" fill="none" opacity="0.5"/>
       </g>
       <g opacity="0.15">
-        <circle cx="125" cy="125" r="3" fill="#7A5230"/>
-        <circle cx="275" cy="140" r="2" fill="#8B5A3C"/>
-        <circle cx="135" cy="275" r="3" fill="#6B4423"/>
-        <circle cx="265" cy="270" r="2" fill="#7A5230"/>
+        <circle cx="120" cy="120" r="4" fill="#E6C35C"/>
+        <circle cx="280" cy="135" r="3" fill="#D4AF37"/>
+        <circle cx="130" cy="280" r="4" fill="#DAA520"/>
+        <circle cx="270" cy="270" r="3" fill="#E6C35C"/>
       </g>
-      <text x="200" y="345" font-family="Georgia, serif" font-size="28" font-weight="bold" fill="#B89968" text-anchor="middle" letter-spacing="1">CHAAT MASALA</text>
-      <text x="200" y="375" font-family="Arial, sans-serif" font-size="15" fill="#9B8262" text-anchor="middle" opacity="0.95">Tangy & Zesty</text>
+      <text x="200" y="345" font-family="Georgia, serif" font-size="28" font-weight="bold" fill="#F4E4BC" text-anchor="middle" letter-spacing="1">CHAAT MASALA</text>
+      <text x="200" y="375" font-family="Arial, sans-serif" font-size="15" fill="#E6C35C" text-anchor="middle" opacity="0.95">Tangy & Zesty</text>
     </svg>
   `)}`,
   
