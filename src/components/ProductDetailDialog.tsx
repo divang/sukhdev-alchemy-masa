@@ -24,9 +24,10 @@ type ProductDetailDialogProps = {
 export function ProductDetailDialog({ product, open, onOpenChange, onAddToCart }: ProductDetailDialogProps) {
   const [selectedGrams, setSelectedGrams] = useState<number>(250)
   const [reviews] = useKV<Review[]>("reviews", [])
+  const [productImages] = useKV<Record<string, string>>("product-images", {})
   
   const productReviews = (reviews || []).filter(r => r.productId === product.id)
-  const imageUrl = getProductImage(product.id)
+  const imageUrl = getProductImage(product.id, productImages ?? {})
   
   const handleAddToCart = () => {
     onAddToCart(product, selectedGrams)

@@ -6,6 +6,7 @@ import { StarRating } from "./StarRating"
 import type { Product } from "@/lib/types"
 import { motion } from "framer-motion"
 import { getProductImage } from "@/lib/product-images"
+import { useKV } from "@github/spark/hooks"
 
 type ProductCardProps = {
   product: Product
@@ -14,7 +15,8 @@ type ProductCardProps = {
 }
 
 export function ProductCard({ product, onViewDetails, onAddToCart }: ProductCardProps) {
-  const imageUrl = getProductImage(product.id)
+  const [productImages] = useKV<Record<string, string>>("product-images", {})
+  const imageUrl = getProductImage(product.id, productImages ?? {})
   
   return (
     <motion.div

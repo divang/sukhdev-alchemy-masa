@@ -2,7 +2,7 @@ import { useState, useEffect } from "react"
 import { useKV } from "@github/spark/hooks"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { ShoppingCart, List, Package, CreditCard } from "@phosphor-icons/react"
+import { ShoppingCart, List, Package, CreditCard, Gear } from "@phosphor-icons/react"
 import { CategorySidebar } from "@/components/CategorySidebar"
 import { ProductCard } from "@/components/ProductCard"
 import { CartDrawer } from "@/components/CartDrawer"
@@ -10,12 +10,13 @@ import { ProductDetailDialog } from "@/components/ProductDetailDialog"
 import { CheckoutView } from "@/components/CheckoutView"
 import { OrderTrackingView } from "@/components/OrderTrackingView"
 import { TestimonialsSection } from "@/components/TestimonialsSection"
+import { AdminPanel } from "@/components/AdminPanel"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 import type { Category, Product, CartItem, Order } from "@/lib/types"
 import { toast } from "sonner"
 import { useInitialData } from "@/hooks/use-initial-data"
 
-type View = "store" | "checkout" | "payment" | "tracking"
+type View = "store" | "checkout" | "payment" | "tracking" | "admin"
 
 function App() {
   useInitialData()
@@ -206,6 +207,27 @@ function App() {
     )
   }
   
+  if (currentView === "admin") {
+    return (
+      <div className="min-h-screen bg-background">
+        <header className="border-b bg-card sticky top-0 z-10 shadow-sm">
+          <div className="container mx-auto px-4 py-4">
+            <div className="flex items-center justify-between">
+              <h1 className="text-2xl font-bold">Admin Panel</h1>
+              <Button variant="outline" onClick={handleBackToStore}>
+                Back to Store
+              </Button>
+            </div>
+          </div>
+        </header>
+        
+        <div className="container mx-auto px-4 py-8">
+          <AdminPanel />
+        </div>
+      </div>
+    )
+  }
+  
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b bg-card sticky top-0 z-10 shadow-sm">
@@ -240,6 +262,16 @@ function App() {
             </div>
             
             <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setCurrentView("admin")}
+                className="hidden md:flex"
+              >
+                <Gear size={18} className="mr-2" />
+                Manage Images
+              </Button>
+              
               <Button
                 variant="outline"
                 size="sm"
