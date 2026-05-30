@@ -16,6 +16,8 @@ type AuthViewProps = {
   onAuthenticated: (profile: UserProfile) => void
 }
 
+const SIGN_IN_TIMEOUT_MS = 30000
+
 async function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
   let timeoutId: ReturnType<typeof setTimeout> | undefined
   const timeoutPromise = new Promise<never>((_, reject) => {
@@ -52,8 +54,8 @@ export function AuthView({ mode, onBack, onAuthenticated }: AuthViewProps) {
 
     try {
       const result = mode === "admin"
-        ? await withTimeout(signInAdmin(signInData), 15000, "Admin sign in timed out. Please retry.")
-        : await withTimeout(signInCustomer(signInData), 15000, "Sign in timed out. Please retry.")
+        ? await withTimeout(signInAdmin(signInData), SIGN_IN_TIMEOUT_MS, "Admin sign in timed out. Please retry.")
+        : await withTimeout(signInCustomer(signInData), SIGN_IN_TIMEOUT_MS, "Sign in timed out. Please retry.")
 
       console.log("[auth-ui] handleSignIn result", {
         hasError: Boolean(result.error),
@@ -70,7 +72,22 @@ export function AuthView({ mode, onBack, onAuthenticated }: AuthViewProps) {
       toast.success(mode === "admin" ? "Admin access granted." : "Signed in successfully.")
       onAuthenticated(result.profile)
     } catch (error) {
-      console.error("[auth-ui] handleSignIn unexpected error", error)
+      if (error instanceof Error) {
+        console.error("[auth-ui] handleSignIn unexpected error", {
+          name: error.name,
+          message: error.message,
+          stack: error.stack,
+          cause: error.cause,
+          mode,
+          email: signInData.email,
+        })
+      } else {
+        console.error("[auth-ui] handleSignIn unexpected non-Error", {
+          error,
+          mode,
+          email: signInData.email,
+        })
+      }
       toast.error("Sign in request failed. Please retry.")
     } finally {
       setIsSubmitting(false)

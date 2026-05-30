@@ -1,8 +1,8 @@
 # Continuation Context
 
-Last updated: 2026-05-30 19:52:34 UTC
+Last updated: 2026-05-30 22:35:00 UTC
 Branch: main
-Latest pushed commit: f562d89
+Latest pushed commit: ae50546
 
 ## Current State Snapshot
 - Supabase project used for testing: ndjztlhfhupvydozuski
@@ -13,6 +13,85 @@ Latest pushed commit: f562d89
 - Email confirmation flow is working end-to-end:
   - confirmation email received
   - confirmation link redirects to deployed GitHub URL
+
+## Platform Integration Map (What, Why, and How They Connect)
+### 1) GitHub (Code + CI/CD + Hosting)
+- What it is used for:
+   - Source control for the frontend codebase.
+   - GitHub Actions build/deploy pipeline.
+   - GitHub Pages hosting for the live website.
+- Why it is used:
+   - Single workflow for versioning + automated deployments.
+   - Free/static hosting suitable for current frontend architecture.
+- How it connects:
+   - `main` branch push triggers `.github/workflows/deploy-pages.yml`.
+   - Workflow injects `VITE_*` secrets, builds app, publishes `dist` to Pages.
+   - Custom domain is attached in GitHub Pages settings.
+
+### 2) Squarespace Domains (DNS Provider)
+- What it is used for:
+   - DNS management for `sukhdevialchemy.com`.
+- Why it is used:
+   - Domain registrar/provider where DNS records are controlled.
+- How it connects:
+   - Website DNS points to GitHub Pages:
+      - `A @ -> 185.199.108.153`
+      - `A @ -> 185.199.109.153`
+      - `A @ -> 185.199.110.153`
+      - `A @ -> 185.199.111.153`
+      - `CNAME www -> divang.github.io`
+   - Email-related DNS (Google Workspace + Resend) coexists in same zone.
+
+### 3) Supabase (Auth + Database + RLS)
+- What it is used for:
+   - User authentication (customer/admin).
+   - Persistent order storage.
+   - Catalog, reviews, testimonials storage.
+   - Row-level security (RLS) for ownership/admin access control.
+- Why it is used:
+   - Managed Postgres + Auth + policy controls in one platform.
+   - Replaces browser-only storage for shared production data.
+- How it connects:
+   - Frontend uses `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`.
+   - Auth email redirects use Supabase URL configuration + `VITE_AUTH_REDIRECT_URL`.
+   - SQL migrations in `supabase/sql/*` define schema, policies, and seed data.
+
+### 4) Resend (Transactional Email Provider)
+- What it is used for:
+   - Delivery of authentication emails (confirmation/recovery) via custom domain.
+- Why it is used:
+   - Reliable deliverability for transactional emails compared with test sender restrictions.
+- How it connects:
+   - Domain `sukhdevialchemy.com` verified in Resend.
+   - Resend DNS records added in Squarespace (DKIM/SPF/MX/DMARC as configured).
+   - Supabase Auth SMTP settings point to Resend SMTP:
+      - host `smtp.resend.com`
+      - username `resend`
+      - sender `no-reply@sukhdevialchemy.com`
+
+### 5) Google Workspace (Business Email)
+- What it is used for:
+   - Primary mailbox and business email routing for domain email accounts.
+- Why it is used:
+   - Standard mailbox/identity management for business operations.
+- How it connects:
+   - Google MX/TXT records remain configured in Squarespace DNS.
+   - These records should not be removed when configuring website or Resend DNS.
+
+### End-to-End Interaction Flow
+1. User opens `https://sukhdevialchemy.com`.
+2. DNS (Squarespace) resolves domain to GitHub Pages.
+3. GitHub Pages serves static frontend build from latest successful deploy.
+4. Frontend calls Supabase for auth, orders, catalog, reviews, testimonials.
+5. Supabase sends auth emails through Resend SMTP.
+6. Resend uses verified DNS records on same domain to deliver mail successfully.
+7. Google Workspace continues handling normal mailbox receiving/sending for business email accounts.
+
+### Operational Notes
+- GitHub Pages hosts the app; Squarespace only provides DNS for domain routing.
+- Supabase is the data/auth backend; GitHub Pages does not provide backend APIs.
+- Resend is for transactional auth mail delivery; Google Workspace is business mailbox.
+- All platforms are required together for current end-to-end production flow.
 
 ## What Happened In This Session
 1. SMTP and confirmation flow was validated from CLI against live Supabase project.
