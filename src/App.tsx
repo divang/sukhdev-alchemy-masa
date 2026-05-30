@@ -259,7 +259,7 @@ function App() {
               
               <h1 className="text-2xl md:text-3xl font-bold">Sukhdevi Alchemy Masala</h1>
               <Badge variant="secondary" className="hidden sm:inline-flex">Premium Masala</Badge>
-                  <Badge 
+            </div>
             
             <div className="flex items-center gap-2">
               <Button
