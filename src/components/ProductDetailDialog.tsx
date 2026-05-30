@@ -91,10 +91,10 @@ export function ProductDetailDialog({ product, open, onOpenChange, onAddToCart }
                   className="w-full" 
                   size="lg"
                   onClick={handleAddToCart}
-                  disabled={!product.inStock}
+                  disabled={true}
                 >
                   <ShoppingCart size={20} className="mr-2" />
-                  {product.inStock ? "Add to Cart" : "Out of Stock"}
+                  Coming Soon
                 </Button>
               </div>
             </div>

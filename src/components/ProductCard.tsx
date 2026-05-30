@@ -64,10 +64,10 @@ export function ProductCard({ product, onViewDetails, onAddToCart }: ProductCard
               size="sm"
               className="flex-1"
               onClick={() => onAddToCart(product)}
-              disabled={!product.inStock}
+              disabled={true}
             >
               <ShoppingCart size={16} className="mr-1" />
-              {product.inStock ? "Add" : "Out of Stock"}
+              Coming Soon
             </Button>
           </div>
         </CardFooter>
