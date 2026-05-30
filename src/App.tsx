@@ -163,7 +163,7 @@ function App() {
             
             <div className="border-2 border-dashed border-border p-6 rounded-lg">
               <p className="font-semibold mb-2">Pay using UPI:</p>
-              <p className="text-2xl font-mono font-bold text-primary mb-4">sukhdevalchemy@upi</p>
+              <p className="text-2xl font-mono font-bold text-primary mb-4">sukhdevialchemy@upi</p>
               <p className="text-sm text-muted-foreground">
                 Scan QR code or use UPI ID to complete payment
               </p>
@@ -235,7 +235,7 @@ function App() {
                 </SheetContent>
               </Sheet>
               
-              <h1 className="text-2xl md:text-3xl font-bold">Sukhdev Alchemy</h1>
+              <h1 className="text-2xl md:text-3xl font-bold">Sukhdevi Alchemy Masala</h1>
               <Badge variant="secondary" className="hidden sm:inline-flex">Premium Masala</Badge>
             </div>
             
@@ -316,7 +316,7 @@ function App() {
       
       <footer className="border-t bg-card mt-16">
         <div className="container mx-auto px-4 py-8 text-center text-sm text-muted-foreground">
-          <p>© 2024 Sukhdev Alchemy. Premium Masala & Organic Spices.</p>
+          <p>© 2024 Sukhdevi Alchemy Masala. Premium Masala & Organic Spices.</p>
         </div>
       </footer>
       
