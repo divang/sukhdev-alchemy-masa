@@ -1,52 +1,116 @@
 # Continuation Context
 
-Last updated: 2026-05-30 18:27:20 UTC
+Last updated: 2026-05-30 18:53:55 UTC
 Branch: main
-Latest commit: c1200bb
+Latest pushed commit: 5032066
 
-## What Was Completed
-- Validated Supabase email-confirmation flow end-to-end against project `ndjztlhfhupvydozuski`.
-- Added CLI validator script for email confirmation path.
-- Restored and sanitized env template with placeholder values only.
-- Committed and pushed changes to `main`.
+## Current State Snapshot
+- Supabase project used for testing: ndjztlhfhupvydozuski
+- Email confirmation logic is working at auth level (signup can return user with no session when confirmation is required).
+- Current local uncommitted change exists:
+  - src/main.tsx
+  - Purpose: mounted Sonner Toaster so toast errors/success become visible in UI.
 
-## Key Outcomes
-- Confirmation enforcement is active: signup returns `user` with no `session` before verification.
-- SMTP/confirmation path worked when tested with recipient `onboarding@resend.dev`.
-- Earlier failure (`Error sending confirmation email`) occurred for generated `@example.com` address, likely recipient/provider-policy related.
+## What Happened In This Session
+1. SMTP and confirmation flow was validated from CLI against live Supabase project.
+2. Initial error observed for generated test address:
+   - Error sending confirmation email
+3. Confirmation flow passed with onboarding@resend.dev:
+   - user created
+   - no session returned
+   - confirmation required behavior confirmed
+4. Added resend confirmation feature in app.
+5. Added deep debug logs in auth layer and UI layer.
+6. User reported Create Account looked non-responsive.
+7. Root cause identified:
+   - toast calls existed, but no Toaster was mounted, so feedback was invisible.
+8. Toaster mount fix applied locally in src/main.tsx (not pushed yet).
 
-## Files Added/Updated
-- `scripts/test-email-confirmation.mjs`
-- `package.json` (script: `test:email-confirmation`)
-- `.env.example` (sanitized placeholders + optional test email comment)
+## Commits Already Pushed
+1. c1200bb
+   - Added email confirmation test script.
+   - Restored sanitized .env.example.
+2. 4e98353
+   - Added resend confirmation flow and initial continuation file.
+3. 4836ce1
+   - Added detailed auth debug logs in auth service.
+4. 5032066
+   - Added visible auth UI logs and Supabase initialization logs.
 
-## How To Re-Run Validation
-1. Set env vars in shell (do not commit secrets):
-   - `SUPABASE_URL`
-   - `SUPABASE_ANON_KEY`
-   - optional: `TEST_SIGNUP_EMAIL`
+## Files Touched During Debugging
+- scripts/test-email-confirmation.mjs
+- package.json
+- .env.example
+- src/lib/auth.ts
+- src/components/AuthView.tsx
+- src/lib/supabase.ts
+- CONTINUATION_CONTEXT.md
+- src/main.tsx (local-only pending)
+
+## Local Pending Work (Important)
+- src/main.tsx has a needed fix to mount Toaster:
+  - import { Toaster } from sonner
+  - render <Toaster richColors position="top-center" /> with App
+- This should be committed and pushed before next manual auth test, otherwise UI may still appear silent.
+
+## How To Re-Run CLI Confirmation Test
+1. Export env vars in shell:
+   - SUPABASE_URL
+   - SUPABASE_ANON_KEY
+   - optional TEST_SIGNUP_EMAIL
 2. Run:
 
 ```bash
 npm run test:email-confirmation
 ```
 
-## Manual App Test Checklist
-1. Start app: `npm run dev`
-2. Sign up with a real inbox.
-3. Confirm email from received link.
-4. Verify redirect lands on app URL and login works after confirmation.
+## How To Validate In App
+1. Run npm run dev
+2. Open account create flow
+3. Submit with valid password + confirm password
+4. Check:
+   - UI toast feedback appears (requires Toaster fix committed)
+   - console logs with prefixes [auth-ui] and [auth]
+5. If email not received, use Resend Confirmation button and wait at least 60 seconds between resend attempts.
 
-## Next Recommended Steps
-- Add production sender domain in Resend (avoid long-term use of test sender).
-- Ensure Supabase Authentication URL Configuration includes exact production and local redirect URLs.
-- Optionally add this checklist to `README.md` for team visibility.
+## SQL Snippets For User Counts And Cleanup
+Count all users:
 
-## Paste-Into-New-Session Prompt
-Use this in a new Copilot Chat session:
+```sql
+select count(*) as total_users
+from auth.users;
+```
+
+Count confirmed vs unconfirmed:
+
+```sql
+select
+  count(*) filter (where email_confirmed_at is not null) as confirmed_users,
+  count(*) filter (where email_confirmed_at is null) as unconfirmed_users
+from auth.users;
+```
+
+Preview e2e test users:
+
+```sql
+select id, email, created_at
+from auth.users
+where email like 'smtp-e2e-%@example.com'
+order by created_at desc;
+```
+
+Delete only e2e test users:
+
+```sql
+delete from auth.users
+where email like 'smtp-e2e-%@example.com';
+```
+
+## Paste Into New Session
 
 ```text
-Continue from CONTINUATION_CONTEXT.md in this repo.
-Read it first, then confirm current git status and proceed with pending next steps.
-Do not modify unrelated files.
+Continue from CONTINUATION_CONTEXT.md.
+First run: git status --short and git rev-parse --short HEAD.
+Then complete pending local change in src/main.tsx (Toaster mount), commit, push, and re-test signup UX.
+Do not touch unrelated files.
 ```
