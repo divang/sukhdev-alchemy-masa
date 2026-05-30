@@ -8,6 +8,7 @@
         "kill": "fuser -k 5000/tcp",
         "build": "tsc -b --noCheck && vite build",
         "lint": "eslint .",
+        "test:email-confirmation": "node scripts/test-email-confirmation.mjs",
         "optimize": "vite optimize",
         "preview": "vite preview"
     },
