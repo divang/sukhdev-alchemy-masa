@@ -26,6 +26,19 @@ type SignInInput = {
   password: string
 }
 
+function getEmailRedirectTo() {
+  const configured = import.meta.env.VITE_AUTH_REDIRECT_URL as string | undefined
+  if (configured && configured.trim()) {
+    return configured.trim()
+  }
+
+  if (typeof window !== "undefined" && window.location?.origin) {
+    return `${window.location.origin}/`
+  }
+
+  return undefined
+}
+
 function buildProfileFromMetadata(user: User): UserProfile {
   return {
     id: user.id,
@@ -141,6 +154,7 @@ export async function signUpCustomer(input: SignUpInput): Promise<AuthResult> {
     email: input.email,
     password: input.password,
     options: {
+      emailRedirectTo: getEmailRedirectTo(),
       data: {
         full_name: input.fullName,
         phone: input.phone,

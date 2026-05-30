@@ -156,11 +156,22 @@ In Supabase dashboard:
 
 If `Confirm email` is enabled in Supabase Auth, new users must verify their email before the first sign-in. The frontend now handles this by showing a confirmation message instead of moving straight into checkout.
 
+Important redirect setup:
+
+1. Go to Authentication -> URL Configuration in Supabase.
+2. Set Site URL to your deployed domain (not localhost).
+3. Add both your deployed URL and local dev URLs in Additional redirect URLs.
+
+Optional frontend override:
+
+- Set `VITE_AUTH_REDIRECT_URL` to force the email confirmation redirect target from the app.
+
 No extra frontend env vars are needed beyond:
 
 ```bash
 VITE_SUPABASE_URL=https://YOUR_PROJECT_REF.supabase.co
 VITE_SUPABASE_ANON_KEY=YOUR_SUPABASE_ANON_KEY
+VITE_AUTH_REDIRECT_URL=https://YOUR_PUBLIC_SITE_URL/
 ```
 
 ### 3. Create the first admin
