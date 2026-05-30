@@ -202,6 +202,19 @@ Requirement discussed:
 - supabase/sql/003_catalog_and_reviews.sql
 - supabase/sql/004_catalog_seed_data.sql
 
+### Phase 1 Implementation Status (Completed)
+- Added DB schema migration: supabase/sql/003_catalog_and_reviews.sql
+- Added initial seed data migration: supabase/sql/004_catalog_seed_data.sql
+- Added frontend DB catalog loader: src/lib/catalog.ts
+- Updated startup hydration to prefer Supabase catalog with fallback to static seed: src/hooks/use-initial-data.ts
+- Extended product type to include SKU support: src/lib/types.ts
+
+### Activation Steps
+1. Run SQL migration 003 in Supabase SQL Editor.
+2. Run SQL migration 004 in Supabase SQL Editor.
+3. Refresh/restart app.
+4. Verify home page products load correctly and prices/images match expected values.
+
 ### Admin/User Behavior Alignment
 - Admin login remains role-based via public.profiles.role = 'admin'.
 - Customers see only own orders (already implemented).

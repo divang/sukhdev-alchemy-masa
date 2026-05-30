@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { useKV } from '@github/spark/hooks'
 import type { Category, Product, Review, Testimonial } from '@/lib/types'
+import { loadCatalogFromSupabase } from '@/lib/catalog'
 
 export function useInitialData() {
   const [categories, setCategories] = useKV<Category[]>('categories', [])
@@ -11,7 +12,19 @@ export function useInitialData() {
 
   useEffect(() => {
     const initializeData = async () => {
-      const currentVersion = 13
+      const currentVersion = 14
+
+      // Prefer DB catalog when available; fallback to static seed for resilience.
+      const remoteCatalog = await loadCatalogFromSupabase()
+      if (remoteCatalog.source === 'supabase' && remoteCatalog.products.length > 0) {
+        setCategories(remoteCatalog.categories)
+        setProducts(remoteCatalog.products)
+        if (remoteCatalog.reviews.length > 0) {
+          setReviews(remoteCatalog.reviews)
+        }
+        setDataVersion(currentVersion)
+        return
+      }
       
       if (!categories || categories.length === 0 || (dataVersion ?? 0) < currentVersion) {
         setCategories([
