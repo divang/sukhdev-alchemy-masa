@@ -10,7 +10,7 @@ export function useInitialData() {
 
   useEffect(() => {
     const initializeData = async () => {
-      const currentVersion = 5
+      const currentVersion = 6
       
       if (!categories || categories.length === 0 || (dataVersion ?? 0) < currentVersion) {
         setCategories([
