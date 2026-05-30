@@ -26,6 +26,21 @@ type SignInInput = {
   password: string
 }
 
+async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, timeoutMessage: string): Promise<T> {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => reject(new Error(timeoutMessage)), timeoutMs)
+  })
+
+  try {
+    return await Promise.race([promise, timeoutPromise])
+  } finally {
+    if (timeoutId) {
+      clearTimeout(timeoutId)
+    }
+  }
+}
+
 function maskEmail(email: string | undefined) {
   if (!email) {
     return "unknown"
@@ -187,8 +202,19 @@ export async function getCurrentAuthState(): Promise<AuthState> {
     return { user: null, profile: null }
   }
 
-  const { data } = await supabase.auth.getSession()
-  return buildAuthState(data.session)
+  try {
+    const { data } = await withTimeout(
+      supabase.auth.getSession(),
+      10000,
+      "getSession timed out"
+    )
+    return buildAuthState(data.session)
+  } catch (error) {
+    authDebug("getCurrentAuthState failed", {
+      error: error instanceof Error ? error.message : String(error),
+    })
+    return { user: null, profile: null }
+  }
 }
 
 export function subscribeToAuthStateChanges(callback: (state: AuthState) => void) {
@@ -197,7 +223,14 @@ export function subscribeToAuthStateChanges(callback: (state: AuthState) => void
   }
 
   const { data } = supabase.auth.onAuthStateChange(async (_event, session) => {
-    callback(await buildAuthState(session))
+    try {
+      callback(await buildAuthState(session))
+    } catch (error) {
+      authDebug("onAuthStateChange buildAuthState failed", {
+        error: error instanceof Error ? error.message : String(error),
+      })
+      callback({ user: null, profile: null })
+    }
   })
 
   return data.subscription
@@ -301,31 +334,56 @@ export async function signInCustomer(input: SignInInput): Promise<AuthResult> {
     email: maskEmail(input.email),
   })
 
-  const { data, error } = await supabase.auth.signInWithPassword(input)
-  if (error) {
-    authDebug("signInCustomer failed", {
+  try {
+    const signInStart = Date.now()
+    const { data, error } = await supabase.auth.signInWithPassword(input)
+    authDebug("signInCustomer auth request completed", {
       email: maskEmail(input.email),
-      error: error.message,
+      durationMs: Date.now() - signInStart,
+      hasError: Boolean(error),
+      hasUser: Boolean(data?.user),
     })
-    return { user: null, profile: null, error: error.message }
-  }
 
-  const user = data.user
-  if (!user) {
-    authDebug("signInCustomer returned no user", {
+    if (error) {
+      authDebug("signInCustomer failed", {
+        email: maskEmail(input.email),
+        error: error.message,
+      })
+      return { user: null, profile: null, error: error.message }
+    }
+
+    const user = data.user
+    if (!user) {
+      authDebug("signInCustomer returned no user", {
+        email: maskEmail(input.email),
+      })
+      return { user: null, profile: null, error: "Sign in completed without an active user." }
+    }
+
+    const profileStart = Date.now()
+    const profile = await fetchProfile(user)
+    authDebug("signInCustomer profile load completed", {
+      userId: user.id,
+      durationMs: Date.now() - profileStart,
+      hasProfile: Boolean(profile),
+    })
+
+    authDebug("signInCustomer succeeded", {
+      userId: user.id,
+      email: maskEmail(user.email ?? input.email),
+    })
+
+    return {
+      user,
+      profile,
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Sign in failed unexpectedly."
+    authDebug("signInCustomer unexpected failure", {
       email: maskEmail(input.email),
+      error: message,
     })
-    return { user: null, profile: null, error: "Sign in completed without an active user." }
-  }
-
-  authDebug("signInCustomer succeeded", {
-    userId: user.id,
-    email: maskEmail(user.email ?? input.email),
-  })
-
-  return {
-    user,
-    profile: await fetchProfile(user),
+    return { user: null, profile: null, error: message }
   }
 }
 

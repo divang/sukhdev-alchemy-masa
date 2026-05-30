@@ -80,13 +80,24 @@ function App() {
   useEffect(() => {
     let isActive = true
 
+    console.log("[app-auth] getCurrentAuthState requested")
     getCurrentAuthState().then((state) => {
       if (!isActive) return
+      console.log("[app-auth] getCurrentAuthState resolved", {
+        hasUser: Boolean(state.user),
+        hasProfile: Boolean(state.profile),
+        role: state.profile?.role ?? null,
+      })
       setProfile(state.profile)
     })
 
     const subscription = subscribeToAuthStateChanges((state) => {
       if (!isActive) return
+      console.log("[app-auth] onAuthStateChange", {
+        hasUser: Boolean(state.user),
+        hasProfile: Boolean(state.profile),
+        role: state.profile?.role ?? null,
+      })
       setProfile(state.profile)
     })
 
