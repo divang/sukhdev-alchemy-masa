@@ -9,6 +9,7 @@
         "build": "tsc -b --noCheck && vite build",
         "lint": "eslint .",
         "test:email-confirmation": "node scripts/test-email-confirmation.mjs",
+        "test:signin-latency": "node scripts/test-signin-latency.mjs",
         "optimize": "vite optimize",
         "preview": "vite preview"
     },

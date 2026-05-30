@@ -16,8 +16,6 @@ type AuthViewProps = {
   onAuthenticated: (profile: UserProfile) => void
 }
 
-const SIGN_IN_TIMEOUT_MS = 30000
-
 async function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
   let timeoutId: ReturnType<typeof setTimeout> | undefined
   const timeoutPromise = new Promise<never>((_, reject) => {
@@ -54,8 +52,8 @@ export function AuthView({ mode, onBack, onAuthenticated }: AuthViewProps) {
 
     try {
       const result = mode === "admin"
-        ? await withTimeout(signInAdmin(signInData), SIGN_IN_TIMEOUT_MS, "Admin sign in timed out. Please retry.")
-        : await withTimeout(signInCustomer(signInData), SIGN_IN_TIMEOUT_MS, "Sign in timed out. Please retry.")
+        ? await signInAdmin(signInData)
+        : await signInCustomer(signInData)
 
       console.log("[auth-ui] handleSignIn result", {
         hasError: Boolean(result.error),
