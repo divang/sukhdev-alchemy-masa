@@ -37,7 +37,7 @@ export function useInitialData() {
           name: 'Garam Masala Premium Blend',
           category: 'premium-masala',
           price: 350,
-          image: 'https://images.unsplash.com/photo-1596040033229-a0b00b1a8c1f?w=400&h=400&fit=crop',
+          image: 'https://images.unsplash.com/photo-1626200419199-391ae4be7a41?w=800&h=800&fit=crop&auto=format&q=80',
           rating: 4.8,
           reviewCount: 127,
           description: 'Our signature Garam Masala Premium Blend combines the finest aromatic spices to create a perfect balance of warmth and flavor. Handcrafted using traditional methods, this blend adds depth and complexity to any dish.',
