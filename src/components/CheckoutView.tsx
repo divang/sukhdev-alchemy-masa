@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -6,17 +6,18 @@ import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
 import { ArrowLeft } from "@phosphor-icons/react"
-import type { CartItem, Product, Order } from "@/lib/types"
+import type { CartItem, Product, Order, UserProfile } from "@/lib/types"
 import { toast } from "sonner"
 
 type CheckoutViewProps = {
   cartItems: CartItem[]
   products: Product[]
+  accountProfile?: UserProfile | null
   onBack: () => void
   onOrderComplete: (order: Order) => void | Promise<void>
 }
 
-export function CheckoutView({ cartItems, products, onBack, onOrderComplete }: CheckoutViewProps) {
+export function CheckoutView({ cartItems, products, accountProfile, onBack, onOrderComplete }: CheckoutViewProps) {
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -25,6 +26,19 @@ export function CheckoutView({ cartItems, products, onBack, onOrderComplete }: C
     city: "",
     pincode: ""
   })
+
+  useEffect(() => {
+    if (!accountProfile) {
+      return
+    }
+
+    setFormData((current) => ({
+      ...current,
+      name: current.name || accountProfile.fullName,
+      email: current.email || accountProfile.email,
+      phone: current.phone || accountProfile.phone,
+    }))
+  }, [accountProfile])
   
   const getProduct = (productId: string) => products.find(p => p.id === productId)
   
@@ -90,6 +104,15 @@ export function CheckoutView({ cartItems, products, onBack, onOrderComplete }: C
                 <CardTitle>Delivery Information</CardTitle>
               </CardHeader>
               <CardContent>
+                {accountProfile && (
+                  <div className="mb-6 rounded-lg border bg-muted/40 p-4 text-sm">
+                    <p className="font-medium">Signed in as {accountProfile.fullName}</p>
+                    <p className="text-muted-foreground">
+                      This account will be used for order updates, tracking access, and review follow-ups.
+                    </p>
+                  </div>
+                )}
+
                 <form onSubmit={handleSubmit} className="space-y-4">
                   <div className="grid md:grid-cols-2 gap-4">
                     <div>

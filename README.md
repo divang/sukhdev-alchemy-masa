@@ -126,6 +126,64 @@ Validation note:
 - Writes should use minimal return semantics (for example `Prefer: return=minimal`).
 - If a client requests representation data on insert/update, Supabase may return permission errors because row read access is intentionally blocked.
 
+## 🔐 Customer Accounts And Admin Login
+
+The app now supports two authenticated experiences on the frontend:
+
+- Customer account: create an account before checkout, place orders, and view only your own orders.
+- Admin account: sign in separately and view all orders in the admin dashboard.
+
+### 1. Run the auth ownership SQL
+
+After running [supabase/sql/001_orders_secure_launch.sql](supabase/sql/001_orders_secure_launch.sql), also run:
+
+1. [supabase/sql/002_auth_accounts_and_order_ownership.sql](supabase/sql/002_auth_accounts_and_order_ownership.sql)
+
+This adds:
+
+- `public.profiles`
+- `orders.user_id`
+- customer-only order reads via RLS
+- admin-only full order visibility via role checks
+
+### 2. Enable Supabase Auth
+
+In Supabase dashboard:
+
+1. Go to Authentication -> Providers.
+2. Keep Email enabled.
+3. Use email + password sign-in for both customers and admins.
+
+If `Confirm email` is enabled in Supabase Auth, new users must verify their email before the first sign-in. The frontend now handles this by showing a confirmation message instead of moving straight into checkout.
+
+No extra frontend env vars are needed beyond:
+
+```bash
+VITE_SUPABASE_URL=https://YOUR_PROJECT_REF.supabase.co
+VITE_SUPABASE_ANON_KEY=YOUR_SUPABASE_ANON_KEY
+```
+
+### 3. Create the first admin
+
+1. Open the website.
+2. Use the account flow to sign up once with the email you want to use for admin.
+3. If email confirmation is enabled, confirm that email first, then sign in once so the `public.profiles` row is created.
+4. In Supabase SQL Editor, run:
+
+```sql
+update public.profiles
+set role = 'admin'
+where email = 'you@example.com';
+```
+
+5. Sign out and sign in again through the Admin login flow.
+
+### 4. Important behavior note
+
+- The dynamic UPI QR contains the order reference, not personal account data.
+- Customer identity and review consent are stored in authenticated account/profile records, not in the payment QR.
+- Older guest orders with no `user_id` will not automatically appear in a signed-in customer's account.
+
 ## 📄 Google Sheets Order Persistence (No VM / No Lambda)
 
 If you want simpler operations than database + RLS, you can store orders in Google Sheets using a Google Apps Script Web App API.

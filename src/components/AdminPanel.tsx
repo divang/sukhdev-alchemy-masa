@@ -8,9 +8,13 @@ import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Upload, X, Image as ImageIcon, Check } from "@phosphor-icons/react"
 import { toast } from "sonner"
-import type { Product } from "@/lib/types"
+import type { Order, Product } from "@/lib/types"
 
-export function AdminPanel() {
+type AdminPanelProps = {
+  orders?: Order[]
+}
+
+export function AdminPanel({ orders = [] }: AdminPanelProps) {
   const [products] = useKV<Product[]>("products", [])
   const [productImages, setProductImages] = useKV<Record<string, string>>("product-images", {})
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
@@ -70,6 +74,43 @@ export function AdminPanel() {
 
   return (
     <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>Recent Orders</CardTitle>
+          <CardDescription>
+            Admin accounts can review every customer order from one place.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {orders.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No orders available yet.</p>
+          ) : (
+            <div className="space-y-3">
+              {orders.slice(0, 10).map((order) => (
+                <div key={order.id} className="rounded-lg border p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-4">
+                    <div>
+                      <p className="font-semibold">#{order.id}</p>
+                      <p className="text-sm text-muted-foreground">{order.customer.name} • {order.customer.email}</p>
+                      <p className="text-sm text-muted-foreground">{order.customer.phone}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-semibold text-primary">₹{order.totalAmount.toFixed(2)}</p>
+                      <div className="mt-2 flex flex-wrap justify-end gap-2">
+                        <Badge variant="secondary" className="capitalize">{order.status}</Badge>
+                        <Badge variant={order.paymentStatus === "paid" ? "default" : "outline"} className="capitalize">
+                          {order.paymentStatus}
+                        </Badge>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       <div>
         <h2 className="text-3xl font-bold mb-2">Product Image Management</h2>
         <p className="text-muted-foreground">

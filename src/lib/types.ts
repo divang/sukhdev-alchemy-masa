@@ -38,6 +38,7 @@ export type CartItem = {
 
 export type Order = {
   id: string
+  userId?: string | null
   items: Array<{
     productId: string
     productName: string
@@ -58,6 +59,18 @@ export type Order = {
   paymentStatus: 'pending' | 'paid'
   createdAt: string
   updatedAt: string
+}
+
+export type UserRole = "customer" | "admin"
+
+export type UserProfile = {
+  id: string
+  email: string
+  fullName: string
+  phone: string
+  role: UserRole
+  reviewOptIn: boolean
+  marketingOptIn: boolean
 }
 
 export type Testimonial = {
