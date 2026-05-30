@@ -107,8 +107,15 @@ function App() {
     setCurrentView("payment")
 
     const result = await persistOrderToSupabase(order)
-    if (!result.persisted && result.reason === "error") {
-      toast.warning("Cloud sync failed. Order is safely stored locally.")
+    if (!result.persisted) {
+      if (result.reason === "error") {
+        toast.error(`Database Error: ${result.error || "Failed to save order to cloud."}\n[Order ID: ${order.id}]`)
+        console.error("Order persistence failed:", result)
+      } else {
+        toast.info("Cloud storage not configured. Order saved locally.")
+      }
+    } else {
+      toast.success(`Order saved to ${result.provider}!`)
     }
   }
   
@@ -129,8 +136,15 @@ function App() {
     setCurrentView("tracking")
 
     const result = await updateSupabaseOrderPayment(updatedOrder.id, "paid", "processing")
-    if (!result.persisted && result.reason === "error") {
-      toast.warning("Payment status synced locally. Cloud update failed.")
+    if (!result.persisted) {
+      if (result.reason === "error") {
+        toast.error(`Payment status update failed: ${result.error || "Unknown error"}`)
+        console.error("Payment update failed:", result)
+      } else {
+        toast.info("Payment status updated locally (cloud update not enabled).")
+      }
+    } else {
+      toast.success("Payment status updated!")
     }
   }
   
@@ -217,9 +231,10 @@ function App() {
               </p>
             </div>
             
-            <div className="text-sm text-muted-foreground">
-              <p>After completing the payment, please click the button below.</p>
-              <p>Your order will be processed once payment is confirmed.</p>
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm">
+              <p className="font-semibold text-blue-900 mb-2">✓ Order Created</p>
+              <p className="text-blue-800">Your order (ID: {currentOrder.id}) was created successfully during checkout and is stored in our system.</p>
+              <p className="text-blue-800 mt-2">Complete your UPI payment above, then confirm to update the order status.</p>
             </div>
             
             <div className="flex gap-4">
