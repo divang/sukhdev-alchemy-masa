@@ -1,6 +1,6 @@
 import { Card, CardContent } from "@/components/ui/card"
 import { StarRating } from "./StarRating"
-import { useKV } from "@github/spark/hooks"
+import { useKV } from "@/hooks/use-kv"
 import type { Testimonial } from "@/lib/types"
 
 export function TestimonialsSection() {

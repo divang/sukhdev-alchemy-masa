@@ -5,7 +5,7 @@ import { X, Minus, Plus, ShoppingCart } from "@phosphor-icons/react"
 import type { CartItem, Product } from "@/lib/types"
 import { GRAM_OPTIONS } from "@/lib/types"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { useKV } from "@github/spark/hooks"
+import { useKV } from "@/hooks/use-kv"
 import { getProductImage } from "@/lib/product-images"
 
 type CartDrawerProps = {

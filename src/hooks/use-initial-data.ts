@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { useKV } from '@github/spark/hooks'
+import { useKV } from '@/hooks/use-kv'
 import type { Category, Product, Review, Testimonial } from '@/lib/types'
 import { loadCatalogFromSupabase } from '@/lib/catalog'
 

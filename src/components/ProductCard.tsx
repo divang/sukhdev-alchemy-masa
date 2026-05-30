@@ -6,7 +6,7 @@ import { StarRating } from "./StarRating"
 import type { Product } from "@/lib/types"
 import { motion } from "framer-motion"
 import { getProductImage } from "@/lib/product-images"
-import { useKV } from "@github/spark/hooks"
+import { useKV } from "@/hooks/use-kv"
 
 type ProductCardProps = {
   product: Product

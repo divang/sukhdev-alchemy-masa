@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { useKV } from "@github/spark/hooks"
+import { useKV } from "@/hooks/use-kv"
 import { ShoppingCart, List, Package, CreditCard, Gear, SignOut, UserCircle } from "@phosphor-icons/react"
 import { QRCodeSVG as QRCode } from "qrcode.react"
 import { Button } from "@/components/ui/button"
