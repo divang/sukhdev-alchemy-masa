@@ -1,15 +1,18 @@
 # Continuation Context
 
-Last updated: 2026-05-30 18:53:55 UTC
+Last updated: 2026-05-30 19:31:21 UTC
 Branch: main
-Latest pushed commit: 5032066
+Latest pushed commit: a0cc5d1
 
 ## Current State Snapshot
 - Supabase project used for testing: ndjztlhfhupvydozuski
-- Email confirmation logic is working at auth level (signup can return user with no session when confirmation is required).
-- Current local uncommitted change exists:
-  - src/main.tsx
-  - Purpose: mounted Sonner Toaster so toast errors/success become visible in UI.
+- Supabase auth config is now loading in runtime:
+  - hasUrl: true
+  - hasAnonKey: true
+  - isSupabaseConfigured: true
+- Email confirmation flow is working end-to-end:
+  - confirmation email received
+  - confirmation link redirects to deployed GitHub URL
 
 ## What Happened In This Session
 1. SMTP and confirmation flow was validated from CLI against live Supabase project.
@@ -24,7 +27,10 @@ Latest pushed commit: 5032066
 6. User reported Create Account looked non-responsive.
 7. Root cause identified:
    - toast calls existed, but no Toaster was mounted, so feedback was invisible.
-8. Toaster mount fix applied locally in src/main.tsx (not pushed yet).
+8. Toaster mount fix applied and pushed.
+9. Deployment issue diagnosed:
+   - hosted build lacked VITE Supabase envs, causing auth not configured.
+10. Deployment workflow updated to inject envs and fail fast when secrets are missing.
 
 ## Commits Already Pushed
 1. c1200bb
@@ -36,64 +42,208 @@ Latest pushed commit: 5032066
    - Added detailed auth debug logs in auth service.
 4. 5032066
    - Added visible auth UI logs and Supabase initialization logs.
+5. cbe75fb
+   - Mounted Sonner Toaster and refreshed continuation context.
+6. bc8057b
+   - Added Pages workflow env injection and documented deployment requirements.
 
-## Files Touched During Debugging
-- scripts/test-email-confirmation.mjs
-- package.json
-- .env.example
-- src/lib/auth.ts
-- src/components/AuthView.tsx
-- src/lib/supabase.ts
-- CONTINUATION_CONTEXT.md
-- src/main.tsx (local-only pending)
-
-## Local Pending Work (Important)
-- src/main.tsx has a needed fix to mount Toaster:
-  - import { Toaster } from sonner
-  - render <Toaster richColors position="top-center" /> with App
-- This should be committed and pushed before next manual auth test, otherwise UI may still appear silent.
-
-## Deployment Fix Added (GitHub Pages)
-- Root cause of `Supabase auth is not configured` on deployed site:
-   - GitHub Pages build did not receive Vite env values.
-- Workflow updated in .github/workflows/deploy-pages.yml to:
-   - fail fast when required secrets are missing
-   - inject VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY during `npm run build`
-   - inject optional VITE_AUTH_REDIRECT_URL during build
-- Required GitHub repo secrets now:
-   - VITE_SUPABASE_URL
-   - VITE_SUPABASE_ANON_KEY
-   - optional: VITE_AUTH_REDIRECT_URL
-
-## How To Re-Run CLI Confirmation Test
-1. Export env vars in shell:
-   - SUPABASE_URL
-   - SUPABASE_ANON_KEY
-   - optional TEST_SIGNUP_EMAIL
-2. Run:
+## Environment Setup (Single Source)
+### Local Development (.env)
+Create local .env in repo root:
 
 ```bash
-npm run test:email-confirmation
+VITE_SUPABASE_URL=https://ndjztlhfhupvydozuski.supabase.co
+VITE_SUPABASE_ANON_KEY=sb_publishable_...
+VITE_AUTH_REDIRECT_URL=http://localhost:5000/
 ```
 
-## How To Validate In App
-1. Run npm run dev
-2. Open account create flow
-3. Submit with valid password + confirm password
-4. Check:
-   - UI toast feedback appears (requires Toaster fix committed)
-   - console logs with prefixes [auth-ui] and [auth]
-5. If email not received, use Resend Confirmation button and wait at least 60 seconds between resend attempts.
+Notes:
+- Do not commit .env.
+- Restart npm run dev after changing .env.
+- VITE_AUTH_REDIRECT_URL is recommended for predictable confirm-email redirects.
 
-## SQL Snippets For User Counts And Cleanup
-Count all users:
+### Spark Deploy Environment Variables
+Set in Spark project settings:
+
+```bash
+VITE_SUPABASE_URL=https://ndjztlhfhupvydozuski.supabase.co
+VITE_SUPABASE_ANON_KEY=sb_publishable_...
+VITE_AUTH_REDIRECT_URL=https://YOUR_SPARK_DOMAIN/
+```
+
+Then republish.
+
+### GitHub Pages / Actions Secrets
+Repository secrets required:
+- VITE_SUPABASE_URL
+- VITE_SUPABASE_ANON_KEY
+- VITE_AUTH_REDIRECT_URL (optional but recommended)
+
+### Supabase URL Configuration
+In Supabase Authentication -> URL Configuration:
+- Site URL: deployed app URL
+- Additional redirect URLs: deployed app URL + local URL
+
+Examples:
+- https://YOUR_SPARK_DOMAIN/
+- http://localhost:5000/
+
+## Auth Roles and Order Access (Single Source)
+### Feature Summary
+- Customer login: can see only their own orders.
+- Admin login: can see all orders.
+
+### Current Deployment Support Conditions
+1. VITE Supabase envs configured in the deployed build.
+2. SQL migrations applied:
+   - supabase/sql/001_orders_secure_launch.sql
+   - supabase/sql/002_auth_accounts_and_order_ownership.sql
+3. Role rows exist in public.profiles.
+
+### How User vs Admin Is Differentiated In DB
+- Role is in public.profiles.role with values customer or admin.
+- public.profiles.id references auth.users.id.
+- public.orders.user_id references auth.users.id.
+
+Policy behavior from migration:
+- Customers can select only own orders.
+- Admins can select all orders.
+- Admins can update orders.
+
+### Admin Payment/Status Update Discussion
+Requirement: admin should update order status/payment (for example payment received).
+
+Current behavior:
+- Frontend has update helpers in src/lib/order-persistence.ts.
+- Runtime flag VITE_ALLOW_CLIENT_ORDER_UPDATES controls client updates.
+- If false: client updates intentionally blocked; use trusted backend/service role.
+- If true: client attempts updates, still protected by RLS (admin-only update).
+
+Production recommendation:
+- Keep VITE_ALLOW_CLIENT_ORDER_UPDATES=false.
+- Perform status/payment updates through backend/service-role endpoint.
+
+## Catalog Migration Plan (Static Data -> DB)
+Requirement discussed:
+- Move homepage product catalog and related static content to Supabase DB.
+- Include product display data, price, SKU, image path, rating/review data.
+- Allow logged-in users to submit product reviews.
+
+### Scope To Move From KV To DB
+- categories
+- products
+- product reviews
+- testimonials (optional in phase 2)
+- image path references (store relative path or public URL)
+
+### Proposed Tables
+1. public.categories
+   - id text primary key
+   - name text not null
+   - slug text unique not null
+   - enabled boolean not null default true
+   - sort_order int not null default 0
+   - created_at timestamptz default now()
+
+2. public.products
+   - id text primary key
+   - category_id text references public.categories(id)
+   - sku text unique not null
+   - name text not null
+   - description text not null
+   - price_per_100g numeric(10,2) not null
+   - image_path text not null
+   - youtube_url text null
+   - in_stock boolean not null default true
+   - tags text[] not null default '{}'
+   - ingredients text[] not null default '{}'
+   - is_active boolean not null default true
+   - created_at timestamptz default now()
+   - updated_at timestamptz default now()
+
+3. public.product_reviews
+   - id uuid primary key default gen_random_uuid()
+   - product_id text not null references public.products(id) on delete cascade
+   - user_id uuid not null references auth.users(id) on delete cascade
+   - rating int not null check (rating between 1 and 5)
+   - comment text not null
+   - verified_purchase boolean not null default false
+   - created_at timestamptz default now()
+   - updated_at timestamptz default now()
+   - unique(product_id, user_id)
+
+4. public.product_rating_summary (view)
+   - product_id
+   - avg_rating
+   - review_count
+
+### RLS Design
+- categories/products: public read (anon + authenticated), admin write.
+- product_reviews:
+  - everyone can read approved reviews
+  - authenticated users can insert/update/delete only their own reviews
+  - optional: restrict insert to verified purchasers (check orders.user_id + items JSON contains product_id)
+- admin users can moderate/remove reviews.
+
+### Frontend Refactor Plan
+1. Add new data layer file (example: src/lib/catalog.ts) for DB fetches.
+2. Replace useInitialData KV catalog bootstrap with Supabase reads.
+3. Keep KV only as fallback/cache if DB is unavailable.
+4. Replace Product.rating and Product.reviewCount with values from rating summary view.
+5. Wire review submission UI for authenticated users only.
+
+### Migration Strategy (Safe Rollout)
+1. Add SQL migration file for new catalog/review tables.
+2. Seed DB with current static data from useInitialData.
+3. Release frontend reading from DB behind a feature flag.
+4. Validate production data, then retire static KV bootstrap for products/reviews.
+
+### Suggested New SQL Migration Files
+- supabase/sql/003_catalog_and_reviews.sql
+- supabase/sql/004_catalog_seed_data.sql
+
+### Admin/User Behavior Alignment
+- Admin login remains role-based via public.profiles.role = 'admin'.
+- Customers see only own orders (already implemented).
+- Admin sees all orders and can update order status/payment based on backend/RLS mode (already implemented).
+
+### Promote Admin User
+After signup and profile row exists:
+
+```sql
+update public.profiles
+set role = 'admin'
+where email = 'you@example.com';
+```
+
+Sign out and sign in again afterward.
+
+## Verification and SQL Snippets
+### Quick App Verification
+1. Confirm console log:
+
+```text
+[auth] supabase module initialized { hasUrl: true, hasAnonKey: true, isSupabaseConfigured: true }
+```
+
+2. Customer flow:
+   - Sign in as customer and open tracking.
+   - Only own orders should be visible.
+3. Admin flow:
+   - Sign in as admin and open admin/tracking.
+   - All orders should be visible.
+4. Updates:
+   - Admin status/payment update should succeed (based on env mode + RLS).
+   - Customer update should be blocked.
+
+### Count users
 
 ```sql
 select count(*) as total_users
 from auth.users;
 ```
 
-Count confirmed vs unconfirmed:
+### Confirmed vs unconfirmed
 
 ```sql
 select
@@ -102,16 +252,51 @@ select
 from auth.users;
 ```
 
-Preview e2e test users:
+### Users + confirmation info
 
 ```sql
-select id, email, created_at
+select id, email, email_confirmed_at, last_sign_in_at
 from auth.users
-where email like 'smtp-e2e-%@example.com'
-order by created_at desc;
+order by created_at desc
+limit 50;
 ```
 
-Delete only e2e test users:
+### Profiles and roles
+
+```sql
+select id, email, role, created_at
+from public.profiles
+order by created_at desc
+limit 50;
+```
+
+### Find admins
+
+```sql
+select id, email, role
+from public.profiles
+where role = 'admin';
+```
+
+### Orders ownership mapping
+
+```sql
+select id, user_id, customer_email, status, payment_status, created_at
+from public.orders
+order by created_at desc
+limit 50;
+```
+
+### Re-run CLI confirmation test
+
+```bash
+SUPABASE_URL=https://ndjztlhfhupvydozuski.supabase.co \
+SUPABASE_ANON_KEY=sb_publishable_... \
+TEST_SIGNUP_EMAIL=you@example.com \
+npm run test:email-confirmation
+```
+
+### Cleanup e2e test users
 
 ```sql
 delete from auth.users
@@ -121,8 +306,8 @@ where email like 'smtp-e2e-%@example.com';
 ## Paste Into New Session
 
 ```text
-Continue from CONTINUATION_CONTEXT.md.
-First run: git status --short and git rev-parse --short HEAD.
-Then complete pending local change in src/main.tsx (Toaster mount), commit, push, and re-test signup UX.
-Do not touch unrelated files.
+Read CONTINUATION_CONTEXT.md first.
+Then verify deployment env values for Supabase, validate signup + email confirmation flow,
+and confirm customer-vs-admin order access with SQL checks.
+If env values are missing, ask me for each key one by one.
 ```

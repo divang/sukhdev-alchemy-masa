@@ -505,15 +505,19 @@ function App() {
             </div>
 
             <div className="flex items-center gap-2">
-              <Button variant="ghost" size="sm" onClick={handleOpenAdmin} className="hidden md:flex">
-                <Gear size={18} className="mr-2" />
-                Admin
-              </Button>
+              {profile?.role === "admin" && (
+                <Button variant="ghost" size="sm" onClick={handleOpenAdmin} className="hidden md:flex">
+                  <Gear size={18} className="mr-2" />
+                  Admin
+                </Button>
+              )}
 
-              <Button variant="outline" size="sm" onClick={handleOpenTracking} className="hidden sm:flex">
-                <Package size={18} className="mr-2" />
-                Track Order
-              </Button>
+              {profile && (
+                <Button variant="outline" size="sm" onClick={handleOpenTracking} className="hidden sm:flex">
+                  <Package size={18} className="mr-2" />
+                  Track Order
+                </Button>
+              )}
 
               <Button
                 variant="ghost"

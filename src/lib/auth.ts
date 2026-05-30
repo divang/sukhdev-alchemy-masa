@@ -52,6 +52,14 @@ function authDebug(message: string, details?: Record<string, unknown>) {
   console.log(`[auth] ${message}`)
 }
 
+function mapSignupErrorMessage(message: string) {
+  if (message.toLowerCase().includes("error sending confirmation email")) {
+    return "We could not send the confirmation email right now. Please retry after 60 seconds, verify SMTP settings/sender domain, or use another recipient inbox."
+  }
+
+  return message
+}
+
 function getEmailRedirectTo() {
   const configured = import.meta.env.VITE_AUTH_REDIRECT_URL as string | undefined
   if (configured && configured.trim()) {
@@ -222,11 +230,12 @@ export async function signUpCustomer(input: SignUpInput): Promise<AuthResult> {
   })
 
   if (error) {
+    const mappedError = mapSignupErrorMessage(error.message)
     authDebug("signUpCustomer failed", {
       email: maskEmail(input.email),
-      error: error.message,
+      error: mappedError,
     })
-    return { user: null, profile: null, error: error.message }
+    return { user: null, profile: null, error: mappedError }
   }
 
   const user = data.user

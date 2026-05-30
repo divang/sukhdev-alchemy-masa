@@ -16,6 +16,21 @@ type AuthViewProps = {
   onAuthenticated: (profile: UserProfile) => void
 }
 
+async function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => reject(new Error(message)), ms)
+  })
+
+  try {
+    return await Promise.race([promise, timeoutPromise])
+  } finally {
+    if (timeoutId) {
+      clearTimeout(timeoutId)
+    }
+  }
+}
+
 export function AuthView({ mode, onBack, onAuthenticated }: AuthViewProps) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isResending, setIsResending] = useState(false)
@@ -37,8 +52,8 @@ export function AuthView({ mode, onBack, onAuthenticated }: AuthViewProps) {
 
     try {
       const result = mode === "admin"
-        ? await signInAdmin(signInData)
-        : await signInCustomer(signInData)
+        ? await withTimeout(signInAdmin(signInData), 15000, "Admin sign in timed out. Please retry.")
+        : await withTimeout(signInCustomer(signInData), 15000, "Sign in timed out. Please retry.")
 
       console.log("[auth-ui] handleSignIn result", {
         hasError: Boolean(result.error),
@@ -79,14 +94,18 @@ export function AuthView({ mode, onBack, onAuthenticated }: AuthViewProps) {
     setIsSubmitting(true)
 
     try {
-      const result = await signUpCustomer({
-        fullName: signUpData.fullName,
-        email: signUpData.email,
-        phone: signUpData.phone,
-        password: signUpData.password,
-        reviewOptIn: signUpData.reviewOptIn,
-        marketingOptIn: signUpData.marketingOptIn,
-      })
+      const result = await withTimeout(
+        signUpCustomer({
+          fullName: signUpData.fullName,
+          email: signUpData.email,
+          phone: signUpData.phone,
+          password: signUpData.password,
+          reviewOptIn: signUpData.reviewOptIn,
+          marketingOptIn: signUpData.marketingOptIn,
+        }),
+        15000,
+        "Account creation timed out. Please retry."
+      )
       console.log("[auth-ui] handleSignUp result", {
         hasError: Boolean(result.error),
         hasProfile: Boolean(result.profile),
@@ -129,7 +148,21 @@ export function AuthView({ mode, onBack, onAuthenticated }: AuthViewProps) {
     }
 
     setIsResending(true)
-    const error = await resendSignupConfirmation(email)
+    let error: string | undefined
+
+    try {
+      error = await withTimeout(
+        resendSignupConfirmation(email),
+        15000,
+        "Resend request timed out. Please retry."
+      )
+    } catch (timeoutError) {
+      console.error("[auth-ui] handleResendConfirmation unexpected error", timeoutError)
+      toast.error(timeoutError instanceof Error ? timeoutError.message : "Resend request failed. Please retry.")
+      setIsResending(false)
+      return
+    }
+
     setIsResending(false)
 
     if (error) {
