@@ -82,12 +82,15 @@ See [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md) for complete instructions on de
 
 ## 📸 Adding Your Product Images
 
-1. Place images in `src/assets/images/products/`
-2. Import in your component:
-   ```typescript
-   import garamMasala from '@/assets/images/products/garam-masala.jpg'
-   ```
-3. Use in your product data initialization
+For production-safe image paths, use one of these:
+
+1. Put files in `public/images/products/` and set `image: 'images/products/garam-masala-premium.jpg'`
+2. Import files from `src/assets/images/products/` and assign the imported value to `image`
+3. Use a full CDN URL such as `https://...`
+
+Do not use a local filesystem path like `C:\Users\...` or `/home/...` because it will not work on deployed websites.
+
+The current seeded product data already points to files under `public/images/products/`.
 
 ## 🔧 Configuration
 

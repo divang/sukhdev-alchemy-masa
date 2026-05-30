@@ -9,7 +9,7 @@ export function useInitialData() {
 
   useEffect(() => {
     const initializeData = async () => {
-      const currentVersion = 8
+      const currentVersion = 10
       
       if (!categories || categories.length === 0 || (dataVersion ?? 0) < currentVersion) {
         setCategories([
@@ -35,7 +35,7 @@ export function useInitialData() {
             name: 'Garam Masala Premium Blend',
             category: 'premium-masala',
             price: 350,
-            image: 'https://images.unsplash.com/photo-1599946347371-68eb71b16afc?w=800&auto=format&fit=crop',
+            image: 'images/products/garam-masala-premium.png',
             rating: 4.8,
             reviewCount: 127,
             description: 'Made from the authentic family recipe. Our signature Garam Masala Premium Blend combines the finest aromatic spices to create a perfect balance of warmth and flavor.',
@@ -59,7 +59,7 @@ export function useInitialData() {
           name: 'Bharwa Masala Premium',
           category: 'premium-masala',
           price: 300,
-          image: 'https://images.unsplash.com/photo-1506368249639-73a05d6f6488?w=800&auto=format&fit=crop',
+          image: 'images/products/bharwa-masala-premium.png',
           rating: 4.7,
           reviewCount: 98,
           description: 'Specially crafted Bharwa Masala for stuffed vegetables. This premium blend brings authentic North Indian flavors with a perfect mix of tangy and spicy notes.',
@@ -82,7 +82,7 @@ export function useInitialData() {
           name: 'Chat Masala Premium',
           category: 'premium-masala',
           price: 330,
-          image: 'https://images.unsplash.com/photo-1596097635604-1347c93e0daa?w=800&auto=format&fit=crop',
+          image: 'images/products/chat-masala-premium.png',
           rating: 4.9,
           reviewCount: 156,
           description: 'A tangy and zesty Chat Masala that transforms ordinary snacks into extraordinary treats. Perfect for fruits, salads, and street food favorites.',
@@ -105,7 +105,7 @@ export function useInitialData() {
           name: 'Chhole Masala Premium',
           category: 'premium-masala',
           price: 330,
-          image: 'https://images.unsplash.com/photo-1631452180519-c014fe946bc7?w=800&auto=format&fit=crop',
+          image: 'images/products/chhole-masala-premium.png',
           rating: 4.8,
           reviewCount: 143,
           description: 'Authentic Chhole Masala that brings the taste of Punjab to your kitchen. Rich, aromatic, and perfectly balanced for the perfect chickpea curry.',

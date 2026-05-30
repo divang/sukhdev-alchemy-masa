@@ -27,7 +27,7 @@ export function ProductDetailDialog({ product, open, onOpenChange, onAddToCart }
   const [productImages] = useKV<Record<string, string>>("product-images", {})
   
   const productReviews = (reviews || []).filter(r => r.productId === product.id)
-  const imageUrl = getProductImage(product.id, productImages ?? {})
+  const imageUrl = getProductImage(product, productImages ?? {})
   
   const handleAddToCart = () => {
     onAddToCart(product, selectedGrams)

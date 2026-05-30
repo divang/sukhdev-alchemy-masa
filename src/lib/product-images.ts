@@ -1,17 +1,35 @@
+import type { Product } from "@/lib/types"
+
 const defaultImages: Record<string, string> = {
-  'garam-masala-premium': 'https://images.unsplash.com/photo-1596040033229-a0b78e2dfcce?w=800&q=80',
+  'garam-masala-premium': 'images/products/garam-masala-premium.png',
   
-  'bharwa-masala-premium': 'https://images.unsplash.com/photo-1599599810769-bcde5a160d32?w=800&q=80',
+  'bharwa-masala-premium': 'images/products/bharwa-masala-premium.png',
   
-  'chat-masala-premium': 'https://images.unsplash.com/photo-1505253758473-96b7015fcd40?w=800&q=80',
+  'chat-masala-premium': 'images/products/chat-masala-premium.png',
   
-  'chhole-masala-premium': 'https://images.unsplash.com/photo-1585937421612-70a008356fbe?w=800&q=80',
+  'chhole-masala-premium': 'images/products/chhole-masala-premium.png',
 }
 
-export function getProductImage(productId: string, uploadedImages?: Record<string, string>): string {
-  if (uploadedImages && uploadedImages[productId]) {
-    return uploadedImages[productId]
+function normalizeImageUrl(imagePath?: string): string {
+  if (!imagePath) {
+    return ''
   }
-  
-  return defaultImages[productId] || ''
+
+  if (/^(?:https?:|data:|blob:|\/\/)/i.test(imagePath)) {
+    return imagePath
+  }
+
+  const baseUrl = import.meta.env.BASE_URL || '/'
+  const normalizedBaseUrl = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`
+  const normalizedImagePath = imagePath.replace(/^\.?\//, '')
+
+  return `${normalizedBaseUrl}${normalizedImagePath}`
+}
+
+export function getProductImage(product: Pick<Product, 'id' | 'image'>, uploadedImages?: Record<string, string>): string {
+  if (uploadedImages && uploadedImages[product.id]) {
+    return uploadedImages[product.id]
+  }
+
+  return normalizeImageUrl(product.image) || normalizeImageUrl(defaultImages[product.id])
 }

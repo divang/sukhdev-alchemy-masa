@@ -16,7 +16,7 @@ type ProductCardProps = {
 
 export function ProductCard({ product, onViewDetails, onAddToCart }: ProductCardProps) {
   const [productImages] = useKV<Record<string, string>>("product-images", {})
-  const imageUrl = getProductImage(product.id, productImages ?? {})
+  const imageUrl = getProductImage(product, productImages ?? {})
   
   return (
     <motion.div

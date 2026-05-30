@@ -118,7 +118,50 @@ Since this is a Spark application with browser-based storage, you have several d
 
 Currently the app uses placeholder data. To add your own images:
 
-### Method 1: Import Local Images (Recommended)
+### Method 1: Use the `public/` Folder (Recommended for deployed websites)
+
+This is the simplest option when you want image paths to work both locally and after deployment.
+
+1. **Create a public images folder**:
+    ```
+    public/
+       images/
+          products/
+             garam-masala.jpg
+             chat-masala.jpg
+             rajma-masala.jpg
+             pav-bhaji-masala.jpg
+    ```
+
+2. **Store relative paths in product data**:
+    ```typescript
+    const products = [
+       {
+          id: 'garam-masala-premium',
+          name: 'Garam Masala Premium Blend',
+          image: 'images/products/garam-masala-premium.jpg',
+          // ...rest of product data
+       }
+    ]
+    ```
+
+    In this project, put your files here:
+    ```
+    public/images/products/
+    ```
+
+    The current seeded products expect these filenames:
+    - `garam-masala-premium.jpg`
+    - `bharwa-masala-premium.jpg`
+    - `chat-masala-premium.jpg`
+    - `chhole-masala-premium.jpg`
+
+3. **Why this works**:
+    - Vite copies everything in `public/` into the final build unchanged
+    - The app can serve the same files locally and on your public website
+    - Relative public paths are safer than hard-coded local filesystem paths like `C:\\photos\\masala.jpg`
+
+### Method 2: Import Local Images From `src/assets/`
 
 1. **Add images to your project**:
    ```
@@ -148,16 +191,51 @@ Currently the app uses placeholder data. To add your own images:
    ]
    ```
 
-### Method 2: Use External URLs
+This is also valid for production because Vite fingerprints the file and rewrites the final URL during build.
+
+### Method 3: Use External URLs
 
 If you have images hosted elsewhere (like Cloudinary, S3, etc.):
 - Use full URLs: `https://your-image-host.com/garam-masala.jpg`
 - Update product data with these URLs
 
-### Method 3: Base64 Encoded (Small Images Only)
+### Method 4: Admin Uploads in This Spark App
+
+- The Admin Panel currently stores uploaded images in browser storage as base64 data
+- This is useful for local testing on your machine
+- Those uploads are **not a shared production image library** for real users
+- For a public website, prefer `public/images/...`, imported assets, or external storage
+
+### Method 5: Base64 Encoded (Small Images Only)
 - Convert images to base64
 - Embed directly in the data
 - Not recommended for large product images
+
+### Important Rule
+
+- Do **not** use your local computer path in product data, for example `C:\\Users\\...\\photo.jpg` or `/home/you/photo.jpg`
+- Browsers on public websites cannot read files from your computer
+- Use one of these instead: `images/products/file.jpg`, imported assets, or `https://...`
+
+## Testing Images Locally Before Deployment
+
+1. Add one image to `public/images/products/`
+2. Set one product `image` field to `images/products/your-file.jpg`
+3. Run:
+   ```bash
+   npm install
+   npm run dev
+   ```
+4. Open the app and verify the image in:
+   - product card
+   - product detail dialog
+   - cart drawer
+5. Build the production bundle:
+   ```bash
+   npm run build
+   npm run preview
+   ```
+6. Test again in preview mode to confirm the same image path still works after build
 
 ## Current Limitations & Important Notes
 

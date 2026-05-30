@@ -5,6 +5,8 @@ import { X, Minus, Plus, ShoppingCart } from "@phosphor-icons/react"
 import type { CartItem, Product } from "@/lib/types"
 import { GRAM_OPTIONS } from "@/lib/types"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { useKV } from "@github/spark/hooks"
+import { getProductImage } from "@/lib/product-images"
 
 type CartDrawerProps = {
   open: boolean
@@ -27,6 +29,8 @@ export function CartDrawer({
   onRemoveItem,
   onCheckout
 }: CartDrawerProps) {
+  const [productImages] = useKV<Record<string, string>>("product-images", {})
+
   const getProduct = (productId: string) => products.find(p => p.id === productId)
   
   const calculateItemTotal = (item: CartItem) => {
@@ -62,12 +66,13 @@ export function CartDrawer({
               {cartItems.map((item) => {
                 const product = getProduct(item.productId)
                 if (!product) return null
+                const imageUrl = getProductImage(product, productImages ?? {})
                 
                 return (
                   <div key={item.productId} className="flex gap-4 p-4 border rounded-lg">
                     <div 
                       className="w-20 h-20 rounded-md bg-cover bg-center flex-shrink-0"
-                      style={{ backgroundImage: `url(${product.image})` }}
+                      style={{ backgroundImage: `url(${imageUrl})` }}
                     />
                     <div className="flex-1 min-w-0">
                       <div className="flex justify-between items-start">
