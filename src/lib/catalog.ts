@@ -227,3 +227,104 @@ export async function submitProductReview(input: SubmitReviewInput): Promise<Sub
     },
   }
 }
+
+export type AdminProductInput = {
+  id: string
+  categoryId: string
+  sku: string
+  name: string
+  description: string
+  pricePer100g: number
+  imagePath: string
+  ingredients: string[]
+  tags: string[]
+  youtubeUrl?: string
+  inStock: boolean
+  isActive?: boolean
+}
+
+type AdminProductResult = {
+  product?: Product
+  error?: string
+}
+
+function mapProductRowToProduct(row: ProductRow): Product {
+  return {
+    id: row.id,
+    category: row.category_id,
+    name: row.name,
+    price: Number(row.price_per_100g),
+    image: row.image_path,
+    rating: Number(row.rating_avg),
+    reviewCount: Number(row.review_count),
+    description: row.description,
+    ingredients: Array.isArray(row.ingredients) ? row.ingredients : [],
+    youtubeUrl: row.youtube_url ?? undefined,
+    inStock: row.in_stock,
+    tags: Array.isArray(row.tags) ? row.tags : [],
+    sku: row.sku,
+  }
+}
+
+export async function updateProductByAdmin(input: AdminProductInput): Promise<AdminProductResult> {
+  if (!supabase || !isSupabaseConfigured) {
+    return { error: "Supabase is not configured." }
+  }
+
+  const { data, error } = await supabase
+    .from("products")
+    .update({
+      category_id: input.categoryId,
+      sku: input.sku,
+      name: input.name,
+      description: input.description,
+      price_per_100g: input.pricePer100g,
+      image_path: input.imagePath,
+      ingredients: input.ingredients,
+      tags: input.tags,
+      youtube_url: input.youtubeUrl?.trim() || null,
+      in_stock: input.inStock,
+      is_active: input.isActive ?? true,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", input.id)
+    .select("id, category_id, name, sku, price_per_100g, image_path, rating_avg, review_count, description, ingredients, youtube_url, in_stock, tags")
+    .single()
+
+  if (error || !data) {
+    return { error: error?.message ?? "Failed to update product." }
+  }
+
+  return { product: mapProductRowToProduct(data as ProductRow) }
+}
+
+export async function createProductByAdmin(input: AdminProductInput): Promise<AdminProductResult> {
+  if (!supabase || !isSupabaseConfigured) {
+    return { error: "Supabase is not configured." }
+  }
+
+  const { data, error } = await supabase
+    .from("products")
+    .insert({
+      id: input.id,
+      category_id: input.categoryId,
+      sku: input.sku,
+      name: input.name,
+      description: input.description,
+      price_per_100g: input.pricePer100g,
+      image_path: input.imagePath,
+      ingredients: input.ingredients,
+      tags: input.tags,
+      youtube_url: input.youtubeUrl?.trim() || null,
+      in_stock: input.inStock,
+      is_active: input.isActive ?? true,
+    })
+    .select("id, category_id, name, sku, price_per_100g, image_path, rating_avg, review_count, description, ingredients, youtube_url, in_stock, tags")
+    .single()
+
+  if (error || !data) {
+    return { error: error?.message ?? "Failed to create product." }
+  }
+
+  return { product: mapProductRowToProduct(data as ProductRow) }
+}

@@ -335,6 +335,37 @@ export async function signInAdmin(input: SignInInput): Promise<AuthResult> {
     return result
   }
 
+  if (!supabase || !isSupabaseConfigured) {
+    return { user: null, profile: null, error: "Supabase auth is not configured." }
+  }
+
+  // Resolve role from the profiles table at admin login time so stale metadata fallback
+  // does not incorrectly block valid admins.
+  const { data: adminProfile, error: adminProfileError } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", result.user.id)
+    .maybeSingle()
+
+  if (adminProfileError) {
+    await signOutUser()
+    return {
+      user: null,
+      profile: null,
+      error: `Unable to validate admin role: ${adminProfileError.message}`,
+    }
+  }
+
+  if (adminProfile?.role === "admin") {
+    return {
+      ...result,
+      profile: {
+        ...result.profile,
+        role: "admin",
+      },
+    }
+  }
+
   if (result.profile.role !== "admin") {
     await signOutUser()
     return {

@@ -1,75 +1,197 @@
-import { useState, useRef } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useKV } from "@github/spark/hooks"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Upload, X, Image as ImageIcon, Check } from "@phosphor-icons/react"
+import { Textarea } from "@/components/ui/textarea"
+import { Switch } from "@/components/ui/switch"
 import { toast } from "sonner"
-import type { Order, Product } from "@/lib/types"
+import type { Category, Order, Product } from "@/lib/types"
+import { createProductByAdmin, loadCatalogFromSupabase, type AdminProductInput, updateProductByAdmin } from "@/lib/catalog"
+import { isSupabaseConfigured } from "@/lib/supabase"
+
+type EditableProduct = {
+  id: string
+  categoryId: string
+  sku: string
+  name: string
+  description: string
+  pricePer100g: string
+  imagePath: string
+  tagsCsv: string
+  ingredientsCsv: string
+  youtubeUrl: string
+  inStock: boolean
+}
 
 type AdminPanelProps = {
   orders?: Order[]
 }
 
 export function AdminPanel({ orders = [] }: AdminPanelProps) {
-  const [products] = useKV<Product[]>("products", [])
-  const [productImages, setProductImages] = useKV<Record<string, string>>("product-images", {})
-  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
-  const [uploading, setUploading] = useState(false)
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [products, setProducts] = useKV<Product[]>("products", [])
+  const [categories, setCategories] = useKV<Category[]>("categories", [])
+  const [editableProducts, setEditableProducts] = useState<EditableProduct[]>([])
+  const [savingProductId, setSavingProductId] = useState<string | null>(null)
+  const [isCreating, setIsCreating] = useState(false)
+  const [newProduct, setNewProduct] = useState<EditableProduct>({
+    id: "",
+    categoryId: "premium-masala",
+    sku: "",
+    name: "",
+    description: "",
+    pricePer100g: "",
+    imagePath: "",
+    tagsCsv: "",
+    ingredientsCsv: "",
+    youtubeUrl: "",
+    inStock: true,
+  })
 
-  const handleImageUpload = async (productId: string, file: File) => {
-    if (!file.type.startsWith('image/')) {
-      toast.error('Please select an image file')
-      return
+  const categoryOptions = useMemo(() => {
+    if (categories && categories.length > 0) {
+      return categories
     }
 
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error('Image size must be less than 5MB')
-      return
+    return [{ id: "premium-masala", name: "Premium Masala", slug: "premium-masala", enabled: true }]
+  }, [categories])
+
+  useEffect(() => {
+    setEditableProducts(
+      (products || []).map((product) => ({
+        id: product.id,
+        categoryId: product.category,
+        sku: product.sku ?? "",
+        name: product.name,
+        description: product.description,
+        pricePer100g: String(product.price),
+        imagePath: product.image,
+        tagsCsv: product.tags.join(", "),
+        ingredientsCsv: product.ingredients.join(", "),
+        youtubeUrl: product.youtubeUrl ?? "",
+        inStock: product.inStock,
+      }))
+    )
+  }, [products])
+
+  useEffect(() => {
+    async function refreshCatalogForAdmin() {
+      const snapshot = await loadCatalogFromSupabase()
+      if (snapshot.source !== "supabase") {
+        return
+      }
+
+      if (snapshot.categories.length > 0) {
+        setCategories(snapshot.categories)
+      }
+      if (snapshot.products.length > 0) {
+        setProducts(snapshot.products)
+      }
     }
 
-    setUploading(true)
-    try {
-      const reader = new FileReader()
-      reader.onloadend = () => {
-        const base64String = reader.result as string
-        setProductImages((current) => ({
-          ...current,
-          [productId]: base64String
-        }))
-        toast.success('Image uploaded successfully!')
-        setSelectedProduct(null)
-      }
-      reader.onerror = () => {
-        toast.error('Failed to read image file')
-      }
-      reader.readAsDataURL(file)
-    } catch (error) {
-      toast.error('Failed to upload image')
-      console.error(error)
-    } finally {
-      setUploading(false)
+    refreshCatalogForAdmin()
+  }, [setCategories, setProducts])
+
+  const updateEditableProduct = (productId: string, key: keyof EditableProduct, value: string | boolean) => {
+    setEditableProducts((current) =>
+      current.map((item) => (item.id === productId ? { ...item, [key]: value } : item))
+    )
+  }
+
+  const buildAdminPayload = (input: EditableProduct): AdminProductInput | undefined => {
+    const price = Number(input.pricePer100g)
+    if (!Number.isFinite(price) || price < 0) {
+      toast.error("Price per 100g must be a valid non-negative number.")
+      return undefined
+    }
+
+    if (!input.id.trim() || !input.name.trim() || !input.sku.trim() || !input.categoryId.trim()) {
+      toast.error("ID, SKU, Name, and Category are required.")
+      return undefined
+    }
+
+    return {
+      id: input.id.trim(),
+      categoryId: input.categoryId.trim(),
+      sku: input.sku.trim(),
+      name: input.name.trim(),
+      description: input.description.trim(),
+      pricePer100g: price,
+      imagePath: input.imagePath.trim(),
+      ingredients: input.ingredientsCsv.split(",").map((value) => value.trim()).filter(Boolean),
+      tags: input.tagsCsv.split(",").map((value) => value.trim()).filter(Boolean),
+      youtubeUrl: input.youtubeUrl.trim() || undefined,
+      inStock: input.inStock,
+      isActive: true,
     }
   }
 
-  const handleRemoveImage = (productId: string) => {
-    setProductImages((current) => {
-      const updated = { ...current }
-      delete updated[productId]
-      return updated
+  const handleSaveProduct = async (productId: string) => {
+    if (!isSupabaseConfigured) {
+      toast.error("Supabase auth is not configured.")
+      return
+    }
+
+    const editable = editableProducts.find((item) => item.id === productId)
+    if (!editable) {
+      return
+    }
+
+    const payload = buildAdminPayload(editable)
+    if (!payload) {
+      return
+    }
+
+    setSavingProductId(productId)
+    const result = await updateProductByAdmin(payload)
+    setSavingProductId(null)
+
+    if (!result.product || result.error) {
+      toast.error(result.error ?? "Failed to save product.")
+      return
+    }
+
+    setProducts((current = []) => current.map((item) => (item.id === result.product?.id ? result.product : item)))
+    toast.success("Product updated successfully.")
+  }
+
+  const handleCreateProduct = async () => {
+    if (!isSupabaseConfigured) {
+      toast.error("Supabase auth is not configured.")
+      return
+    }
+
+    const payload = buildAdminPayload(newProduct)
+    if (!payload) {
+      return
+    }
+
+    setIsCreating(true)
+    const result = await createProductByAdmin(payload)
+    setIsCreating(false)
+
+    if (!result.product || result.error) {
+      toast.error(result.error ?? "Failed to create product.")
+      return
+    }
+
+    setProducts((current = []) => [result.product as Product, ...current])
+    setNewProduct({
+      id: "",
+      categoryId: categoryOptions[0]?.id ?? "premium-masala",
+      sku: "",
+      name: "",
+      description: "",
+      pricePer100g: "",
+      imagePath: "",
+      tagsCsv: "",
+      ingredientsCsv: "",
+      youtubeUrl: "",
+      inStock: true,
     })
-    toast.info('Image removed')
-  }
-
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (file && selectedProduct) {
-      handleImageUpload(selectedProduct.id, file)
-    }
+    toast.success("Product created successfully.")
   }
 
   return (
@@ -111,64 +233,122 @@ export function AdminPanel({ orders = [] }: AdminPanelProps) {
         </CardContent>
       </Card>
 
+      <Card>
+        <CardHeader>
+          <CardTitle>Create Product</CardTitle>
+          <CardDescription>Add a new catalog item directly in Supabase.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-2">
+            <div>
+              <Label>Product ID</Label>
+              <Input value={newProduct.id} onChange={(event) => setNewProduct((c) => ({ ...c, id: event.target.value }))} placeholder="chat-masala-premium" />
+            </div>
+            <div>
+              <Label>SKU</Label>
+              <Input value={newProduct.sku} onChange={(event) => setNewProduct((c) => ({ ...c, sku: event.target.value }))} placeholder="PM-CHAT-001" />
+            </div>
+            <div>
+              <Label>Name</Label>
+              <Input value={newProduct.name} onChange={(event) => setNewProduct((c) => ({ ...c, name: event.target.value }))} placeholder="Chat Masala Premium" />
+            </div>
+            <div>
+              <Label>Category ID</Label>
+              <Input value={newProduct.categoryId} onChange={(event) => setNewProduct((c) => ({ ...c, categoryId: event.target.value }))} placeholder="premium-masala" />
+            </div>
+            <div>
+              <Label>Price Per 100g</Label>
+              <Input type="number" value={newProduct.pricePer100g} onChange={(event) => setNewProduct((c) => ({ ...c, pricePer100g: event.target.value }))} placeholder="350" />
+            </div>
+            <div>
+              <Label>Image Path</Label>
+              <Input value={newProduct.imagePath} onChange={(event) => setNewProduct((c) => ({ ...c, imagePath: event.target.value }))} placeholder="images/products/chat-masala-premium.png" />
+            </div>
+          </div>
+          <div>
+            <Label>Description</Label>
+            <Textarea value={newProduct.description} onChange={(event) => setNewProduct((c) => ({ ...c, description: event.target.value }))} rows={3} />
+          </div>
+          <div className="grid gap-4 md:grid-cols-2">
+            <div>
+              <Label>Tags (comma-separated)</Label>
+              <Input value={newProduct.tagsCsv} onChange={(event) => setNewProduct((c) => ({ ...c, tagsCsv: event.target.value }))} placeholder="premium, aromatic" />
+            </div>
+            <div>
+              <Label>Ingredients (comma-separated)</Label>
+              <Input value={newProduct.ingredientsCsv} onChange={(event) => setNewProduct((c) => ({ ...c, ingredientsCsv: event.target.value }))} placeholder="Cumin Seeds, Black Pepper" />
+            </div>
+          </div>
+          <div>
+            <Label>YouTube URL (optional)</Label>
+            <Input value={newProduct.youtubeUrl} onChange={(event) => setNewProduct((c) => ({ ...c, youtubeUrl: event.target.value }))} placeholder="https://youtu.be/..." />
+          </div>
+          <div className="flex items-center gap-3">
+            <Switch checked={newProduct.inStock} onCheckedChange={(checked) => setNewProduct((c) => ({ ...c, inStock: checked }))} />
+            <span className="text-sm">In stock</span>
+          </div>
+          <Button onClick={handleCreateProduct} disabled={isCreating}>{isCreating ? "Creating..." : "Create Product"}</Button>
+        </CardContent>
+      </Card>
+
       <div>
-        <h2 className="text-3xl font-bold mb-2">Product Image Management</h2>
-        <p className="text-muted-foreground">
-          Upload and manage product images. Images are stored securely and will persist across sessions.
-        </p>
+        <h2 className="text-3xl font-bold mb-2">Catalog Management</h2>
+        <p className="text-muted-foreground">Edit product fields and persist updates to Supabase.</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {(products || []).map((product) => {
-          const hasImage = !!productImages?.[product.id]
-          const imageUrl = productImages?.[product.id]
+        {editableProducts.map((product) => {
+          const isSaving = savingProductId === product.id
+          const categoryName = categoryOptions.find((item) => item.id === product.categoryId)?.name ?? product.categoryId
 
           return (
             <Card key={product.id}>
               <CardHeader>
-                <CardTitle className="text-lg">{product.name}</CardTitle>
-                <CardDescription>₹{product.price}/100g</CardDescription>
+                <CardTitle className="text-lg">{product.name || product.id}</CardTitle>
+                <CardDescription>{categoryName}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="aspect-square bg-muted rounded-lg overflow-hidden relative">
-                  {imageUrl ? (
-                    <img
-                      src={imageUrl}
-                      alt={product.name}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <ImageIcon size={48} className="text-muted-foreground" />
-                    </div>
-                  )}
-                  {hasImage && (
-                    <Badge className="absolute top-2 right-2 bg-green-600">
-                      <Check size={14} className="mr-1" />
-                      Uploaded
-                    </Badge>
-                  )}
+                <div>
+                  <Label>Name</Label>
+                  <Input value={product.name} onChange={(event) => updateEditableProduct(product.id, "name", event.target.value)} />
                 </div>
-
-                <div className="flex gap-2">
-                  <Button
-                    onClick={() => setSelectedProduct(product)}
-                    className="flex-1"
-                    variant={hasImage ? "outline" : "default"}
-                  >
-                    <Upload size={16} className="mr-2" />
-                    {hasImage ? 'Change' : 'Upload'}
-                  </Button>
-                  {hasImage && (
-                    <Button
-                      onClick={() => handleRemoveImage(product.id)}
-                      variant="destructive"
-                      size="icon"
-                    >
-                      <X size={16} />
-                    </Button>
-                  )}
+                <div>
+                  <Label>SKU</Label>
+                  <Input value={product.sku} onChange={(event) => updateEditableProduct(product.id, "sku", event.target.value)} />
                 </div>
+                <div>
+                  <Label>Category ID</Label>
+                  <Input value={product.categoryId} onChange={(event) => updateEditableProduct(product.id, "categoryId", event.target.value)} />
+                </div>
+                <div>
+                  <Label>Price Per 100g</Label>
+                  <Input type="number" value={product.pricePer100g} onChange={(event) => updateEditableProduct(product.id, "pricePer100g", event.target.value)} />
+                </div>
+                <div>
+                  <Label>Image Path</Label>
+                  <Input value={product.imagePath} onChange={(event) => updateEditableProduct(product.id, "imagePath", event.target.value)} />
+                </div>
+                <div>
+                  <Label>Tags (comma-separated)</Label>
+                  <Input value={product.tagsCsv} onChange={(event) => updateEditableProduct(product.id, "tagsCsv", event.target.value)} />
+                </div>
+                <div>
+                  <Label>Ingredients (comma-separated)</Label>
+                  <Input value={product.ingredientsCsv} onChange={(event) => updateEditableProduct(product.id, "ingredientsCsv", event.target.value)} />
+                </div>
+                <div>
+                  <Label>Description</Label>
+                  <Textarea value={product.description} onChange={(event) => updateEditableProduct(product.id, "description", event.target.value)} rows={3} />
+                </div>
+                <div>
+                  <Label>YouTube URL</Label>
+                  <Input value={product.youtubeUrl} onChange={(event) => updateEditableProduct(product.id, "youtubeUrl", event.target.value)} />
+                </div>
+                <div className="flex items-center gap-3">
+                  <Switch checked={product.inStock} onCheckedChange={(checked) => updateEditableProduct(product.id, "inStock", checked)} />
+                  <span className="text-sm">In stock</span>
+                </div>
+                <Button onClick={() => handleSaveProduct(product.id)} disabled={isSaving}>{isSaving ? "Saving..." : "Save Product"}</Button>
               </CardContent>
             </Card>
           )
@@ -182,64 +362,6 @@ export function AdminPanel({ orders = [] }: AdminPanelProps) {
           </CardContent>
         </Card>
       )}
-
-      <Dialog open={!!selectedProduct} onOpenChange={(open) => !open && setSelectedProduct(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Upload Image for {selectedProduct?.name}</DialogTitle>
-          </DialogHeader>
-
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="image-upload">Select Image</Label>
-              <Input
-                id="image-upload"
-                type="file"
-                accept="image/*"
-                ref={fileInputRef}
-                onChange={handleFileSelect}
-                disabled={uploading}
-                className="mt-2"
-              />
-              <p className="text-sm text-muted-foreground mt-2">
-                Accepted formats: JPG, PNG, WebP. Max size: 5MB
-              </p>
-            </div>
-
-            {selectedProduct && productImages?.[selectedProduct.id] && (
-              <div>
-                <Label>Current Image</Label>
-                <div className="mt-2 aspect-square bg-muted rounded-lg overflow-hidden">
-                  <img
-                    src={productImages[selectedProduct.id]}
-                    alt={selectedProduct.name}
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-              </div>
-            )}
-
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                onClick={() => setSelectedProduct(null)}
-                className="flex-1"
-                disabled={uploading}
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={() => fileInputRef.current?.click()}
-                className="flex-1"
-                disabled={uploading}
-              >
-                <Upload size={16} className="mr-2" />
-                {uploading ? 'Uploading...' : 'Choose File'}
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }
