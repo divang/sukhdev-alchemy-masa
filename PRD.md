@@ -20,11 +20,17 @@ This is a full-featured e-commerce platform with product catalog, cart managemen
 - **Success criteria**: Categories can be enabled/disabled via admin settings, filtered products display correctly
 
 ### Product Grid Display
-- **Functionality**: 2-column responsive grid showing masala products with images, names, prices, and ratings
+- **Functionality**: 2-column responsive grid showing 4 premium masala products with images, names, prices, and ratings
 - **Purpose**: Present products in an organized, scannable format that highlights key information
 - **Trigger**: Page load or category selection
 - **Progression**: Load products → Render grid → Display product cards → Enable interactions
 - **Success criteria**: Products display with proper spacing, images load, ratings visible, responsive on mobile
+
+**Current Product Lineup**:
+1. Garam Masala Premium Blend - ₹350/100g
+2. Bharwa Masala Premium - ₹300/100g
+3. Chat Masala Premium - ₹330/100g
+4. Chhole Masala Premium - ₹330/100g
 
 ### Product Detail View
 - **Functionality**: Detailed product page with ingredients, YouTube video link, reviews, ratings, and add-to-cart

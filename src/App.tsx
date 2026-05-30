@@ -13,10 +13,13 @@ import { TestimonialsSection } from "@/components/TestimonialsSection"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 import type { Category, Product, CartItem, Order } from "@/lib/types"
 import { toast } from "sonner"
+import { useInitialData } from "@/hooks/use-initial-data"
 
 type View = "store" | "checkout" | "payment" | "tracking"
 
 function App() {
+  useInitialData()
+  
   const [categories, setCategories] = useKV<Category[]>("categories", [])
   const [products] = useKV<Product[]>("products", [])
   const [cartItems, setCartItems] = useKV<CartItem[]>("cart", [])
