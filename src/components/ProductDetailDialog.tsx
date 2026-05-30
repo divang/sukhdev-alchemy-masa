@@ -12,6 +12,7 @@ import { GRAM_OPTIONS } from "@/lib/types"
 import { useState } from "react"
 import { useKV } from "@github/spark/hooks"
 import type { Review } from "@/lib/types"
+import { getProductImage } from "@/lib/product-images"
 
 type ProductDetailDialogProps = {
   product: Product
@@ -25,6 +26,7 @@ export function ProductDetailDialog({ product, open, onOpenChange, onAddToCart }
   const [reviews] = useKV<Review[]>("reviews", [])
   
   const productReviews = (reviews || []).filter(r => r.productId === product.id)
+  const imageUrl = getProductImage(product.id)
   
   const handleAddToCart = () => {
     onAddToCart(product, selectedGrams)
@@ -40,10 +42,19 @@ export function ProductDetailDialog({ product, open, onOpenChange, onAddToCart }
         
         <div className="grid md:grid-cols-2 gap-6">
           <div className="space-y-4">
-            <div 
-              className="w-full h-64 md:h-80 rounded-lg bg-cover bg-center"
-              style={{ backgroundImage: `url(${product.image})` }}
-            />
+            <div className="w-full h-64 md:h-80 rounded-lg overflow-hidden bg-muted">
+              {imageUrl ? (
+                <img
+                  src={imageUrl}
+                  alt={product.name}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center">
+                  <span className="text-muted-foreground">No image</span>
+                </div>
+              )}
+            </div>
             <div className="flex gap-2 flex-wrap">
               {product.tags.map((tag) => (
                 <Badge key={tag} variant="secondary">{tag}</Badge>

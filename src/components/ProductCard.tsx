@@ -5,6 +5,7 @@ import { Eye, ShoppingCart } from "@phosphor-icons/react"
 import { StarRating } from "./StarRating"
 import type { Product } from "@/lib/types"
 import { motion } from "framer-motion"
+import { getProductImage } from "@/lib/product-images"
 
 type ProductCardProps = {
   product: Product
@@ -13,6 +14,8 @@ type ProductCardProps = {
 }
 
 export function ProductCard({ product, onViewDetails, onAddToCart }: ProductCardProps) {
+  const imageUrl = getProductImage(product.id)
+  
   return (
     <motion.div
       whileHover={{ y: -4 }}
@@ -20,13 +23,17 @@ export function ProductCard({ product, onViewDetails, onAddToCart }: ProductCard
     >
       <Card className="overflow-hidden h-full flex flex-col hover:shadow-lg transition-shadow">
         <div className="relative h-48 bg-muted overflow-hidden">
-          <div 
-            className="w-full h-full bg-cover bg-center transition-transform hover:scale-105 duration-300"
-            style={{ 
-              backgroundImage: `url(${product.image})`,
-              backgroundColor: 'oklch(0.92 0.02 75)'
-            }}
-          />
+          {imageUrl ? (
+            <img
+              src={imageUrl}
+              alt={product.name}
+              className="w-full h-full object-cover transition-transform hover:scale-105 duration-300"
+            />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center bg-muted">
+              <span className="text-muted-foreground">No image</span>
+            </div>
+          )}
         </div>
         
         <CardContent className="flex-1 p-4 flex flex-col gap-2">
