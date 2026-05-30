@@ -45,11 +45,11 @@ function maskEmail(email: string | undefined) {
 
 function authDebug(message: string, details?: Record<string, unknown>) {
   if (details) {
-    console.info(`[auth] ${message}`, details)
+    console.log(`[auth] ${message}`, details)
     return
   }
 
-  console.info(`[auth] ${message}`)
+  console.log(`[auth] ${message}`)
 }
 
 function getEmailRedirectTo() {
@@ -197,6 +197,7 @@ export function subscribeToAuthStateChanges(callback: (state: AuthState) => void
 
 export async function signUpCustomer(input: SignUpInput): Promise<AuthResult> {
   if (!supabase || !isSupabaseConfigured) {
+    console.error("[auth] signUpCustomer blocked: Supabase auth is not configured.")
     return { user: null, profile: null, error: "Supabase auth is not configured." }
   }
 
@@ -283,6 +284,7 @@ export async function signUpCustomer(input: SignUpInput): Promise<AuthResult> {
 
 export async function signInCustomer(input: SignInInput): Promise<AuthResult> {
   if (!supabase || !isSupabaseConfigured) {
+    console.error("[auth] signInCustomer blocked: Supabase auth is not configured.")
     return { user: null, profile: null, error: "Supabase auth is not configured." }
   }
 
@@ -348,6 +350,7 @@ export async function signOutUser() {
 
 export async function resendSignupConfirmation(email: string): Promise<string | undefined> {
   if (!supabase || !isSupabaseConfigured) {
+    console.error("[auth] resendSignupConfirmation blocked: Supabase auth is not configured.")
     return "Supabase auth is not configured."
   }
 

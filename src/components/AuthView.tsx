@@ -32,11 +32,19 @@ export function AuthView({ mode, onBack, onAuthenticated }: AuthViewProps) {
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault()
+    console.log("[auth-ui] handleSignIn submitted", { mode, email: signInData.email })
     setIsSubmitting(true)
 
     const result = mode === "admin"
       ? await signInAdmin(signInData)
       : await signInCustomer(signInData)
+
+    console.log("[auth-ui] handleSignIn result", {
+      hasError: Boolean(result.error),
+      hasProfile: Boolean(result.profile),
+      requiresEmailConfirmation: Boolean(result.requiresEmailConfirmation),
+      error: result.error,
+    })
 
     setIsSubmitting(false)
 
@@ -51,6 +59,7 @@ export function AuthView({ mode, onBack, onAuthenticated }: AuthViewProps) {
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault()
+    console.log("[auth-ui] handleSignUp submitted", { email: signUpData.email })
 
     if (signUpData.password.length < 8) {
       toast.error("Password must be at least 8 characters long.")
@@ -70,6 +79,12 @@ export function AuthView({ mode, onBack, onAuthenticated }: AuthViewProps) {
       password: signUpData.password,
       reviewOptIn: signUpData.reviewOptIn,
       marketingOptIn: signUpData.marketingOptIn,
+    })
+    console.log("[auth-ui] handleSignUp result", {
+      hasError: Boolean(result.error),
+      hasProfile: Boolean(result.profile),
+      requiresEmailConfirmation: Boolean(result.requiresEmailConfirmation),
+      error: result.error,
     })
     setIsSubmitting(false)
 
@@ -95,6 +110,7 @@ export function AuthView({ mode, onBack, onAuthenticated }: AuthViewProps) {
 
   const handleResendConfirmation = async () => {
     const email = signInData.email.trim() || signUpData.email.trim()
+    console.log("[auth-ui] handleResendConfirmation clicked", { email })
     if (!email) {
       toast.error("Enter your email first, then tap resend confirmation.")
       return
