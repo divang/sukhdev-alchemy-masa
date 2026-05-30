@@ -21,12 +21,6 @@ export function useInitialData() {
           slug: 'raw-organic-spices',
           enabled: false,
         },
-        {
-          id: 'byom',
-          name: 'Build Your Own Masala',
-          slug: 'byom',
-          enabled: false,
-        },
       ])
     }
 
