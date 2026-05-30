@@ -5,26 +5,33 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Textarea } from "@/components/ui/textarea"
 import { ShoppingCart, VideoCamera } from "@phosphor-icons/react"
 import { StarRating } from "./StarRating"
-import type { Product } from "@/lib/types"
+import type { Product, UserProfile } from "@/lib/types"
 import { GRAM_OPTIONS } from "@/lib/types"
 import { useState } from "react"
 import { useKV } from "@github/spark/hooks"
 import type { Review } from "@/lib/types"
 import { getProductImage } from "@/lib/product-images"
+import { submitProductReview } from "@/lib/catalog"
+import { toast } from "sonner"
 
 type ProductDetailDialogProps = {
   product: Product
+  currentUser: UserProfile | null
   open: boolean
   onOpenChange: (open: boolean) => void
   onAddToCart: (product: Product, grams: number) => void
 }
 
-export function ProductDetailDialog({ product, open, onOpenChange, onAddToCart }: ProductDetailDialogProps) {
+export function ProductDetailDialog({ product, currentUser, open, onOpenChange, onAddToCart }: ProductDetailDialogProps) {
   const [selectedGrams, setSelectedGrams] = useState<number>(250)
-  const [reviews] = useKV<Review[]>("reviews", [])
+  const [reviews, setReviews] = useKV<Review[]>("reviews", [])
   const [productImages] = useKV<Record<string, string>>("product-images", {})
+  const [reviewRating, setReviewRating] = useState<string>("5")
+  const [reviewComment, setReviewComment] = useState("")
+  const [isSubmittingReview, setIsSubmittingReview] = useState(false)
   
   const productReviews = (reviews || []).filter(r => r.productId === product.id)
   const imageUrl = getProductImage(product, productImages ?? {})
@@ -32,6 +39,39 @@ export function ProductDetailDialog({ product, open, onOpenChange, onAddToCart }
   const handleAddToCart = () => {
     onAddToCart(product, selectedGrams)
     onOpenChange(false)
+  }
+
+  const handleSubmitReview = async () => {
+    if (!currentUser) {
+      toast.error("Sign in to submit a review.")
+      return
+    }
+
+    if (!reviewComment.trim()) {
+      toast.error("Please write a review comment before submitting.")
+      return
+    }
+
+    setIsSubmittingReview(true)
+    const result = await submitProductReview({
+      productId: product.id,
+      rating: Number(reviewRating),
+      comment: reviewComment,
+    })
+    setIsSubmittingReview(false)
+
+    if (result.error || !result.review) {
+      toast.error(result.error ?? "Unable to submit review.")
+      return
+    }
+
+    setReviews((current = []) => {
+      const remaining = current.filter((item) => item.id !== result.review?.id)
+      return [result.review as Review, ...remaining]
+    })
+    setReviewComment("")
+    setReviewRating("5")
+    toast.success("Review submitted successfully.")
   }
   
   return (
@@ -145,6 +185,43 @@ export function ProductDetailDialog({ product, open, onOpenChange, onAddToCart }
           
           <TabsContent value="reviews">
             <ScrollArea className="h-48">
+              <div className="p-4 border-b space-y-3">
+                {currentUser ? (
+                  <>
+                    <p className="text-sm font-medium">Write a review</p>
+                    <div>
+                      <label className="text-xs text-muted-foreground block mb-1">Rating</label>
+                      <Select value={reviewRating} onValueChange={setReviewRating}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="5">5 - Excellent</SelectItem>
+                          <SelectItem value="4">4 - Good</SelectItem>
+                          <SelectItem value="3">3 - Average</SelectItem>
+                          <SelectItem value="2">2 - Poor</SelectItem>
+                          <SelectItem value="1">1 - Bad</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <label className="text-xs text-muted-foreground block mb-1">Comment</label>
+                      <Textarea
+                        value={reviewComment}
+                        onChange={(event) => setReviewComment(event.target.value)}
+                        placeholder="Share your experience with this product"
+                        rows={3}
+                      />
+                    </div>
+                    <Button size="sm" onClick={handleSubmitReview} disabled={isSubmittingReview}>
+                      {isSubmittingReview ? "Submitting..." : "Submit Review"}
+                    </Button>
+                  </>
+                ) : (
+                  <p className="text-sm text-muted-foreground">Sign in to write a review.</p>
+                )}
+              </div>
+
               {productReviews.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
                   No reviews yet. Be the first to review!

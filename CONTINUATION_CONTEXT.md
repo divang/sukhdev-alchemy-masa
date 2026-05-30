@@ -1,8 +1,8 @@
 # Continuation Context
 
-Last updated: 2026-05-30 19:31:21 UTC
+Last updated: 2026-05-30 19:52:34 UTC
 Branch: main
-Latest pushed commit: a0cc5d1
+Latest pushed commit: f562d89
 
 ## Current State Snapshot
 - Supabase project used for testing: ndjztlhfhupvydozuski
@@ -214,6 +214,30 @@ Requirement discussed:
 2. Run SQL migration 004 in Supabase SQL Editor.
 3. Refresh/restart app.
 4. Verify home page products load correctly and prices/images match expected values.
+
+## Phase 2 Implementation Status (In Progress - Code Complete, Not Pushed Yet)
+Implemented in working tree:
+- DB-backed testimonials support with new SQL migration:
+   - supabase/sql/005_testimonials.sql
+- Catalog data layer enhancements:
+   - load testimonials from DB in src/lib/catalog.ts
+   - submit/update product review API in src/lib/catalog.ts
+- App bootstrap now hydrates testimonials from DB snapshot in src/hooks/use-initial-data.ts
+- Product review UI now allows logged-in users to submit/update reviews in src/components/ProductDetailDialog.tsx
+- Product dialog receives current logged-in user in src/App.tsx
+- Review type includes optional userId in src/lib/types.ts
+
+### Phase 2 Activation Steps
+1. Run SQL migration 005 in Supabase SQL Editor.
+2. Refresh/restart app.
+3. Validate testimonials are visible from DB data.
+4. Sign in and submit a product review from Product Details -> Reviews tab.
+5. Confirm row is added/updated in public.product_reviews.
+
+### Phase 2 Notes
+- product_reviews table enforces one review per user per product (upsert path used).
+- Rating summary fields on products are refreshed by DB triggers from migration 003.
+- Existing static fallback remains for resilience if DB read fails.
 
 ### Admin/User Behavior Alignment
 - Admin login remains role-based via public.profiles.role = 'admin'.

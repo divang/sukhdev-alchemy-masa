@@ -621,6 +621,7 @@ function App() {
       {selectedProduct && (
         <ProductDetailDialog
           product={selectedProduct}
+          currentUser={profile}
           open={!!selectedProduct}
           onOpenChange={(open: boolean) => !open && setSelectedProduct(null)}
           onAddToCart={handleAddToCart}

@@ -19,9 +19,8 @@ export function useInitialData() {
       if (remoteCatalog.source === 'supabase' && remoteCatalog.products.length > 0) {
         setCategories(remoteCatalog.categories)
         setProducts(remoteCatalog.products)
-        if (remoteCatalog.reviews.length > 0) {
-          setReviews(remoteCatalog.reviews)
-        }
+        setReviews(remoteCatalog.reviews)
+        setTestimonials(remoteCatalog.testimonials)
         setDataVersion(currentVersion)
         return
       }

@@ -23,6 +23,7 @@ export type Product = {
 
 export type Review = {
   id: string
+  userId?: string
   productId: string
   customerName: string
   rating: number
