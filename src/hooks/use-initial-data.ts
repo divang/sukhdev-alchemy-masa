@@ -1,56 +1,61 @@
 import { useEffect } from 'react'
 import { useKV } from '@github/spark/hooks'
 import type { Category, Product } from '@/lib/types'
-import garamMasalaImg from '@/assets/images/garam-masala.jpg'
 
 export function useInitialData() {
   const [categories, setCategories] = useKV<Category[]>('categories', [])
   const [products, setProducts] = useKV<Product[]>('products', [])
+  const [dataVersion, setDataVersion] = useKV<number>('data-version', 0)
 
   useEffect(() => {
-    if (!categories || categories.length === 0) {
-      setCategories([
-        {
-          id: 'premium-masala',
-          name: 'Premium Masala',
-          slug: 'premium-masala',
-          enabled: true,
-        },
-        {
-          id: 'raw-organic-spices',
-          name: 'Raw Organic Spices',
-          slug: 'raw-organic-spices',
-          enabled: false,
-        },
-      ])
-    }
+    const initializeData = async () => {
+      const currentVersion = 2
+      
+      if (!categories || categories.length === 0 || (dataVersion ?? 0) < currentVersion) {
+        setCategories([
+          {
+            id: 'premium-masala',
+            name: 'Premium Masala',
+            slug: 'premium-masala',
+            enabled: true,
+          },
+          {
+            id: 'raw-organic-spices',
+            name: 'Raw Organic Spices',
+            slug: 'raw-organic-spices',
+            enabled: false,
+          },
+        ])
+      }
 
-    if (!products || products.length === 0) {
-      setProducts([
-        {
-          id: 'garam-masala-premium',
-          name: 'Garam Masala Premium Blend',
-          category: 'premium-masala',
-          price: 350,
-          image: garamMasalaImg,
-          rating: 4.8,
-          reviewCount: 127,
-          description: 'Made from the authentic family recipe. Our signature Garam Masala Premium Blend combines the finest aromatic spices to create a perfect balance of warmth and flavor.',
-          ingredients: [
-            'Cumin Seeds',
-            'Coriander Seeds',
-            'Black Pepper',
-            'Cardamom',
-            'Cloves',
-            'Cinnamon',
-            'Bay Leaves',
-            'Nutmeg',
-            'Mace'
-          ],
-          youtubeUrl: 'https://www.youtube.com/watch?v=example1',
-          inStock: true,
-          tags: ['bestseller', 'premium', 'aromatic'],
-        },
+      if (!products || products.length === 0 || (dataVersion ?? 0) < currentVersion) {
+        const garamMasalaImg = await import('@/assets/images/garam-masala.jpg')
+        
+        setProducts([
+          {
+            id: 'garam-masala-premium',
+            name: 'Garam Masala Premium Blend',
+            category: 'premium-masala',
+            price: 350,
+            image: garamMasalaImg.default,
+            rating: 4.8,
+            reviewCount: 127,
+            description: 'Made from the authentic family recipe. Our signature Garam Masala Premium Blend combines the finest aromatic spices to create a perfect balance of warmth and flavor.',
+            ingredients: [
+              'Cumin Seeds',
+              'Coriander Seeds',
+              'Black Pepper',
+              'Cardamom',
+              'Cloves',
+              'Cinnamon',
+              'Bay Leaves',
+              'Nutmeg',
+              'Mace'
+            ],
+            youtubeUrl: 'https://www.youtube.com/watch?v=example1',
+            inStock: true,
+            tags: ['bestseller', 'premium', 'aromatic'],
+          },
         {
           id: 'bharwa-masala-premium',
           name: 'Bharwa Masala Premium',
@@ -122,7 +127,12 @@ export function useInitialData() {
           tags: ['premium', 'punjabi', 'aromatic'],
         },
       ])
+      
+      setDataVersion(currentVersion)
+      }
     }
+    
+    initializeData()
   }, [])
 
   return { categories, products }
