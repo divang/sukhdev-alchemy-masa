@@ -35,26 +35,31 @@ export function AuthView({ mode, onBack, onAuthenticated }: AuthViewProps) {
     console.log("[auth-ui] handleSignIn submitted", { mode, email: signInData.email })
     setIsSubmitting(true)
 
-    const result = mode === "admin"
-      ? await signInAdmin(signInData)
-      : await signInCustomer(signInData)
+    try {
+      const result = mode === "admin"
+        ? await signInAdmin(signInData)
+        : await signInCustomer(signInData)
 
-    console.log("[auth-ui] handleSignIn result", {
-      hasError: Boolean(result.error),
-      hasProfile: Boolean(result.profile),
-      requiresEmailConfirmation: Boolean(result.requiresEmailConfirmation),
-      error: result.error,
-    })
+      console.log("[auth-ui] handleSignIn result", {
+        hasError: Boolean(result.error),
+        hasProfile: Boolean(result.profile),
+        requiresEmailConfirmation: Boolean(result.requiresEmailConfirmation),
+        error: result.error,
+      })
 
-    setIsSubmitting(false)
+      if (result.error || !result.profile) {
+        toast.error(result.error ?? "Unable to sign in.")
+        return
+      }
 
-    if (result.error || !result.profile) {
-      toast.error(result.error ?? "Unable to sign in.")
-      return
+      toast.success(mode === "admin" ? "Admin access granted." : "Signed in successfully.")
+      onAuthenticated(result.profile)
+    } catch (error) {
+      console.error("[auth-ui] handleSignIn unexpected error", error)
+      toast.error("Sign in request failed. Please retry.")
+    } finally {
+      setIsSubmitting(false)
     }
-
-    toast.success(mode === "admin" ? "Admin access granted." : "Signed in successfully.")
-    onAuthenticated(result.profile)
   }
 
   const handleSignUp = async (e: React.FormEvent) => {
@@ -72,40 +77,47 @@ export function AuthView({ mode, onBack, onAuthenticated }: AuthViewProps) {
     }
 
     setIsSubmitting(true)
-    const result = await signUpCustomer({
-      fullName: signUpData.fullName,
-      email: signUpData.email,
-      phone: signUpData.phone,
-      password: signUpData.password,
-      reviewOptIn: signUpData.reviewOptIn,
-      marketingOptIn: signUpData.marketingOptIn,
-    })
-    console.log("[auth-ui] handleSignUp result", {
-      hasError: Boolean(result.error),
-      hasProfile: Boolean(result.profile),
-      requiresEmailConfirmation: Boolean(result.requiresEmailConfirmation),
-      error: result.error,
-    })
-    setIsSubmitting(false)
 
-    if (result.requiresEmailConfirmation) {
-      toast.success(result.error ?? "Account created. Check your email and confirm the account before signing in.")
-      setSignInData({ email: signUpData.email, password: "" })
-      setSignUpData((current) => ({
-        ...current,
-        password: "",
-        confirmPassword: "",
-      }))
-      return
+    try {
+      const result = await signUpCustomer({
+        fullName: signUpData.fullName,
+        email: signUpData.email,
+        phone: signUpData.phone,
+        password: signUpData.password,
+        reviewOptIn: signUpData.reviewOptIn,
+        marketingOptIn: signUpData.marketingOptIn,
+      })
+      console.log("[auth-ui] handleSignUp result", {
+        hasError: Boolean(result.error),
+        hasProfile: Boolean(result.profile),
+        requiresEmailConfirmation: Boolean(result.requiresEmailConfirmation),
+        error: result.error,
+      })
+
+      if (result.requiresEmailConfirmation) {
+        toast.success(result.error ?? "Account created. Check your email and confirm the account before signing in.")
+        setSignInData({ email: signUpData.email, password: "" })
+        setSignUpData((current) => ({
+          ...current,
+          password: "",
+          confirmPassword: "",
+        }))
+        return
+      }
+
+      if (result.error || !result.profile) {
+        toast.error(result.error ?? "Unable to create account.")
+        return
+      }
+
+      toast.success("Account created. You can now continue to payment.")
+      onAuthenticated(result.profile)
+    } catch (error) {
+      console.error("[auth-ui] handleSignUp unexpected error", error)
+      toast.error("Account creation request failed. Please retry.")
+    } finally {
+      setIsSubmitting(false)
     }
-
-    if (result.error || !result.profile) {
-      toast.error(result.error ?? "Unable to create account.")
-      return
-    }
-
-    toast.success("Account created. You can now continue to payment.")
-    onAuthenticated(result.profile)
   }
 
   const handleResendConfirmation = async () => {
