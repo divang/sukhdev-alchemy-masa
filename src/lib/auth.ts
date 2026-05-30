@@ -251,3 +251,24 @@ export async function signOutUser() {
 
   await supabase.auth.signOut()
 }
+
+export async function resendSignupConfirmation(email: string): Promise<string | undefined> {
+  if (!supabase || !isSupabaseConfigured) {
+    return "Supabase auth is not configured."
+  }
+
+  const trimmedEmail = email.trim()
+  if (!trimmedEmail) {
+    return "Please enter an email address first."
+  }
+
+  const { error } = await supabase.auth.resend({
+    type: "signup",
+    email: trimmedEmail,
+    options: {
+      emailRedirectTo: getEmailRedirectTo(),
+    },
+  })
+
+  return error?.message
+}

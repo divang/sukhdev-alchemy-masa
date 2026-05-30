@@ -8,7 +8,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { toast } from "sonner"
 import type { UserProfile } from "@/lib/types"
-import { signInAdmin, signInCustomer, signUpCustomer } from "@/lib/auth"
+import { resendSignupConfirmation, signInAdmin, signInCustomer, signUpCustomer } from "@/lib/auth"
 
 type AuthViewProps = {
   mode: "customer" | "admin"
@@ -18,6 +18,7 @@ type AuthViewProps = {
 
 export function AuthView({ mode, onBack, onAuthenticated }: AuthViewProps) {
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isResending, setIsResending] = useState(false)
   const [signInData, setSignInData] = useState({ email: "", password: "" })
   const [signUpData, setSignUpData] = useState({
     fullName: "",
@@ -90,6 +91,25 @@ export function AuthView({ mode, onBack, onAuthenticated }: AuthViewProps) {
 
     toast.success("Account created. You can now continue to payment.")
     onAuthenticated(result.profile)
+  }
+
+  const handleResendConfirmation = async () => {
+    const email = signInData.email.trim() || signUpData.email.trim()
+    if (!email) {
+      toast.error("Enter your email first, then tap resend confirmation.")
+      return
+    }
+
+    setIsResending(true)
+    const error = await resendSignupConfirmation(email)
+    setIsResending(false)
+
+    if (error) {
+      toast.error(error)
+      return
+    }
+
+    toast.success("Confirmation email sent. If you retry, wait at least 60 seconds between attempts.")
   }
 
   return (
@@ -176,6 +196,15 @@ export function AuthView({ mode, onBack, onAuthenticated }: AuthViewProps) {
                     </div>
                     <Button className="w-full" type="submit" disabled={isSubmitting}>
                       {isSubmitting ? "Signing in..." : "Sign In"}
+                    </Button>
+                    <Button
+                      className="w-full"
+                      type="button"
+                      variant="outline"
+                      disabled={isSubmitting || isResending}
+                      onClick={handleResendConfirmation}
+                    >
+                      {isResending ? "Resending..." : "Resend Confirmation Email"}
                     </Button>
                   </form>
                 </TabsContent>
