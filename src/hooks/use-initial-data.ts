@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { useKV } from '@github/spark/hooks'
 import type { Category, Product } from '@/lib/types'
+import garamMasalaImg from '@/assets/images/garam-masala.jpg'
 
 export function useInitialData() {
   const [categories, setCategories] = useKV<Category[]>('categories', [])
@@ -9,7 +10,7 @@ export function useInitialData() {
 
   useEffect(() => {
     const initializeData = async () => {
-      const currentVersion = 2
+      const currentVersion = 3
       
       if (!categories || categories.length === 0 || (dataVersion ?? 0) < currentVersion) {
         setCategories([
@@ -29,15 +30,13 @@ export function useInitialData() {
       }
 
       if (!products || products.length === 0 || (dataVersion ?? 0) < currentVersion) {
-        const garamMasalaImg = await import('@/assets/images/garam-masala.jpg')
-        
         setProducts([
           {
             id: 'garam-masala-premium',
             name: 'Garam Masala Premium Blend',
             category: 'premium-masala',
             price: 350,
-            image: garamMasalaImg.default,
+            image: garamMasalaImg,
             rating: 4.8,
             reviewCount: 127,
             description: 'Made from the authentic family recipe. Our signature Garam Masala Premium Blend combines the finest aromatic spices to create a perfect balance of warmth and flavor.',
