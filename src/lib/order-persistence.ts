@@ -38,24 +38,21 @@ export async function persistOrderToSupabase(order: Order): Promise<PersistenceR
     return { persisted: false, reason: "not-configured" }
   }
 
-  const { error } = await client.from("orders").upsert(
-    {
-      id: order.id,
-      customer_name: order.customer.name,
-      customer_email: order.customer.email,
-      customer_phone: order.customer.phone,
-      customer_address: order.customer.address,
-      customer_city: order.customer.city,
-      customer_pincode: order.customer.pincode,
-      items: order.items,
-      total_amount: order.totalAmount,
-      status: order.status,
-      payment_status: order.paymentStatus,
-      created_at: order.createdAt,
-      updated_at: order.updatedAt,
-    },
-    { onConflict: "id" }
-  )
+  const { error } = await client.from("orders").insert({
+    id: order.id,
+    customer_name: order.customer.name,
+    customer_email: order.customer.email,
+    customer_phone: order.customer.phone,
+    customer_address: order.customer.address,
+    customer_city: order.customer.city,
+    customer_pincode: order.customer.pincode,
+    items: order.items,
+    total_amount: order.totalAmount,
+    status: order.status,
+    payment_status: order.paymentStatus,
+    created_at: order.createdAt,
+    updated_at: order.updatedAt,
+  })
 
   if (error) {
     return { persisted: false, reason: "error", error: error.message }

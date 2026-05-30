@@ -3,6 +3,7 @@ import { useKV } from "@github/spark/hooks"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { ShoppingCart, List, Package, CreditCard, Gear } from "@phosphor-icons/react"
+import { QRCodeSVG as QRCode } from "qrcode.react"
 import { CategorySidebar } from "@/components/CategorySidebar"
 import { ProductCard } from "@/components/ProductCard"
 import { CartDrawer } from "@/components/CartDrawer"
@@ -214,11 +215,12 @@ function App() {
               <p className="text-lg sm:text-2xl font-mono font-bold text-primary mb-4 break-all leading-relaxed px-2">{upiId}</p>
 
               <div className="mx-auto mb-4 w-fit rounded-lg border bg-white p-3">
-                <img
-                  src={qrCodeUrl}
+                <QRCode
+                  value={upiLink}
+                  size={224}
+                  level="H"
+                  includeMargin={true}
                   alt="UPI QR code for payment"
-                  className="h-56 w-56"
-                  loading="lazy"
                 />
               </div>
 
@@ -227,7 +229,7 @@ function App() {
               </Button>
 
               <p className="text-sm text-muted-foreground">
-                Scan QR code or use UPI ID to complete payment
+                <strong>Scan the QR code</strong> with your UPI app to pay. The order ID is automatically included in the transaction.
               </p>
             </div>
             
