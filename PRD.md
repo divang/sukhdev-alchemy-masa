@@ -170,3 +170,22 @@ Animations should feel organic and unhurried, like the gentle settling of ground
   - Touch-friendly buttons (min 44px height)
   - Simplified product cards with essential info only on mobile
   - Order tracking timeline switches to vertical layout
+
+## Deployment Notes
+
+This application is built as a Spark application with client-side data persistence. See `DEPLOYMENT_GUIDE.md` for complete deployment instructions to https://sukhdevialchemy.com/.
+
+### Current Architecture
+- **Frontend**: React + TypeScript (this application)
+- **Data Storage**: Spark KV (browser-based, per-user)
+- **Hosting**: Static hosting (Netlify, Vercel, GitHub Pages recommended)
+
+### Production Migration Path
+For production e-commerce, this frontend will be connected to:
+- **Backend**: Java microservices (planned)
+- **Database**: MySQL/PostgreSQL (planned)
+- **Payment Gateway**: Razorpay/PayU integration (planned)
+- **Image CDN**: Cloudinary or AWS S3 (planned)
+
+### Adding Product Images
+Place product images in `src/assets/images/products/` and import them in your data initialization code. See deployment guide for details.
