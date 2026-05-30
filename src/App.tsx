@@ -173,7 +173,7 @@ function App() {
             
             <div className="border-2 border-dashed border-border p-6 rounded-lg">
               <p className="font-semibold mb-2">Pay using UPI:</p>
-              <p className="text-2xl font-mono font-bold text-primary mb-4">{upiId}</p>
+              <p className="text-lg sm:text-2xl font-mono font-bold text-primary mb-4 break-all leading-relaxed px-2">{upiId}</p>
 
               <div className="mx-auto mb-4 w-fit rounded-lg border bg-white p-3">
                 <img
