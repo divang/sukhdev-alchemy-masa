@@ -27,13 +27,6 @@ export function ProductCard({ product, onViewDetails, onAddToCart }: ProductCard
               backgroundColor: 'oklch(0.92 0.02 75)'
             }}
           />
-          <div className="absolute top-2 right-2 flex flex-col gap-2">
-            {product.tags.map((tag) => (
-              <Badge key={tag} variant="secondary" className="bg-card/90 backdrop-blur-sm">
-                {tag}
-              </Badge>
-            ))}
-          </div>
         </div>
         
         <CardContent className="flex-1 p-4 flex flex-col gap-2">
