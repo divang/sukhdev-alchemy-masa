@@ -64,10 +64,9 @@ export function ProductCard({ product, onViewDetails, onAddToCart }: ProductCard
               size="sm"
               className="flex-1"
               onClick={() => onAddToCart(product)}
-              disabled={true}
             >
               <ShoppingCart size={16} className="mr-1" />
-              Coming Soon
+              Add to Cart
             </Button>
           </div>
         </CardFooter>
