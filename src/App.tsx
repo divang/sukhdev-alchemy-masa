@@ -15,6 +15,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/co
 import type { Category, Product, CartItem, Order } from "@/lib/types"
 import { toast } from "sonner"
 import { useInitialData } from "@/hooks/use-initial-data"
+import { persistOrderToSupabase, updateSupabaseOrderPayment } from "@/lib/order-persistence"
 
 type View = "store" | "checkout" | "payment" | "tracking" | "admin"
 
@@ -99,15 +100,38 @@ function App() {
     setCurrentView("checkout")
   }
   
-  const handleOrderComplete = (order: Order) => {
+  const handleOrderComplete = async (order: Order) => {
     setOrders((current = []) => [...current, order])
     setCurrentOrder(order)
     setCartItems([])
     setCurrentView("payment")
+
+    const result = await persistOrderToSupabase(order)
+    if (!result.persisted && result.reason === "error") {
+      toast.warning("Cloud sync failed. Order is safely stored locally.")
+    }
   }
   
-  const handlePaymentComplete = () => {
+  const handlePaymentComplete = async () => {
+    if (!currentOrder) return
+
+    const updatedOrder: Order = {
+      ...currentOrder,
+      paymentStatus: "paid",
+      status: "processing",
+      updatedAt: new Date().toISOString(),
+    }
+
+    setOrders((current = []) => current.map(order =>
+      order.id === updatedOrder.id ? updatedOrder : order
+    ))
+    setCurrentOrder(updatedOrder)
     setCurrentView("tracking")
+
+    const result = await updateSupabaseOrderPayment(updatedOrder.id, "paid", "processing")
+    if (!result.persisted && result.reason === "error") {
+      toast.warning("Payment status synced locally. Cloud update failed.")
+    }
   }
   
   const handleBackToStore = () => {
@@ -371,7 +395,7 @@ function App() {
       
       <footer className="border-t bg-card mt-16">
         <div className="container mx-auto px-4 py-8 text-center text-sm text-muted-foreground">
-          <p>© 2024 Sukhdevi Alchemy Masala. Premium Masala & Organic Spices.</p>
+          <p>© 2026 Sukhdevi Alchemy Masala. Premium Masala & Organic Spices.</p>
         </div>
       </footer>
       

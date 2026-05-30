@@ -29,6 +29,180 @@ npm run build
 npm run preview
 ```
 
+## 🧾 Supabase Order Persistence (Free Tier)
+
+This project now supports cloud order persistence via Supabase while keeping local browser fallback.
+
+### 1. Create a Supabase account
+
+1. Go to https://supabase.com and click Start your project.
+2. Sign in with GitHub (recommended).
+3. Click New project.
+4. Choose your organization.
+5. Enter:
+  - Project name: `sukhdevi-orders` (or any name)
+  - Database password: choose a strong password and save it
+  - Region: pick nearest to your users
+6. Click Create new project and wait for provisioning.
+
+### 2. Get project credentials
+
+1. Open your Supabase project dashboard.
+2. Go to Project Settings -> API.
+3. Copy:
+  - Project URL
+  - `anon` public key
+
+Create a `.env` file in project root (you can copy from `.env.example`):
+
+```bash
+VITE_SUPABASE_URL=https://YOUR_PROJECT_REF.supabase.co
+VITE_SUPABASE_ANON_KEY=YOUR_SUPABASE_ANON_KEY
+```
+
+### 3. Create the orders table
+
+In Supabase SQL Editor, run:
+
+```sql
+create table if not exists public.orders (
+  id text primary key,
+  customer_name text not null,
+  customer_email text not null,
+  customer_phone text not null,
+  customer_address text not null,
+  customer_city text not null,
+  customer_pincode text not null,
+  items jsonb not null,
+  total_amount numeric(10,2) not null,
+  status text not null check (status in ('pending', 'processing', 'shipped', 'delivered')),
+  payment_status text not null check (payment_status in ('pending', 'paid')),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+```
+
+### 4. Enable write access for demo websites
+
+For a basic public demo, run this in SQL Editor:
+
+```sql
+alter table public.orders enable row level security;
+
+create policy "Allow anon insert" on public.orders
+for insert to anon
+with check (true);
+
+create policy "Allow anon update" on public.orders
+for update to anon
+using (true)
+with check (true);
+
+create policy "Allow anon select" on public.orders
+for select to anon
+using (true);
+```
+
+Important: this is open access suitable only for basic/demo usage. For production, secure with auth and stricter RLS.
+
+### 5. Secure Launch RLS (recommended)
+
+For initial public launch, use strict policies where frontend (`anon`) can only create pending orders.
+
+1. Run SQL from [supabase/sql/001_orders_secure_launch.sql](supabase/sql/001_orders_secure_launch.sql).
+2. Keep this in `.env`:
+
+```bash
+VITE_ALLOW_CLIENT_ORDER_UPDATES=false
+```
+
+With this mode:
+- Frontend can create new pending orders.
+- Frontend cannot directly update payment or order status in DB.
+- Trusted backend/service_role can update status later.
+
+Validation note:
+- In strict launch mode, anon role has no `select` privilege on `orders`.
+- Writes should use minimal return semantics (for example `Prefer: return=minimal`).
+- If a client requests representation data on insert/update, Supabase may return permission errors because row read access is intentionally blocked.
+
+## 📄 Google Sheets Order Persistence (No VM / No Lambda)
+
+If you want simpler operations than database + RLS, you can store orders in Google Sheets using a Google Apps Script Web App API.
+
+### 1. Create a Google Sheet
+
+Create columns in row 1:
+
+`id, created_at, updated_at, customer_name, customer_email, customer_phone, customer_address, customer_city, customer_pincode, total_amount, status, payment_status, items_json`
+
+### 2. Add Apps Script
+
+In the Sheet: Extensions -> Apps Script. Paste this code:
+
+```javascript
+function doPost(e) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  const payload = JSON.parse(e.postData.contents || '{}');
+
+  if (payload.action === 'create_order' && payload.order) {
+    const o = payload.order;
+    sheet.appendRow([
+      o.id,
+      o.createdAt,
+      o.updatedAt,
+      o.customer.name,
+      o.customer.email,
+      o.customer.phone,
+      o.customer.address,
+      o.customer.city,
+      o.customer.pincode,
+      o.totalAmount,
+      o.status,
+      o.paymentStatus,
+      JSON.stringify(o.items)
+    ]);
+    return ContentService.createTextOutput(JSON.stringify({ ok: true })).setMimeType(ContentService.MimeType.JSON);
+  }
+
+  if ((payload.action === 'update_payment' || payload.action === 'update_status') && payload.orderId) {
+    const values = sheet.getDataRange().getValues();
+    for (let i = 1; i < values.length; i++) {
+      if (values[i][0] === payload.orderId) {
+        if (payload.paymentStatus) sheet.getRange(i + 1, 12).setValue(payload.paymentStatus);
+        if (payload.status) sheet.getRange(i + 1, 11).setValue(payload.status);
+        sheet.getRange(i + 1, 3).setValue(payload.updatedAt || new Date().toISOString());
+        return ContentService.createTextOutput(JSON.stringify({ ok: true })).setMimeType(ContentService.MimeType.JSON);
+      }
+    }
+    return ContentService.createTextOutput(JSON.stringify({ ok: false, error: 'Order not found' })).setMimeType(ContentService.MimeType.JSON);
+  }
+
+  return ContentService.createTextOutput(JSON.stringify({ ok: false, error: 'Invalid payload' })).setMimeType(ContentService.MimeType.JSON);
+}
+```
+
+### 3. Deploy as Web App
+
+1. Click Deploy -> New deployment.
+2. Type: Web app.
+3. Execute as: Me.
+4. Who has access: Anyone.
+5. Deploy and copy the Web App URL.
+
+### 4. Configure frontend
+
+Set in `.env`:
+
+```bash
+VITE_GOOGLE_SHEETS_WEBHOOK_URL=https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec
+```
+
+Notes:
+- If `VITE_GOOGLE_SHEETS_WEBHOOK_URL` is configured, the app uses Google Sheets first.
+- If not configured, it falls back to Supabase.
+- Browser local order history remains enabled as a fallback.
+
 ## 📁 Project Structure
 
 ```
@@ -58,7 +232,7 @@ src/
 - **Animations**: Framer Motion
 - **Forms**: React Hook Form + Zod
 - **Notifications**: Sonner
-- **Data Persistence**: Spark KV Store (browser-based)
+- **Data Persistence**: Spark KV Store (browser-based) + optional Supabase cloud sync
 
 ## 🎯 Current Status
 

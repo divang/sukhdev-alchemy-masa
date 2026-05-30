@@ -11,7 +11,7 @@ export function useInitialData() {
 
   useEffect(() => {
     const initializeData = async () => {
-      const currentVersion = 12
+      const currentVersion = 13
       
       if (!categories || categories.length === 0 || (dataVersion ?? 0) < currentVersion) {
         setCategories([
@@ -39,7 +39,7 @@ export function useInitialData() {
             price: 350,
             image: 'images/products/garam-masala-premium.png',
             rating: 4.8,
-            reviewCount: 127,
+            reviewCount: 5,
             description: 'Made from the authentic family recipe. Our signature Mix Masala Premium Blend combines the finest aromatic spices to create a perfect balance of warmth and flavor.',
             ingredients: [
               'Cumin Seeds',
@@ -63,7 +63,7 @@ export function useInitialData() {
           price: 300,
           image: 'images/products/bharwa-masala-premium.png',
           rating: 4.7,
-          reviewCount: 98,
+          reviewCount: 4,
           description: 'Specially crafted Bharwa Masala for stuffed vegetables. This premium blend brings authentic North Indian flavors with a perfect mix of tangy and spicy notes.',
           ingredients: [
             'Coriander Powder',
@@ -86,7 +86,7 @@ export function useInitialData() {
           price: 330,
           image: 'images/products/chat-masala-premium.png',
           rating: 4.9,
-          reviewCount: 156,
+          reviewCount: 3,
           description: 'A tangy and zesty Chat Masala that transforms ordinary snacks into extraordinary treats. Perfect for fruits, salads, and street food favorites.',
           ingredients: [
             'Black Salt',
@@ -109,7 +109,7 @@ export function useInitialData() {
           price: 330,
           image: 'images/products/chhole-masala-premium.png',
           rating: 4.8,
-          reviewCount: 143,
+          reviewCount: 6,
           description: 'Authentic Chhole Masala that brings the taste of Punjab to your kitchen. Rich, aromatic, and perfectly balanced for the perfect chickpea curry.',
           ingredients: [
             'Coriander Seeds',

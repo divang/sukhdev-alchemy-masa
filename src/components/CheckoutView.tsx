@@ -13,7 +13,7 @@ type CheckoutViewProps = {
   cartItems: CartItem[]
   products: Product[]
   onBack: () => void
-  onOrderComplete: (order: Order) => void
+  onOrderComplete: (order: Order) => void | Promise<void>
 }
 
 export function CheckoutView({ cartItems, products, onBack, onOrderComplete }: CheckoutViewProps) {
@@ -37,7 +37,7 @@ export function CheckoutView({ cartItems, products, onBack, onOrderComplete }: C
   
   const cartTotal = cartItems.reduce((sum, item) => sum + calculateItemTotal(item), 0)
   
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
     if (!formData.name || !formData.email || !formData.phone || !formData.address || !formData.city || !formData.pincode) {
@@ -65,7 +65,7 @@ export function CheckoutView({ cartItems, products, onBack, onOrderComplete }: C
       updatedAt: new Date().toISOString()
     }
     
-    onOrderComplete(order)
+    await onOrderComplete(order)
     toast.success("Order placed successfully!")
   }
   
