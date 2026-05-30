@@ -511,8 +511,8 @@ function App() {
                 </SheetContent>
               </Sheet>
 
-              <h1 className="text-2xl md:text-3xl font-bold">Sukhdevi Alchemy Masala</h1>
-              <Badge variant="secondary" className="hidden sm:inline-flex">Premium Masala</Badge>
+              <h1 className="text-2xl md:text-3xl font-bold">Sukhdevi Alchemy</h1>
+              <Badge variant="secondary" className="inline-flex text-xs sm:text-sm">Premium Masala</Badge>
             </div>
 
             <div className="flex items-center gap-2">
@@ -614,7 +614,7 @@ function App() {
 
       <footer className="border-t bg-card mt-16">
         <div className="container mx-auto px-4 py-8 text-center text-sm text-muted-foreground">
-          <p>© 2026 Sukhdevi Alchemy Masala. Premium Masala & Organic Spices.</p>
+          <p>© 2026 Sukhdevi Alchemy. Premium Masala & Organic Spices.</p>
         </div>
       </footer>
 

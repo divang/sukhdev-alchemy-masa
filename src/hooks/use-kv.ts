@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useState } from "react"
 
 type Updater<T> = T | ((prev: T) => T)
 
@@ -21,10 +21,6 @@ function readStoredValue<T>(key: string, initialValue: T): T {
 
 export function useKV<T>(key: string, initialValue: T): readonly [T, (next: Updater<T>) => void] {
   const [value, setValue] = useState<T>(() => readStoredValue(key, initialValue))
-
-  useEffect(() => {
-    setValue(readStoredValue(key, initialValue))
-  }, [key, initialValue])
 
   const setPersistedValue = useCallback((next: Updater<T>) => {
     setValue((prev) => {
