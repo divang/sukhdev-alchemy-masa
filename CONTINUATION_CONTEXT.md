@@ -53,6 +53,18 @@ Latest pushed commit: 5032066
   - render <Toaster richColors position="top-center" /> with App
 - This should be committed and pushed before next manual auth test, otherwise UI may still appear silent.
 
+## Deployment Fix Added (GitHub Pages)
+- Root cause of `Supabase auth is not configured` on deployed site:
+   - GitHub Pages build did not receive Vite env values.
+- Workflow updated in .github/workflows/deploy-pages.yml to:
+   - fail fast when required secrets are missing
+   - inject VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY during `npm run build`
+   - inject optional VITE_AUTH_REDIRECT_URL during build
+- Required GitHub repo secrets now:
+   - VITE_SUPABASE_URL
+   - VITE_SUPABASE_ANON_KEY
+   - optional: VITE_AUTH_REDIRECT_URL
+
 ## How To Re-Run CLI Confirmation Test
 1. Export env vars in shell:
    - SUPABASE_URL
