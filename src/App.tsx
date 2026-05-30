@@ -135,6 +135,15 @@ function App() {
   }
   
   if (currentView === "payment" && currentOrder) {
+    const upiId = "poonam.om.107@okicici"
+    const upiName = "Sukhdevi Alchemy"
+    const amount = currentOrder.totalAmount.toFixed(2)
+    const transactionNote = `Order ${currentOrder.id}`
+    const upiLink = `upi://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(upiName)}&am=${encodeURIComponent(amount)}&cu=INR&tn=${encodeURIComponent(transactionNote)}`
+    const baseUrl = import.meta.env.BASE_URL || "/"
+    const normalizedBaseUrl = baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`
+    const qrCodeUrl = `${normalizedBaseUrl}images/products/SukhDeviAlchemy-UPI-Barcode.jpeg`
+
     return (
       <div className="min-h-screen bg-background">
         <header className="border-b bg-card sticky top-0 z-10">
@@ -164,7 +173,21 @@ function App() {
             
             <div className="border-2 border-dashed border-border p-6 rounded-lg">
               <p className="font-semibold mb-2">Pay using UPI:</p>
-              <p className="text-2xl font-mono font-bold text-primary mb-4">sukhdevialchemy@upi</p>
+              <p className="text-2xl font-mono font-bold text-primary mb-4">{upiId}</p>
+
+              <div className="mx-auto mb-4 w-fit rounded-lg border bg-white p-3">
+                <img
+                  src={qrCodeUrl}
+                  alt="UPI QR code for payment"
+                  className="h-56 w-56"
+                  loading="lazy"
+                />
+              </div>
+
+              <Button asChild variant="outline" className="mb-3">
+                <a href={upiLink}>Pay in UPI App</a>
+              </Button>
+
               <p className="text-sm text-muted-foreground">
                 Scan QR code or use UPI ID to complete payment
               </p>
