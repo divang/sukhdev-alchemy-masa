@@ -31,10 +31,10 @@ export function useInitialData() {
           name: 'Garam Masala Premium Blend',
           category: 'premium-masala',
           price: 350,
-          image: 'https://images.unsplash.com/photo-1596040033229-a0b1e2c7bf65?w=800&h=800&fit=crop&auto=format&q=80',
+          image: 'https://i.imgur.com/8xYQK5m.jpeg',
           rating: 4.8,
           reviewCount: 127,
-          description: 'Our signature Garam Masala Premium Blend combines the finest aromatic spices to create a perfect balance of warmth and flavor. Handcrafted using traditional methods, this blend adds depth and complexity to any dish.',
+          description: 'Made from the authentic family recipe. Our signature Garam Masala Premium Blend combines the finest aromatic spices to create a perfect balance of warmth and flavor.',
           ingredients: [
             'Cumin Seeds',
             'Coriander Seeds',
