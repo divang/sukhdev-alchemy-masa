@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useKV } from "@github/spark/hooks"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -17,10 +17,28 @@ import { toast } from "sonner"
 type View = "store" | "checkout" | "payment" | "tracking"
 
 function App() {
-  const [categories] = useKV<Category[]>("categories", [])
+  const [categories, setCategories] = useKV<Category[]>("categories", [])
   const [products] = useKV<Product[]>("products", [])
   const [cartItems, setCartItems] = useKV<CartItem[]>("cart", [])
   const [orders, setOrders] = useKV<Order[]>("orders", [])
+  
+  useEffect(() => {
+    if (categories && categories.length > 0) {
+      const rawSpicesCategory = categories.find(cat => 
+        cat.slug === 'raw-organic-spices' || cat.name === 'Raw Organic Spices'
+      )
+      
+      if (rawSpicesCategory && rawSpicesCategory.enabled) {
+        setCategories((current = []) =>
+          current.map(cat =>
+            (cat.slug === 'raw-organic-spices' || cat.name === 'Raw Organic Spices')
+              ? { ...cat, enabled: false }
+              : cat
+          )
+        )
+      }
+    }
+  }, [])
   
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
   const [cartOpen, setCartOpen] = useState(false)
@@ -203,7 +221,7 @@ function App() {
                   </SheetHeader>
                   <div className="mt-4">
                     <CategorySidebar
-                      categories={categories}
+                      categories={categories || []}
                       selectedCategory={selectedCategory}
                       onSelectCategory={(cat) => {
                         setSelectedCategory(cat)
