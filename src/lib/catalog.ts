@@ -56,6 +56,18 @@ type CatalogSnapshot = {
   source: "supabase" | "fallback"
 }
 
+function inferPackGrams(row: Pick<ProductRow, "id" | "tags" | "sku">) {
+  if (Array.isArray(row.tags) && row.tags.includes("combo-pack")) {
+    return 200
+  }
+
+  if (row.id === "sukhdevi-combo-pack" || row.sku === "PM-COMBO-001") {
+    return 200
+  }
+
+  return 50
+}
+
 export async function loadCatalogFromSupabase(): Promise<CatalogSnapshot> {
   if (!supabase || !isSupabaseConfigured) {
     return { categories: [], products: [], reviews: [], testimonials: [], source: "fallback" }
@@ -119,6 +131,7 @@ export async function loadCatalogFromSupabase(): Promise<CatalogSnapshot> {
     category: row.category_id,
     name: row.name,
     price: Number(row.price_per_100g),
+    packGrams: inferPackGrams(row),
     image: row.image_path,
     rating: Number(row.rating_avg),
     reviewCount: Number(row.review_count),
@@ -170,6 +183,32 @@ type SubmitReviewResult = {
   error?: string
 }
 
+type PurchasedOrderRow = {
+  items: Array<{ productId?: string }>
+}
+
+async function hasPaidPurchaseForProduct(userId: string, productId: string) {
+  if (!supabase || !isSupabaseConfigured) {
+    return { canReview: false, error: "Supabase is not configured." }
+  }
+
+  const { data, error } = await supabase
+    .from("orders")
+    .select("items")
+    .eq("user_id", userId)
+    .eq("payment_status", "paid")
+
+  if (error) {
+    return { canReview: false, error: error.message }
+  }
+
+  const canReview = ((data as PurchasedOrderRow[] | null) ?? []).some((order) =>
+    Array.isArray(order.items) && order.items.some((item) => item.productId === productId)
+  )
+
+  return { canReview }
+}
+
 export async function submitProductReview(input: SubmitReviewInput): Promise<SubmitReviewResult> {
   if (!supabase || !isSupabaseConfigured) {
     return { error: "Supabase is not configured." }
@@ -187,6 +226,15 @@ export async function submitProductReview(input: SubmitReviewInput): Promise<Sub
   const trimmedComment = input.comment.trim()
   if (!trimmedComment) {
     return { error: "Review comment cannot be empty." }
+  }
+
+  const purchaseStatus = await hasPaidPurchaseForProduct(user.id, input.productId)
+  if (purchaseStatus.error) {
+    return { error: purchaseStatus.error }
+  }
+
+  if (!purchaseStatus.canReview) {
+    return { error: "Only signed-in customers who purchased this item can review it." }
   }
 
   const { data, error } = await supabase
@@ -254,6 +302,7 @@ function mapProductRowToProduct(row: ProductRow): Product {
     category: row.category_id,
     name: row.name,
     price: Number(row.price_per_100g),
+    packGrams: inferPackGrams(row),
     image: row.image_path,
     rating: Number(row.rating_avg),
     reviewCount: Number(row.review_count),

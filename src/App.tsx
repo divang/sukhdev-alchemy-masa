@@ -19,12 +19,19 @@ import { toast } from "sonner"
 import { useInitialData } from "@/hooks/use-initial-data"
 import { getCurrentAuthState, signOutUser, subscribeToAuthStateChanges } from "@/lib/auth"
 import {
+  fetchCartForCurrentUser,
+  removeCartItemForCurrentUser,
+  replaceCartForCurrentUser,
+  upsertCartItemForCurrentUser,
+} from "@/lib/cart-persistence"
+import {
   fetchOrdersForAdmin,
   fetchOrdersForCurrentUser,
   persistOrderToSupabase,
   updateSupabaseOrderPayment,
 } from "@/lib/order-persistence"
 import { isSupabaseConfigured } from "@/lib/supabase"
+import { getProductPackGrams, hasPurchasedProduct } from "@/lib/pricing"
 
 type View = "store" | "account" | "checkout" | "payment" | "tracking" | "admin"
 
@@ -38,6 +45,44 @@ function mergeOrders(primary: Order[], secondary: Order[]) {
   return [...deduped.values()].sort(
     (left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime()
   )
+}
+
+function getCartItemKey(item: CartItem) {
+  return `${item.productId}:${item.grams}`
+}
+
+function mergeCartItems(primary: CartItem[], secondary: CartItem[]) {
+  const merged = new Map<string, CartItem>()
+
+  for (const item of [...primary, ...secondary]) {
+    const key = getCartItemKey(item)
+    const existing = merged.get(key)
+
+    if (existing) {
+      merged.set(key, { ...existing, quantity: existing.quantity + item.quantity })
+      continue
+    }
+
+    merged.set(key, item)
+  }
+
+  return [...merged.values()]
+}
+
+function normalizeCartItems(cartItems: CartItem[], products: Product[]) {
+  const normalized = cartItems.map((item) => {
+    const product = products.find((entry) => entry.id === item.productId)
+    if (!product) {
+      return item
+    }
+
+    return {
+      ...item,
+      grams: getProductPackGrams(product),
+    }
+  })
+
+  return mergeCartItems(normalized, [])
 }
 
 function App() {
@@ -137,6 +182,50 @@ function App() {
     }
   }, [profile])
 
+  useEffect(() => {
+    if (!products || products.length === 0) {
+      return
+    }
+
+    setCartItems((current = []) => normalizeCartItems(current, products))
+  }, [products, setCartItems])
+
+  useEffect(() => {
+    let isActive = true
+
+    async function syncPersistedCart() {
+      if (!profile || !isSupabaseConfigured) {
+        return
+      }
+
+      const result = await fetchCartForCurrentUser()
+      if (!isActive) {
+        return
+      }
+
+      if (result.error) {
+        console.error("Failed to load cart items", result.error)
+        return
+      }
+
+      const mergedCart = normalizeCartItems(mergeCartItems(cartItems || [], result.cartItems), products || [])
+      setCartItems(mergedCart)
+
+      const persistResult = await replaceCartForCurrentUser(mergedCart)
+      if (!isActive || persistResult.persisted || !persistResult.error) {
+        return
+      }
+
+      console.error("Failed to sync cart items", persistResult.error)
+    }
+
+    syncPersistedCart()
+
+    return () => {
+      isActive = false
+    }
+  }, [profile?.id])
+
   const filteredProducts = selectedCategory
     ? (products || []).filter((product) => product.category === selectedCategory)
     : products || []
@@ -149,42 +238,91 @@ function App() {
   const adminOrders = mergeOrders(cloudOrders, localOrders)
   const cartItemCount = (cartItems || []).reduce((sum, item) => sum + item.quantity, 0)
 
-  const handleAddToCart = (product: Product, grams: number = 100) => {
+  const persistCartItem = async (item: CartItem) => {
+    if (!profile || !isSupabaseConfigured) {
+      return
+    }
+
+    const result = await upsertCartItemForCurrentUser(item)
+    if (!result.persisted && result.error) {
+      console.error("Failed to save cart item", result.error)
+    }
+  }
+
+  const persistCartRemoval = async (productId: string, grams: number) => {
+    if (!profile || !isSupabaseConfigured) {
+      return
+    }
+
+    const result = await removeCartItemForCurrentUser(productId, grams)
+    if (!result.persisted && result.error) {
+      console.error("Failed to remove cart item", result.error)
+    }
+  }
+
+  const handleAddToCart = (product: Product, grams: number = getProductPackGrams(product)) => {
+    let nextItem: CartItem | null = null
+
     setCartItems((current = []) => {
-      const existingItem = current.find((item) => item.productId === product.id)
+      const normalized = normalizeCartItems(current, products || [])
+      const existingItem = normalized.find((item) => item.productId === product.id && item.grams === grams)
       if (existingItem) {
-        return current.map((item) =>
-          item.productId === product.id
+        nextItem = { ...existingItem, quantity: existingItem.quantity + 1 }
+        return normalized.map((item) =>
+          item.productId === product.id && item.grams === grams
             ? { ...item, quantity: item.quantity + 1, grams }
             : item
         )
       }
 
-      return [...current, { productId: product.id, quantity: 1, grams }]
+      nextItem = { productId: product.id, quantity: 1, grams }
+      return [...normalized, nextItem]
     })
+
+    if (nextItem) {
+      void persistCartItem(nextItem)
+    }
+
     toast.success(`${product.name} added to cart!`)
   }
 
   const handleUpdateQuantity = (productId: string, quantity: number) => {
     if (quantity < 1) return
-    setCartItems((current = []) =>
-      current.map((item) =>
-        item.productId === productId ? { ...item, quantity } : item
-      )
-    )
-  }
 
-  const handleUpdateGrams = (productId: string, grams: number) => {
+    let nextItem: CartItem | null = null
     setCartItems((current = []) =>
       current.map((item) =>
-        item.productId === productId ? { ...item, grams } : item
+        item.productId === productId
+          ? ((nextItem = { ...item, quantity }), { ...item, quantity })
+          : item
       )
     )
+
+    if (nextItem) {
+      void persistCartItem(nextItem)
+    }
   }
 
   const handleRemoveItem = (productId: string) => {
+    const targetItem = (cartItems || []).find((item) => item.productId === productId)
     setCartItems((current = []) => current.filter((item) => item.productId !== productId))
+
+    if (targetItem) {
+      void persistCartRemoval(targetItem.productId, targetItem.grams)
+    }
+
     toast.info("Item removed from cart")
+  }
+
+  const handleOpenAccount = () => {
+    if (profile) {
+      setCurrentView(profile.role === "admin" ? "admin" : "tracking")
+      return
+    }
+
+    setAuthMode("customer")
+    setPostAuthView("store")
+    setCurrentView("account")
   }
 
   const handleCheckout = () => {
@@ -261,6 +399,7 @@ function App() {
     setCloudOrders((current) => mergeOrders([nextOrder], current))
     setCurrentOrder(nextOrder)
     setCartItems([])
+    void replaceCartForCurrentUser([])
     setCurrentView("payment")
 
     const result = await persistOrderToSupabase(nextOrder)
@@ -530,19 +669,14 @@ function App() {
                 </Button>
               )}
 
+              <Button variant="ghost" size="icon" onClick={handleOpenAccount} className="sm:hidden" aria-label="Account">
+                <UserCircle size={18} />
+              </Button>
+
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => {
-                  if (profile) {
-                    setCurrentView(profile.role === "admin" ? "admin" : "tracking")
-                    return
-                  }
-
-                  setAuthMode("customer")
-                  setPostAuthView("store")
-                  setCurrentView("account")
-                }}
+                onClick={handleOpenAccount}
                 className="hidden sm:flex"
               >
                 <UserCircle size={18} className="mr-2" />
@@ -624,7 +758,6 @@ function App() {
         cartItems={cartItems ?? []}
         products={products ?? []}
         onUpdateQuantity={handleUpdateQuantity}
-        onUpdateGrams={handleUpdateGrams}
         onRemoveItem={handleRemoveItem}
         onCheckout={handleCheckout}
       />
@@ -633,6 +766,7 @@ function App() {
         <ProductDetailDialog
           product={selectedProduct}
           currentUser={profile}
+          canReview={Boolean(profile && profile.role === "customer" && hasPurchasedProduct(customerOrders, selectedProduct.id))}
           open={!!selectedProduct}
           onOpenChange={(open: boolean) => !open && setSelectedProduct(null)}
           onAddToCart={handleAddToCart}

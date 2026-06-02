@@ -9,24 +9,24 @@ import { Textarea } from "@/components/ui/textarea"
 import { ShoppingCart, VideoCamera } from "@phosphor-icons/react"
 import { StarRating } from "./StarRating"
 import type { Product, UserProfile } from "@/lib/types"
-import { GRAM_OPTIONS } from "@/lib/types"
 import { useState } from "react"
 import { useKV } from "@/hooks/use-kv"
 import type { Review } from "@/lib/types"
 import { getProductImage } from "@/lib/product-images"
 import { submitProductReview } from "@/lib/catalog"
 import { toast } from "sonner"
+import { getProductPackGrams, getProductPackLabel } from "@/lib/pricing"
 
 type ProductDetailDialogProps = {
   product: Product
   currentUser: UserProfile | null
+  canReview: boolean
   open: boolean
   onOpenChange: (open: boolean) => void
   onAddToCart: (product: Product, grams: number) => void
 }
 
-export function ProductDetailDialog({ product, currentUser, open, onOpenChange, onAddToCart }: ProductDetailDialogProps) {
-  const [selectedGrams, setSelectedGrams] = useState<number>(250)
+export function ProductDetailDialog({ product, currentUser, canReview, open, onOpenChange, onAddToCart }: ProductDetailDialogProps) {
   const [reviews, setReviews] = useKV<Review[]>("reviews", [])
   const [productImages] = useKV<Record<string, string>>("product-images", {})
   const [reviewRating, setReviewRating] = useState<string>("5")
@@ -37,7 +37,7 @@ export function ProductDetailDialog({ product, currentUser, open, onOpenChange, 
   const imageUrl = getProductImage(product, productImages ?? {})
   
   const handleAddToCart = () => {
-    onAddToCart(product, selectedGrams)
+    onAddToCart(product, getProductPackGrams(product))
     onOpenChange(false)
   }
 
@@ -49,6 +49,11 @@ export function ProductDetailDialog({ product, currentUser, open, onOpenChange, 
 
     if (!reviewComment.trim()) {
       toast.error("Please write a review comment before submitting.")
+      return
+    }
+
+    if (!canReview) {
+      toast.error("Only signed-in customers who purchased this item can review it.")
       return
     }
 
@@ -119,34 +124,21 @@ export function ProductDetailDialog({ product, currentUser, open, onOpenChange, 
             <div>
               <div className="flex items-baseline gap-2 mb-4">
                 <span className="text-3xl font-bold text-primary">₹{product.price}</span>
-                <span className="text-sm text-muted-foreground">/100g</span>
+                <span className="text-sm text-muted-foreground">{getProductPackLabel(product)}</span>
               </div>
               
               <div className="space-y-3">
-                <div>
-                  <label className="text-sm font-medium mb-2 block">Select Quantity:</label>
-                  <Select value={selectedGrams.toString()} onValueChange={(v) => setSelectedGrams(parseInt(v))}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {GRAM_OPTIONS.map((g) => (
-                        <SelectItem key={g} value={g.toString()}>
-                          {g}g - ₹{(product.price * (g / 100)).toFixed(2)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                <p className="text-sm text-muted-foreground">
+                  Fixed pack size: {getProductPackLabel(product)}
+                </p>
                 
                 <Button 
                   className="w-full" 
                   size="lg"
                   onClick={handleAddToCart}
-                  disabled={true}
                 >
                   <ShoppingCart size={20} className="mr-2" />
-                  Coming Soon
+                  Add to Cart
                 </Button>
               </div>
             </div>
@@ -186,7 +178,7 @@ export function ProductDetailDialog({ product, currentUser, open, onOpenChange, 
           <TabsContent value="reviews">
             <ScrollArea className="h-48">
               <div className="p-4 border-b space-y-3">
-                {currentUser ? (
+                {currentUser && canReview ? (
                   <>
                     <p className="text-sm font-medium">Write a review</p>
                     <div>
@@ -217,6 +209,10 @@ export function ProductDetailDialog({ product, currentUser, open, onOpenChange, 
                       {isSubmittingReview ? "Submitting..." : "Submit Review"}
                     </Button>
                   </>
+                ) : currentUser ? (
+                  <p className="text-sm text-muted-foreground">
+                    Complete a paid purchase for this item to unlock reviews on your account.
+                  </p>
                 ) : (
                   <p className="text-sm text-muted-foreground">Sign in to write a review.</p>
                 )}

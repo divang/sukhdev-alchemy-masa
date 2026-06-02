@@ -8,6 +8,7 @@ import { Separator } from "@/components/ui/separator"
 import { ArrowLeft } from "@phosphor-icons/react"
 import type { CartItem, Product, Order, UserProfile } from "@/lib/types"
 import { toast } from "sonner"
+import { calculateCartItemTotal, calculateCartSubtotal, calculateShippingAmount, FREE_SHIPPING_THRESHOLD, getProductPackLabel } from "@/lib/pricing"
 
 type CheckoutViewProps = {
   cartItems: CartItem[]
@@ -41,15 +42,9 @@ export function CheckoutView({ cartItems, products, accountProfile, onBack, onOr
   }, [accountProfile])
   
   const getProduct = (productId: string) => products.find(p => p.id === productId)
-  
-  const calculateItemTotal = (item: CartItem) => {
-    const product = getProduct(item.productId)
-    if (!product) return 0
-    const gramsMultiplier = item.grams / 100
-    return product.price * gramsMultiplier * item.quantity
-  }
-  
-  const cartTotal = cartItems.reduce((sum, item) => sum + calculateItemTotal(item), 0)
+  const cartSubtotal = calculateCartSubtotal(cartItems, products)
+  const shippingAmount = calculateShippingAmount(cartSubtotal)
+  const cartTotal = cartSubtotal + shippingAmount
   
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -72,6 +67,8 @@ export function CheckoutView({ cartItems, products, accountProfile, onBack, onOr
         }
       }),
       customer: formData,
+      subtotalAmount: cartSubtotal,
+      shippingAmount,
       totalAmount: cartTotal,
       status: "pending",
       paymentStatus: "pending",
@@ -197,19 +194,31 @@ export function CheckoutView({ cartItems, products, accountProfile, onBack, onOr
                   if (!product) return null
                   
                   return (
-                    <div key={item.productId} className="flex justify-between items-start text-sm">
+                    <div key={`${item.productId}-${item.grams}`} className="flex justify-between items-start text-sm">
                       <div className="flex-1">
                         <p className="font-medium">{product.name}</p>
                         <p className="text-muted-foreground text-xs">
-                          {item.grams}g × {item.quantity}
+                          {getProductPackLabel(product)} × {item.quantity}
                         </p>
                       </div>
-                      <p className="font-semibold">₹{calculateItemTotal(item).toFixed(2)}</p>
+                      <p className="font-semibold">₹{calculateCartItemTotal(item, product).toFixed(2)}</p>
                     </div>
                   )
                 })}
                 
                 <Separator />
+
+                <div className="flex justify-between items-center text-sm text-muted-foreground">
+                  <span>Subtotal</span>
+                  <span>₹{cartSubtotal.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between items-center text-sm text-muted-foreground">
+                  <span>Shipping across India</span>
+                  <span>{shippingAmount === 0 ? "Free" : `₹${shippingAmount.toFixed(2)}`}</span>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Shipping is free when the subtotal is above ₹{FREE_SHIPPING_THRESHOLD}. The combo pack qualifies automatically.
+                </p>
                 
                 <div className="flex justify-between items-center text-lg font-bold">
                   <span>Total:</span>

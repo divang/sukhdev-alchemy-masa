@@ -7,6 +7,7 @@ import type { Product } from "@/lib/types"
 import { motion } from "framer-motion"
 import { getProductImage } from "@/lib/product-images"
 import { useKV } from "@/hooks/use-kv"
+import { getProductPackLabel } from "@/lib/pricing"
 
 type ProductCardProps = {
   product: Product
@@ -50,7 +51,7 @@ export function ProductCard({ product, onViewDetails, onAddToCart }: ProductCard
         <CardFooter className="p-4 pt-0 flex flex-col gap-2">
           <div className="flex items-center justify-between w-full">
             <span className="text-2xl font-bold text-primary">₹{product.price}</span>
-            <span className="text-xs text-muted-foreground">/100g</span>
+            <span className="text-xs text-muted-foreground">{getProductPackLabel(product)}</span>
           </div>
           <div className="flex gap-2 w-full">
             <Button

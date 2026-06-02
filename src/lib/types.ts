@@ -11,6 +11,7 @@ export type Product = {
   name: string
   category: string
   price: number
+  packGrams?: number
   image: string
   rating: number
   reviewCount: number
@@ -56,6 +57,8 @@ export type Order = {
     city: string
     pincode: string
   }
+  subtotalAmount?: number
+  shippingAmount?: number
   totalAmount: number
   status: 'pending' | 'processing' | 'shipped' | 'delivered'
   paymentStatus: 'pending' | 'paid'
@@ -84,5 +87,5 @@ export type Testimonial = {
   location: string
 }
 
-export const GRAM_OPTIONS = [100, 250, 500, 1000] as const
+export const GRAM_OPTIONS = [50] as const
 export type GramOption = typeof GRAM_OPTIONS[number]
