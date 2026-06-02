@@ -603,7 +603,6 @@ function App() {
                   size={224}
                   level="H"
                   includeMargin={true}
-                  alt="UPI QR code for payment"
                 />
               </div>
 
