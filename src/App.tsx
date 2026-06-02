@@ -35,6 +35,7 @@ import {
 import { isSupabaseConfigured } from "@/lib/supabase"
 import { getProductPackGrams, hasPurchasedProduct } from "@/lib/pricing"
 import { defaultFeatureFlags, fetchFeatureFlags } from "@/lib/feature-flags"
+import { fallbackUpiConfig, fetchActiveUpiConfig } from "@/lib/payment-upi"
 
 type View = "store" | "account" | "checkout" | "payment" | "tracking" | "admin"
 
@@ -107,6 +108,12 @@ function App() {
   const [postAuthView, setPostAuthView] = useState<View>("store")
   const [cloudOrders, setCloudOrders] = useState<Order[]>([])
   const [featureFlags, setFeatureFlags] = useState(defaultFeatureFlags)
+  const [activeUpiConfig, setActiveUpiConfig] = useState(fallbackUpiConfig)
+  const socialProfiles = [
+    { name: "Instagram", handle: "@sukhdevialchemy", url: "https://instagram.com" },
+    { name: "YouTube", handle: "@sukhdevialchemy", url: "https://youtube.com" },
+    { name: "WhatsApp", handle: "@sukhdevialchemy", url: "https://wa.me" },
+  ]
 
   // Hash-based admin route: visiting /#admin opens admin login directly.
   useEffect(() => {
@@ -174,6 +181,31 @@ function App() {
       subscription.unsubscribe()
     }
   }, [])
+
+  useEffect(() => {
+    let isActive = true
+
+    async function loadActiveUpiConfig() {
+      const result = await fetchActiveUpiConfig()
+      if (!isActive) {
+        return
+      }
+
+      if (result.error) {
+        console.error("Failed to load active UPI config", result.error)
+      }
+
+      setActiveUpiConfig(result.config)
+    }
+
+    if (currentView === "payment") {
+      void loadActiveUpiConfig()
+    }
+
+    return () => {
+      isActive = false
+    }
+  }, [currentView])
 
   useEffect(() => {
     let isActive = true
@@ -521,6 +553,20 @@ function App() {
     }
   }
 
+  const handleOpenCampaignLab = () => {
+    setSelectedCategory(null)
+    if (currentView !== "store") {
+      setCurrentView("store")
+    }
+
+    requestAnimationFrame(() => {
+      const campaignSection = document.getElementById("campaign-lab")
+      if (campaignSection) {
+        campaignSection.scrollIntoView({ behavior: "smooth", block: "start" })
+      }
+    })
+  }
+
   if (currentView === "account") {
     return (
       <AuthView
@@ -554,8 +600,8 @@ function App() {
   }
 
   if (currentView === "payment" && currentOrder) {
-    const upiId = "poonam.om.107@okicici"
-    const upiName = "Sukhdevi Alchemy"
+    const upiId = activeUpiConfig.upiId
+    const upiName = activeUpiConfig.payeeName
     const amount = currentOrder.totalAmount.toFixed(2)
     const transactionNote = `Order ${currentOrder.id}`
     const upiParams = `pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(upiName)}&am=${encodeURIComponent(amount)}&cu=INR&tn=${encodeURIComponent(transactionNote)}`
@@ -596,6 +642,9 @@ function App() {
 
             <div className="border-2 border-dashed border-border p-6 rounded-lg">
               <p className="font-semibold mb-2">Pay using UPI:</p>
+              <p className="text-xs text-muted-foreground mb-3">
+                Active account: {activeUpiConfig.displayName} ({activeUpiConfig.upiId})
+              </p>
 
               <div className="mx-auto mb-4 w-fit rounded-lg border bg-white p-3">
                 <QRCode
@@ -714,6 +763,11 @@ function App() {
                         setSelectedCategory(category)
                         setMobileMenuOpen(false)
                       }}
+                      showCampaignLab={featureFlags.enableSocialExperimentSection}
+                      onOpenCampaignLab={() => {
+                        handleOpenCampaignLab()
+                        setMobileMenuOpen(false)
+                      }}
                     />
                   </div>
                 </SheetContent>
@@ -722,16 +776,22 @@ function App() {
               <h1 className="truncate text-lg sm:text-2xl md:text-3xl font-bold">Sukhdevi Alchemy</h1>
               <Badge variant="secondary" className="hidden md:inline-flex text-xs sm:text-sm">Premium Masala</Badge>
               {featureFlags.enableSocialIcons && (
-                <div className="hidden lg:flex items-center gap-1.5 pl-1">
-                  <a href="https://instagram.com" target="_blank" rel="noreferrer" aria-label="Open Instagram" className="rounded-full border p-1.5 text-muted-foreground transition hover:text-foreground">
-                    <InstagramLogo size={16} weight="duotone" />
-                  </a>
-                  <a href="https://youtube.com" target="_blank" rel="noreferrer" aria-label="Open YouTube" className="rounded-full border p-1.5 text-muted-foreground transition hover:text-foreground">
-                    <YoutubeLogo size={16} weight="duotone" />
-                  </a>
-                  <a href="https://wa.me" target="_blank" rel="noreferrer" aria-label="Open WhatsApp" className="rounded-full border p-1.5 text-muted-foreground transition hover:text-foreground">
-                    <WhatsappLogo size={16} weight="duotone" />
-                  </a>
+                <div className="hidden xl:flex items-center gap-1.5 pl-1">
+                  {socialProfiles.map((profile) => (
+                    <a
+                      key={profile.name}
+                      href={profile.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      aria-label={`Open ${profile.name}`}
+                      className="rounded-full border px-2 py-1 text-muted-foreground transition hover:text-foreground flex items-center gap-1"
+                    >
+                      {profile.name === "Instagram" && <InstagramLogo size={14} weight="duotone" />}
+                      {profile.name === "YouTube" && <YoutubeLogo size={14} weight="duotone" />}
+                      {profile.name === "WhatsApp" && <WhatsappLogo size={14} weight="duotone" />}
+                      <span className="text-[11px] leading-none">{profile.handle}</span>
+                    </a>
+                  ))}
                 </div>
               )}
             </div>
@@ -794,6 +854,8 @@ function App() {
                 categories={categories || []}
                 selectedCategory={selectedCategory}
                 onSelectCategory={setSelectedCategory}
+                showCampaignLab={featureFlags.enableSocialExperimentSection}
+                onOpenCampaignLab={handleOpenCampaignLab}
               />
             </div>
           </aside>

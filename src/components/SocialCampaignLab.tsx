@@ -42,8 +42,14 @@ const reelDrafts: ReelDraft[] = [
 ]
 
 export function SocialCampaignLab({ showReels, showChefCta, showSocialIcons }: SocialCampaignLabProps) {
+  const socialProfiles = [
+    { name: "Instagram", handle: "@sukhdevialchemy", url: "https://instagram.com" },
+    { name: "YouTube", handle: "@sukhdevialchemy", url: "https://youtube.com" },
+    { name: "WhatsApp", handle: "@sukhdevialchemy", url: "https://wa.me" },
+  ]
+
   return (
-    <section className="mb-8 overflow-hidden rounded-2xl border bg-gradient-to-br from-orange-50 via-amber-50 to-lime-50 p-5 shadow-sm sm:p-8">
+    <section id="campaign-lab" className="mb-8 overflow-hidden rounded-2xl border bg-gradient-to-br from-orange-50 via-amber-50 to-lime-50 p-5 shadow-sm sm:p-8">
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div className="max-w-2xl">
           <Badge className="mb-3 bg-orange-600 text-white hover:bg-orange-600">Campaign Lab</Badge>
@@ -54,16 +60,27 @@ export function SocialCampaignLab({ showReels, showChefCta, showSocialIcons }: S
         </div>
 
         {showSocialIcons && (
-          <div className="flex items-center gap-2">
-            <a href="https://instagram.com" target="_blank" rel="noreferrer" aria-label="Open Instagram" className="rounded-full border border-orange-200 bg-white p-2 text-slate-700 transition hover:-translate-y-0.5 hover:text-orange-700">
-              <InstagramLogo size={18} weight="duotone" />
-            </a>
-            <a href="https://youtube.com" target="_blank" rel="noreferrer" aria-label="Open YouTube" className="rounded-full border border-orange-200 bg-white p-2 text-slate-700 transition hover:-translate-y-0.5 hover:text-orange-700">
-              <YoutubeLogo size={18} weight="duotone" />
-            </a>
-            <a href="https://wa.me" target="_blank" rel="noreferrer" aria-label="Open WhatsApp" className="rounded-full border border-orange-200 bg-white p-2 text-slate-700 transition hover:-translate-y-0.5 hover:text-orange-700">
-              <WhatsappLogo size={18} weight="duotone" />
-            </a>
+          <div className="grid gap-2 sm:grid-cols-3">
+            {socialProfiles.map((profile) => (
+              <a
+                key={profile.name}
+                href={profile.url}
+                target="_blank"
+                rel="noreferrer"
+                aria-label={`Open ${profile.name}`}
+                className="rounded-xl border border-orange-200 bg-white px-3 py-2 text-slate-700 transition hover:-translate-y-0.5 hover:text-orange-700"
+              >
+                <div className="flex items-center gap-2">
+                  {profile.name === "Instagram" && <InstagramLogo size={18} weight="duotone" />}
+                  {profile.name === "YouTube" && <YoutubeLogo size={18} weight="duotone" />}
+                  {profile.name === "WhatsApp" && <WhatsappLogo size={18} weight="duotone" />}
+                  <div className="leading-tight">
+                    <p className="text-xs font-medium">{profile.name}</p>
+                    <p className="text-xs text-slate-500">{profile.handle}</p>
+                  </div>
+                </div>
+              </a>
+            ))}
           </div>
         )}
       </div>
