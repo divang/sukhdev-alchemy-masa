@@ -15,7 +15,6 @@ import { TestimonialsSection } from "@/components/TestimonialsSection"
 import { ContactUsSection } from "@/components/ContactUsSection"
 import { AdminPanel } from "@/components/AdminPanel"
 import { AuthView } from "@/components/AuthView"
-import { SocialCampaignLab } from "@/components/SocialCampaignLab"
 import type { Category, Product, CartItem, Order, UserProfile } from "@/lib/types"
 import { toast } from "sonner"
 import { useInitialData } from "@/hooks/use-initial-data"
@@ -109,8 +108,6 @@ function App() {
   const [cloudOrders, setCloudOrders] = useState<Order[]>([])
   const [featureFlags, setFeatureFlags] = useKV("feature-flags", defaultFeatureFlags)
   const [activeUpiConfig, setActiveUpiConfig] = useState(fallbackUpiConfig)
-  const forceShowCampaignLab = true
-  const isCampaignLabVisible = forceShowCampaignLab || featureFlags.enableSocialExperimentSection
   const socialProfiles = [
     { name: "Instagram", handle: "@sukhdevialchemy", url: "https://instagram.com/sukhdevialchemy" },
     { name: "YouTube", handle: "@sukhdevialchemy", url: "https://youtube.com/@sukhdevialchemy" },
@@ -557,20 +554,6 @@ function App() {
     }
   }
 
-  const handleOpenCampaignLab = () => {
-    setSelectedCategory(null)
-    if (currentView !== "store") {
-      setCurrentView("store")
-    }
-
-    requestAnimationFrame(() => {
-      const campaignSection = document.getElementById("campaign-lab")
-      if (campaignSection) {
-        campaignSection.scrollIntoView({ behavior: "smooth", block: "start" })
-      }
-    })
-  }
-
   if (currentView === "account") {
     return (
       <AuthView
@@ -767,11 +750,6 @@ function App() {
                         setSelectedCategory(category)
                         setMobileMenuOpen(false)
                       }}
-                      showCampaignLab={isCampaignLabVisible}
-                      onOpenCampaignLab={() => {
-                        handleOpenCampaignLab()
-                        setMobileMenuOpen(false)
-                      }}
                     />
                   </div>
                 </SheetContent>
@@ -779,25 +757,23 @@ function App() {
 
               <h1 className="truncate text-lg sm:text-2xl md:text-3xl font-bold">Sukhdevi Alchemy</h1>
               <Badge variant="secondary" className="hidden md:inline-flex text-xs sm:text-sm">Premium Masala</Badge>
-              {featureFlags.enableSocialIcons && (
-                <div className="hidden xl:flex items-center gap-1.5 pl-1">
-                  {socialProfiles.map((profile) => (
-                    <a
-                      key={profile.name}
-                      href={profile.url}
-                      target="_blank"
-                      rel="noreferrer"
-                      aria-label={`Open ${profile.name}`}
-                      title={`${profile.name} ${profile.handle}`}
-                      className="rounded-full border p-1.5 text-muted-foreground transition hover:text-foreground"
-                    >
-                      {profile.name === "Instagram" && <InstagramLogo size={14} weight="duotone" />}
-                      {profile.name === "YouTube" && <YoutubeLogo size={14} weight="duotone" />}
-                      {profile.name === "WhatsApp" && <WhatsappLogo size={14} weight="duotone" />}
-                    </a>
-                  ))}
-                </div>
-              )}
+              <div className="hidden xl:flex items-center gap-1.5 pl-1">
+                {socialProfiles.map((profile) => (
+                  <a
+                    key={profile.name}
+                    href={profile.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    aria-label={`Open ${profile.name}`}
+                    title={`${profile.name} ${profile.handle}`}
+                    className="rounded-full border p-1.5 text-muted-foreground transition hover:text-foreground"
+                  >
+                    {profile.name === "Instagram" && <InstagramLogo size={14} weight="duotone" />}
+                    {profile.name === "YouTube" && <YoutubeLogo size={14} weight="duotone" />}
+                    {profile.name === "WhatsApp" && <WhatsappLogo size={14} weight="duotone" />}
+                  </a>
+                ))}
+              </div>
             </div>
 
             <div className="flex items-center gap-1 sm:gap-2">
@@ -848,25 +824,23 @@ function App() {
             </div>
           </div>
 
-          {featureFlags.enableSocialIcons && (
-            <div className="mt-2 flex items-center gap-2 xl:hidden">
-              {socialProfiles.map((profile) => (
-                <a
-                  key={`mobile-${profile.name}`}
-                  href={profile.url}
-                  target="_blank"
-                  rel="noreferrer"
-                  aria-label={`Open ${profile.name}`}
-                  title={`${profile.name} ${profile.handle}`}
-                  className="rounded-full border p-1.5 text-muted-foreground transition hover:text-foreground"
-                >
-                  {profile.name === "Instagram" && <InstagramLogo size={14} weight="duotone" />}
-                  {profile.name === "YouTube" && <YoutubeLogo size={14} weight="duotone" />}
-                  {profile.name === "WhatsApp" && <WhatsappLogo size={14} weight="duotone" />}
-                </a>
-              ))}
-            </div>
-          )}
+          <div className="mt-2 flex items-center gap-2 xl:hidden">
+            {socialProfiles.map((profile) => (
+              <a
+                key={`mobile-${profile.name}`}
+                href={profile.url}
+                target="_blank"
+                rel="noreferrer"
+                aria-label={`Open ${profile.name}`}
+                title={`${profile.name} ${profile.handle}`}
+                className="rounded-full border p-1.5 text-muted-foreground transition hover:text-foreground"
+              >
+                {profile.name === "Instagram" && <InstagramLogo size={14} weight="duotone" />}
+                {profile.name === "YouTube" && <YoutubeLogo size={14} weight="duotone" />}
+                {profile.name === "WhatsApp" && <WhatsappLogo size={14} weight="duotone" />}
+              </a>
+            ))}
+          </div>
         </div>
       </header>
 
@@ -878,21 +852,11 @@ function App() {
                 categories={categories || []}
                 selectedCategory={selectedCategory}
                 onSelectCategory={setSelectedCategory}
-                showCampaignLab={isCampaignLabVisible}
-                onOpenCampaignLab={handleOpenCampaignLab}
               />
             </div>
           </aside>
 
           <main className="flex-1">
-            {isCampaignLabVisible && (
-              <SocialCampaignLab
-                showReels={featureFlags.enableRestaurantToHomeReels}
-                showChefCta={featureFlags.enableChefSampleCta}
-                showSocialIcons={featureFlags.enableSocialIcons}
-              />
-            )}
-
             <div className="mb-6">
               <h2 className="text-2xl font-bold mb-2">
                 {selectedCategory
