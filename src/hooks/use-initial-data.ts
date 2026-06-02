@@ -195,7 +195,7 @@ export function useInitialData() {
           category: 'premium-masala',
           price: 640,
           packGrams: 200,
-          image: 'images/products/garam-masala-premium.png',
+          image: 'images/products/SDA-Combo-Pack.jpeg',
           rating: 5,
           reviewCount: 0,
           description: 'All four signature 50g masalas in one order: Bharwa Masala, Chaat Masala, Chole Masala, and Mix Masala Premium Blend. Free shipping applies automatically because the combo subtotal is above ₹500.',
