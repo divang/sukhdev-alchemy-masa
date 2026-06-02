@@ -7,6 +7,7 @@
         "dev": "vite",
         "kill": "fuser -k 5000/tcp",
         "build": "tsc -b --noCheck && vite build",
+        "build:docs": "npm run build && node scripts/build-docs.mjs",
         "lint": "eslint .",
         "test:email-confirmation": "node scripts/test-email-confirmation.mjs",
         "test:signin-latency": "node scripts/test-signin-latency.mjs",
