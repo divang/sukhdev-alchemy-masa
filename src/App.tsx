@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react"
 import { useKV } from "@/hooks/use-kv"
-import { ShoppingCart, List, Package, CreditCard, Gear, SignOut, UserCircle } from "@phosphor-icons/react"
+import { ShoppingCart, List, Package, CreditCard, Gear, SignOut, UserCircle, InstagramLogo, WhatsappLogo, YoutubeLogo } from "@phosphor-icons/react"
 import { QRCodeSVG as QRCode } from "qrcode.react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -15,6 +15,7 @@ import { TestimonialsSection } from "@/components/TestimonialsSection"
 import { ContactUsSection } from "@/components/ContactUsSection"
 import { AdminPanel } from "@/components/AdminPanel"
 import { AuthView } from "@/components/AuthView"
+import { SocialCampaignLab } from "@/components/SocialCampaignLab"
 import type { Category, Product, CartItem, Order, UserProfile } from "@/lib/types"
 import { toast } from "sonner"
 import { useInitialData } from "@/hooks/use-initial-data"
@@ -33,6 +34,7 @@ import {
 } from "@/lib/order-persistence"
 import { isSupabaseConfigured } from "@/lib/supabase"
 import { getProductPackGrams, hasPurchasedProduct } from "@/lib/pricing"
+import { defaultFeatureFlags, fetchFeatureFlags } from "@/lib/feature-flags"
 
 type View = "store" | "account" | "checkout" | "payment" | "tracking" | "admin"
 
@@ -104,6 +106,7 @@ function App() {
   const [authMode, setAuthMode] = useState<"customer" | "admin">("customer")
   const [postAuthView, setPostAuthView] = useState<View>("store")
   const [cloudOrders, setCloudOrders] = useState<Order[]>([])
+  const [featureFlags, setFeatureFlags] = useState(defaultFeatureFlags)
 
   // Hash-based admin route: visiting /#admin opens admin login directly.
   useEffect(() => {
@@ -205,6 +208,29 @@ function App() {
       isActive = false
     }
   }, [profile])
+
+  useEffect(() => {
+    let isActive = true
+
+    async function loadFeatureFlags() {
+      const result = await fetchFeatureFlags()
+      if (!isActive) {
+        return
+      }
+
+      if (result.error) {
+        console.error("Failed to load feature flags", result.error)
+      }
+
+      setFeatureFlags(result.flags)
+    }
+
+    void loadFeatureFlags()
+
+    return () => {
+      isActive = false
+    }
+  }, [])
 
   useEffect(() => {
     if (!products || products.length === 0) {
@@ -696,6 +722,19 @@ function App() {
 
               <h1 className="truncate text-lg sm:text-2xl md:text-3xl font-bold">Sukhdevi Alchemy</h1>
               <Badge variant="secondary" className="hidden md:inline-flex text-xs sm:text-sm">Premium Masala</Badge>
+              {featureFlags.enableSocialIcons && (
+                <div className="hidden lg:flex items-center gap-1.5 pl-1">
+                  <a href="https://instagram.com" target="_blank" rel="noreferrer" aria-label="Open Instagram" className="rounded-full border p-1.5 text-muted-foreground transition hover:text-foreground">
+                    <InstagramLogo size={16} weight="duotone" />
+                  </a>
+                  <a href="https://youtube.com" target="_blank" rel="noreferrer" aria-label="Open YouTube" className="rounded-full border p-1.5 text-muted-foreground transition hover:text-foreground">
+                    <YoutubeLogo size={16} weight="duotone" />
+                  </a>
+                  <a href="https://wa.me" target="_blank" rel="noreferrer" aria-label="Open WhatsApp" className="rounded-full border p-1.5 text-muted-foreground transition hover:text-foreground">
+                    <WhatsappLogo size={16} weight="duotone" />
+                  </a>
+                </div>
+              )}
             </div>
 
             <div className="flex items-center gap-1 sm:gap-2">
@@ -761,6 +800,14 @@ function App() {
           </aside>
 
           <main className="flex-1">
+            {featureFlags.enableSocialExperimentSection && (
+              <SocialCampaignLab
+                showReels={featureFlags.enableRestaurantToHomeReels}
+                showChefCta={featureFlags.enableChefSampleCta}
+                showSocialIcons={featureFlags.enableSocialIcons}
+              />
+            )}
+
             <div className="mb-6">
               <h2 className="text-2xl font-bold mb-2">
                 {selectedCategory
