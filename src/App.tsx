@@ -509,22 +509,22 @@ function App() {
           </div>
         </header>
 
-        <div className="container mx-auto px-4 py-8 max-w-2xl">
-          <div className="bg-card rounded-lg p-8 text-center space-y-6">
+        <div className="container mx-auto px-4 py-6 max-w-lg">
+          <div className="bg-card rounded-lg p-4 sm:p-6 text-center space-y-5">
             <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto">
               <CreditCard size={32} className="text-primary" />
             </div>
 
             <h2 className="text-2xl font-bold">Complete Your Payment</h2>
 
-            <div className="bg-muted p-6 rounded-lg space-y-4">
-              <div className="flex justify-between text-lg">
-                <span>Order ID:</span>
-                <span className="font-mono font-bold">{currentOrder.id}</span>
+            <div className="bg-muted px-4 py-4 rounded-lg space-y-3 text-left">
+              <div>
+                <p className="text-xs text-muted-foreground uppercase tracking-wide">Order ID</p>
+                <p className="text-sm font-mono font-semibold break-all">{currentOrder.id}</p>
               </div>
-              <div className="flex justify-between text-2xl font-bold">
-                <span>Amount:</span>
-                <span className="text-primary">₹{currentOrder.totalAmount.toFixed(2)}</span>
+              <div className="flex justify-between items-center">
+                <span className="text-base font-medium">Amount</span>
+                <span className="text-2xl font-bold text-primary">₹{currentOrder.totalAmount.toFixed(2)}</span>
               </div>
             </div>
 
@@ -556,11 +556,11 @@ function App() {
               <p className="text-blue-800 mt-2">Complete your UPI payment above, then confirm to update the order status. Your account keeps this order tied to your login for future tracking and review requests.</p>
             </div>
 
-            <div className="flex gap-4">
-              <Button variant="outline" className="flex-1" onClick={handleBackToStore}>
+            <div className="flex flex-col sm:flex-row gap-3 w-full">
+              <Button variant="outline" className="w-full sm:flex-1" onClick={handleBackToStore}>
                 Back to Store
               </Button>
-              <Button className="flex-1" onClick={handlePaymentComplete}>
+              <Button className="w-full sm:flex-1" onClick={handlePaymentComplete}>
                 I have completed payment
               </Button>
             </div>

@@ -59,12 +59,39 @@ function maskEmail(email: string | undefined) {
 }
 
 function authDebug(message: string, details?: Record<string, unknown>) {
+  const ts = new Date().toISOString()
   if (details) {
-    console.log(`[auth] ${message}`, details)
+    console.log(`[auth ${ts}] ${message}`, details)
     return
   }
 
-  console.log(`[auth] ${message}`)
+  console.log(`[auth ${ts}] ${message}`)
+}
+
+function networkDiagnostics(): Record<string, unknown> {
+  if (typeof navigator === "undefined") {
+    return { network: "unavailable" }
+  }
+
+  const conn = (navigator as unknown as { connection?: { effectiveType?: string; downlink?: number; rtt?: number } }).connection
+  return {
+    online: navigator.onLine,
+    effectiveType: conn?.effectiveType ?? "unknown",
+    downlink: conn?.downlink ?? "unknown",
+    rtt: conn?.rtt ?? "unknown",
+  }
+}
+
+function classifySupabaseError(message: string): string {
+  const m = message.toLowerCase()
+  if (m.includes("rate limit") || m.includes("too many requests") || m.includes("429")) return "rate_limit"
+  if (m.includes("timed out") || m.includes("timeout") || m.includes("network")) return "timeout_or_network"
+  if (m.includes("email") && m.includes("confirmation")) return "smtp_confirmation_failure"
+  if (m.includes("invalid login credentials") || m.includes("invalid password")) return "bad_credentials"
+  if (m.includes("user already registered")) return "duplicate_signup"
+  if (m.includes("email not confirmed")) return "email_not_confirmed"
+  if (m.includes("pgrst") || m.includes("postgrest")) return "db_rls_or_schema"
+  return "unknown"
 }
 
 function mapSignupErrorMessage(message: string) {
@@ -135,10 +162,12 @@ async function saveProfile(profile: UserProfile): Promise<string | undefined> {
     return "Supabase auth is not configured."
   }
 
+  const saveStart = Date.now()
   authDebug("saveProfile started", {
     userId: profile.id,
     email: maskEmail(profile.email),
     role: profile.role,
+    ...networkDiagnostics(),
   })
 
   const { error } = await supabase.from("profiles").upsert(
@@ -155,21 +184,33 @@ async function saveProfile(profile: UserProfile): Promise<string | undefined> {
   )
 
   if (error) {
-    authDebug("saveProfile failed", {
+    authDebug("saveProfile FAILED", {
       userId: profile.id,
       error: error.message,
+      errorCode: (error as { code?: string }).code,
+      errorHint: (error as { hint?: string }).hint,
+      rcaCategory: classifySupabaseError(error.message),
+      durationMs: Date.now() - saveStart,
     })
     return error.message
   }
 
-  authDebug("saveProfile succeeded", { userId: profile.id })
+  authDebug("saveProfile succeeded", { userId: profile.id, durationMs: Date.now() - saveStart })
   return undefined
 }
 
 export async function fetchProfile(user: User): Promise<UserProfile | null> {
   if (!supabase || !isSupabaseConfigured) {
+    authDebug("fetchProfile skipped: Supabase not configured", { userId: user.id })
     return null
   }
+
+  const fetchStart = Date.now()
+  authDebug("fetchProfile started", {
+    userId: user.id,
+    email: maskEmail(user.email),
+    ...networkDiagnostics(),
+  })
 
   const { data, error } = await supabase
     .from("profiles")
@@ -177,29 +218,48 @@ export async function fetchProfile(user: User): Promise<UserProfile | null> {
     .eq("id", user.id)
     .maybeSingle()
 
+  authDebug("fetchProfile query completed", {
+    userId: user.id,
+    durationMs: Date.now() - fetchStart,
+    hasData: Boolean(data),
+    hasError: Boolean(error),
+    errorMessage: error?.message,
+    rcaCategory: error ? classifySupabaseError(error.message) : "none",
+  })
+
   if (error) {
-    authDebug("fetchProfile query failed, using metadata fallback", {
+    authDebug("fetchProfile FAILED — using metadata fallback", {
       userId: user.id,
       email: maskEmail(user.email),
       error: error.message,
+      errorCode: (error as { code?: string }).code,
+      rcaCategory: classifySupabaseError(error.message),
     })
-    console.error("Failed to load profile", error)
+    console.error("[auth] fetchProfile error", error)
     return buildProfileFromMetadata(user)
   }
 
   if (!data) {
-    authDebug("fetchProfile no row found, attempting backfill", {
+    authDebug("fetchProfile: no row found — attempting backfill", {
       userId: user.id,
       email: maskEmail(user.email),
     })
     const fallback = buildProfileFromMetadata(user)
     const saveError = await saveProfile(fallback)
     if (saveError) {
-      console.error("Failed to backfill profile", saveError)
+      authDebug("fetchProfile backfill FAILED", { userId: user.id, saveError })
+      console.error("[auth] fetchProfile backfill failed", saveError)
+    } else {
+      authDebug("fetchProfile backfill succeeded", { userId: user.id })
     }
     return fallback
   }
 
+  authDebug("fetchProfile row loaded", {
+    userId: user.id,
+    role: data.role,
+    durationMs: Date.now() - fetchStart,
+  })
   return mapProfileRow(data, user)
 }
 
@@ -217,8 +277,12 @@ async function buildAuthState(session: Session | null): Promise<AuthState> {
 
 export async function getCurrentAuthState(): Promise<AuthState> {
   if (!supabase || !isSupabaseConfigured) {
+    authDebug("getCurrentAuthState skipped: Supabase not configured")
     return { user: null, profile: null }
   }
+
+  const start = Date.now()
+  authDebug("getCurrentAuthState started", networkDiagnostics())
 
   try {
     const { data } = await withTimeout(
@@ -226,10 +290,18 @@ export async function getCurrentAuthState(): Promise<AuthState> {
       10000,
       "getSession timed out"
     )
+    authDebug("getCurrentAuthState getSession completed", {
+      durationMs: Date.now() - start,
+      hasSession: Boolean(data.session),
+      userId: data.session?.user?.id ?? null,
+    })
     return buildAuthState(data.session)
   } catch (error) {
-    authDebug("getCurrentAuthState failed", {
+    authDebug("getCurrentAuthState FAILED", {
       error: error instanceof Error ? error.message : String(error),
+      rcaCategory: error instanceof Error ? classifySupabaseError(error.message) : "unknown",
+      durationMs: Date.now() - start,
+      ...networkDiagnostics(),
     })
     return { user: null, profile: null }
   }
@@ -241,11 +313,18 @@ export function subscribeToAuthStateChanges(callback: (state: AuthState) => void
   }
 
   const { data } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    authDebug("onAuthStateChange fired", {
+      event: _event,
+      hasSession: Boolean(session),
+      userId: session?.user?.id ?? null,
+    })
     try {
       callback(await buildAuthState(session))
     } catch (error) {
-      authDebug("onAuthStateChange buildAuthState failed", {
+      authDebug("onAuthStateChange buildAuthState FAILED", {
         error: error instanceof Error ? error.message : String(error),
+        rcaCategory: error instanceof Error ? classifySupabaseError(error.message) : "unknown",
+        ...networkDiagnostics(),
       })
       callback({ user: null, profile: null })
     }
