@@ -804,7 +804,7 @@ function App() {
                 className="hidden sm:flex"
               >
                 <UserCircle size={18} className="mr-2" />
-                {profile ? profile.fullName.split(" ")[0] : "Account"}
+                {profile ? (profile.fullName?.split(" ")[0] || "Account") : "Account"}
               </Button>
 
               {profile && (
