@@ -274,7 +274,7 @@ export function CheckoutView({ cartItems, products, accountProfile, onBack, onOr
                       id="promo-code"
                       value={promoInput}
                       onChange={(event) => setPromoInput(event.target.value.toUpperCase())}
-                      placeholder="e.g. SDAJUNE26"
+                        placeholder="SDAJUNE26"
                       className="h-9"
                     />
                     <Button
@@ -287,10 +287,13 @@ export function CheckoutView({ cartItems, products, accountProfile, onBack, onOr
                       {isApplyingPromo ? "Applying..." : "Apply"}
                     </Button>
                   </div>
+                  <p className="text-xs text-muted-foreground">
+                    Example promo code: SDAJUNE26
+                  </p>
                   {appliedPromo && (
                     <div className="flex items-center justify-between text-xs text-green-700">
                       <span>{appliedPromo.code} applied ({appliedPromo.discountScope} discount)</span>
-                      <button type="button" className="underline" onClick={handleRemovePromo}>Remove</button>
+                      <button type="button" className="underline" onClick={handleRemovePromo}>Remove {appliedPromo.code}</button>
                     </div>
                   )}
                 </div>

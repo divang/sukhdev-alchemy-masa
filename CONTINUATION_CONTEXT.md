@@ -1,330 +1,131 @@
 # Continuation Context
 
-Last updated: 2026-05-30 22:35:00 UTC
+Last updated: 2026-06-02 UTC
 Branch: main
-Latest pushed commit: ae50546
+Latest pushed commit: 07876d5
+Previous major feature commit: d6ef491
 
-## Current State Snapshot
-- Supabase project used for testing: ndjztlhfhupvydozuski
-- Supabase auth config is now loading in runtime:
-  - hasUrl: true
-  - hasAnonKey: true
-  - isSupabaseConfigured: true
-- Email confirmation flow is working end-to-end:
-  - confirmation email received
-  - confirmation link redirects to deployed GitHub URL
+## Why This File Exists
+Use this as the single recovery document when chat/session history is unavailable.
+It captures what is already shipped, what infrastructure is required, and what to verify first.
 
-## Platform Integration Map (What, Why, and How They Connect)
-### 1) GitHub (Code + CI/CD + Hosting)
-- What it is used for:
-   - Source control for the frontend codebase.
-   - GitHub Actions build/deploy pipeline.
-   - GitHub Pages hosting for the live website.
-- Why it is used:
-   - Single workflow for versioning + automated deployments.
-   - Free/static hosting suitable for current frontend architecture.
-- How it connects:
-   - `main` branch push triggers `.github/workflows/deploy-pages.yml`.
-   - Workflow injects `VITE_*` secrets, builds app, publishes `dist` to Pages.
-   - Custom domain is attached in GitHub Pages settings.
+## Current Production Architecture
+- Frontend: React + Vite app (GitHub Pages deployment).
+- Backend: Supabase Auth + Postgres with RLS.
+- Transactional auth email: Resend SMTP via Supabase Auth.
+- Domain/DNS: Squarespace DNS -> GitHub Pages.
 
-### 2) Squarespace Domains (DNS Provider)
-- What it is used for:
-   - DNS management for `sukhdevialchemy.com`.
-- Why it is used:
-   - Domain registrar/provider where DNS records are controlled.
-- How it connects:
-   - Website DNS points to GitHub Pages:
-      - `A @ -> 185.199.108.153`
-      - `A @ -> 185.199.109.153`
-      - `A @ -> 185.199.110.153`
-      - `A @ -> 185.199.111.153`
-      - `CNAME www -> divang.github.io`
-   - Email-related DNS (Google Workspace + Resend) coexists in same zone.
+## What Is Already Shipped (Important)
 
-### 3) Supabase (Auth + Database + RLS)
-- What it is used for:
-   - User authentication (customer/admin).
-   - Persistent order storage.
-   - Catalog, reviews, testimonials storage.
-   - Row-level security (RLS) for ownership/admin access control.
-- Why it is used:
-   - Managed Postgres + Auth + policy controls in one platform.
-   - Replaces browser-only storage for shared production data.
-- How it connects:
-   - Frontend uses `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`.
-   - Auth email redirects use Supabase URL configuration + `VITE_AUTH_REDIRECT_URL`.
-   - SQL migrations in `supabase/sql/*` define schema, policies, and seed data.
+### Catalog + Product Model
+- Product catalog is DB-backed with static fallback.
+- Four primary 50g SKU products are configured:
+  - Bharwa Masala: ₹125
+  - Chaat Masala: ₹145
+  - Chole Masala: ₹160
+  - Mix Masala Premium Blend: ₹210
+- Combo pack exists:
+  - Sukhdevi Combo Pack (4 x 50g): ₹640
 
-### 4) Resend (Transactional Email Provider)
-- What it is used for:
-   - Delivery of authentication emails (confirmation/recovery) via custom domain.
-- Why it is used:
-   - Reliable deliverability for transactional emails compared with test sender restrictions.
-- How it connects:
-   - Domain `sukhdevialchemy.com` verified in Resend.
-   - Resend DNS records added in Squarespace (DKIM/SPF/MX/DMARC as configured).
-   - Supabase Auth SMTP settings point to Resend SMTP:
-      - host `smtp.resend.com`
-      - username `resend`
-      - sender `no-reply@sukhdevialchemy.com`
+### Cart + Wishlist Persistence
+- Signed-in cart items persist in Supabase (`cart_items`).
+- Cart data can be used as wishlist intent data for outreach (email/WhatsApp workflows handled externally).
 
-### 5) Google Workspace (Business Email)
-- What it is used for:
-   - Primary mailbox and business email routing for domain email accounts.
-- Why it is used:
-   - Standard mailbox/identity management for business operations.
-- How it connects:
-   - Google MX/TXT records remain configured in Squarespace DNS.
-   - These records should not be removed when configuring website or Resend DNS.
+### Reviews
+- Review submission requires login and paid purchase of the same product.
+- Enforced in both:
+  - client logic
+  - DB policy/function (`has_purchased_product`)
 
-### End-to-End Interaction Flow
-1. User opens `https://sukhdevialchemy.com`.
-2. DNS (Squarespace) resolves domain to GitHub Pages.
-3. GitHub Pages serves static frontend build from latest successful deploy.
-4. Frontend calls Supabase for auth, orders, catalog, reviews, testimonials.
-5. Supabase sends auth emails through Resend SMTP.
-6. Resend uses verified DNS records on same domain to deliver mail successfully.
-7. Google Workspace continues handling normal mailbox receiving/sending for business email accounts.
+### Checkout + Shipping
+- Shipping is now pincode-based:
+  - Karnataka pincodes (56/57/58/59): ₹60
+  - Rest of India: ₹120
+- Shipping is computed in checkout using entered pincode.
 
-### Operational Notes
-- GitHub Pages hosts the app; Squarespace only provides DNS for domain routing.
-- Supabase is the data/auth backend; GitHub Pages does not provide backend APIs.
-- Resend is for transactional auth mail delivery; Google Workspace is business mailbox.
-- All platforms are required together for current end-to-end production flow.
+### Mobile UX Improvements
+- Header actions compacted for small screens.
+- Cart button/account actions now safer on narrow devices.
+- Product details dialog uses viewport-safe heights and safe-area padding.
+- Cart drawer bottom/actions adjusted for mobile safe-area.
 
-## What Happened In This Session
-1. SMTP and confirmation flow was validated from CLI against live Supabase project.
-2. Initial error observed for generated test address:
-   - Error sending confirmation email
-3. Confirmation flow passed with onboarding@resend.dev:
-   - user created
-   - no session returned
-   - confirmation required behavior confirmed
-4. Added resend confirmation feature in app.
-5. Added deep debug logs in auth layer and UI layer.
-6. User reported Create Account looked non-responsive.
-7. Root cause identified:
-   - toast calls existed, but no Toaster was mounted, so feedback was invisible.
-8. Toaster mount fix applied and pushed.
-9. Deployment issue diagnosed:
-   - hosted build lacked VITE Supabase envs, causing auth not configured.
-10. Deployment workflow updated to inject envs and fail fast when secrets are missing.
+### Contact Us
+Professional contact section is live with:
+- Instagram: https://www.instagram.com/sukhdevialchemy/
+- Facebook: https://www.facebook.com/people/Sukhdevi-Alchemy/61590206949388/
+- YouTube: https://www.youtube.com/@sukhdevialchemy
+- WhatsApp: +91 78894 80171 (wa.me link)
 
-## Commits Already Pushed
-1. c1200bb
-   - Added email confirmation test script.
-   - Restored sanitized .env.example.
-2. 4e98353
-   - Added resend confirmation flow and initial continuation file.
-3. 4836ce1
-   - Added detailed auth debug logs in auth service.
-4. 5032066
-   - Added visible auth UI logs and Supabase initialization logs.
-5. cbe75fb
-   - Mounted Sonner Toaster and refreshed continuation context.
-6. bc8057b
-   - Added Pages workflow env injection and documented deployment requirements.
+## Files Added/Updated in Recent Sessions
+- src/lib/pricing.ts
+- src/lib/cart-persistence.ts
+- src/lib/catalog.ts
+- src/lib/auth.ts
+- src/hooks/use-initial-data.ts
+- src/App.tsx
+- src/components/CartDrawer.tsx
+- src/components/CheckoutView.tsx
+- src/components/ProductDetailDialog.tsx
+- src/components/ProductCard.tsx
+- src/components/ContactUsSection.tsx
+- supabase/sql/004_catalog_seed_data.sql
+- supabase/sql/006_cart_items_and_review_purchase_gate.sql
 
-## Environment Setup (Single Source)
-### Local Development (.env)
-Create local .env in repo root:
+## Supabase SQL Migration Order (Current)
+Apply in this order:
+1. supabase/sql/001_orders_secure_launch.sql
+2. supabase/sql/002_auth_accounts_and_order_ownership.sql
+3. supabase/sql/003_catalog_and_reviews.sql
+4. supabase/sql/004_catalog_seed_data.sql
+5. supabase/sql/005_testimonials.sql
+6. supabase/sql/006_cart_items_and_review_purchase_gate.sql
 
-```bash
-VITE_SUPABASE_URL=https://ndjztlhfhupvydozuski.supabase.co
-VITE_SUPABASE_ANON_KEY=sb_publishable_...
-VITE_AUTH_REDIRECT_URL=http://localhost:5000/
-```
+## Environment Configuration
 
-Notes:
-- Do not commit .env.
-- Restart npm run dev after changing .env.
-- VITE_AUTH_REDIRECT_URL is recommended for predictable confirm-email redirects.
-
-### Spark Deploy Environment Variables
-Set in Spark project settings:
-
-```bash
-VITE_SUPABASE_URL=https://ndjztlhfhupvydozuski.supabase.co
-VITE_SUPABASE_ANON_KEY=sb_publishable_...
-VITE_AUTH_REDIRECT_URL=https://YOUR_SPARK_DOMAIN/
-```
-
-Then republish.
-
-### GitHub Pages / Actions Secrets
-Repository secrets required:
+### Local .env
 - VITE_SUPABASE_URL
 - VITE_SUPABASE_ANON_KEY
-- VITE_AUTH_REDIRECT_URL (optional but recommended)
+- VITE_AUTH_REDIRECT_URL
+- Optional: VITE_ALLOW_CLIENT_ORDER_UPDATES (keep false for production unless explicitly required)
 
-### Supabase URL Configuration
-In Supabase Authentication -> URL Configuration:
-- Site URL: deployed app URL
-- Additional redirect URLs: deployed app URL + local URL
+### GitHub Actions Secrets (Pages deploy)
+- VITE_SUPABASE_URL
+- VITE_SUPABASE_ANON_KEY
+- VITE_AUTH_REDIRECT_URL
 
-Examples:
-- https://YOUR_SPARK_DOMAIN/
-- http://localhost:5000/
+### Supabase Auth URL Config
+- Site URL must match deployed domain.
+- Add both deployed URL and localhost URL to redirect allowlist.
 
-## Auth Roles and Order Access (Single Source)
-### Feature Summary
-- Customer login: can see only their own orders.
-- Admin login: can see all orders.
+## Auth / Login Blocker Notes
 
-### Current Deployment Support Conditions
-1. VITE Supabase envs configured in the deployed build.
-2. SQL migrations applied:
-   - supabase/sql/001_orders_secure_launch.sql
-   - supabase/sql/002_auth_accounts_and_order_ownership.sql
-3. Role rows exist in public.profiles.
+### Observed Behavior
+- Users reported login/sign-up appearing stuck.
+- Prior confirmed risk: Supabase auth rate limiting during bursts.
 
-### How User vs Admin Is Differentiated In DB
-- Role is in public.profiles.role with values customer or admin.
-- public.profiles.id references auth.users.id.
-- public.orders.user_id references auth.users.id.
+### What was improved in code
+- Added explicit auth request timeouts.
+- Added clearer timeout/rate-limit user-facing messages.
+- Added debug instrumentation around sign-in/sign-up/profile fetch flow.
 
-Policy behavior from migration:
-- Customers can select only own orders.
-- Admins can select all orders.
-- Admins can update orders.
+### Likely remaining external cause
+- Supabase Auth rate limits and email provider constraints during pre-launch spikes.
 
-### Admin Payment/Status Update Discussion
-Requirement: admin should update order status/payment (for example payment received).
+### Required operational checks before launch
+1. Supabase Dashboard -> Authentication -> Rate Limits.
+2. Supabase logs for 429/too-many-requests patterns.
+3. SMTP sender health in Resend (domain verified, sender stable).
+4. Decide pre-launch sign-up strategy (controlled ramp vs open flood).
 
-Current behavior:
-- Frontend has update helpers in src/lib/order-persistence.ts.
-- Runtime flag VITE_ALLOW_CLIENT_ORDER_UPDATES controls client updates.
-- If false: client updates intentionally blocked; use trusted backend/service role.
-- If true: client attempts updates, still protected by RLS (admin-only update).
+Note: exact per-hour/per-day quota values depend on Supabase plan/project settings and are not hardcoded in this repo.
 
-Production recommendation:
-- Keep VITE_ALLOW_CLIENT_ORDER_UPDATES=false.
-- Perform status/payment updates through backend/service-role endpoint.
+## Admin / Customer Access Model
+- `public.profiles.role` controls admin access.
+- Customer sees own orders only.
+- Admin can view all orders.
+- Reviews require paid ownership of product.
 
-## Catalog Migration Plan (Static Data -> DB)
-Requirement discussed:
-- Move homepage product catalog and related static content to Supabase DB.
-- Include product display data, price, SKU, image path, rating/review data.
-- Allow logged-in users to submit product reviews.
-
-### Scope To Move From KV To DB
-- categories
-- products
-- product reviews
-- testimonials (optional in phase 2)
-- image path references (store relative path or public URL)
-
-### Proposed Tables
-1. public.categories
-   - id text primary key
-   - name text not null
-   - slug text unique not null
-   - enabled boolean not null default true
-   - sort_order int not null default 0
-   - created_at timestamptz default now()
-
-2. public.products
-   - id text primary key
-   - category_id text references public.categories(id)
-   - sku text unique not null
-   - name text not null
-   - description text not null
-   - price_per_100g numeric(10,2) not null
-   - image_path text not null
-   - youtube_url text null
-   - in_stock boolean not null default true
-   - tags text[] not null default '{}'
-   - ingredients text[] not null default '{}'
-   - is_active boolean not null default true
-   - created_at timestamptz default now()
-   - updated_at timestamptz default now()
-
-3. public.product_reviews
-   - id uuid primary key default gen_random_uuid()
-   - product_id text not null references public.products(id) on delete cascade
-   - user_id uuid not null references auth.users(id) on delete cascade
-   - rating int not null check (rating between 1 and 5)
-   - comment text not null
-   - verified_purchase boolean not null default false
-   - created_at timestamptz default now()
-   - updated_at timestamptz default now()
-   - unique(product_id, user_id)
-
-4. public.product_rating_summary (view)
-   - product_id
-   - avg_rating
-   - review_count
-
-### RLS Design
-- categories/products: public read (anon + authenticated), admin write.
-- product_reviews:
-  - everyone can read approved reviews
-  - authenticated users can insert/update/delete only their own reviews
-  - optional: restrict insert to verified purchasers (check orders.user_id + items JSON contains product_id)
-- admin users can moderate/remove reviews.
-
-### Frontend Refactor Plan
-1. Add new data layer file (example: src/lib/catalog.ts) for DB fetches.
-2. Replace useInitialData KV catalog bootstrap with Supabase reads.
-3. Keep KV only as fallback/cache if DB is unavailable.
-4. Replace Product.rating and Product.reviewCount with values from rating summary view.
-5. Wire review submission UI for authenticated users only.
-
-### Migration Strategy (Safe Rollout)
-1. Add SQL migration file for new catalog/review tables.
-2. Seed DB with current static data from useInitialData.
-3. Release frontend reading from DB behind a feature flag.
-4. Validate production data, then retire static KV bootstrap for products/reviews.
-
-### Suggested New SQL Migration Files
-- supabase/sql/003_catalog_and_reviews.sql
-- supabase/sql/004_catalog_seed_data.sql
-
-### Phase 1 Implementation Status (Completed)
-- Added DB schema migration: supabase/sql/003_catalog_and_reviews.sql
-- Added initial seed data migration: supabase/sql/004_catalog_seed_data.sql
-- Added frontend DB catalog loader: src/lib/catalog.ts
-- Updated startup hydration to prefer Supabase catalog with fallback to static seed: src/hooks/use-initial-data.ts
-- Extended product type to include SKU support: src/lib/types.ts
-
-### Activation Steps
-1. Run SQL migration 003 in Supabase SQL Editor.
-2. Run SQL migration 004 in Supabase SQL Editor.
-3. Refresh/restart app.
-4. Verify home page products load correctly and prices/images match expected values.
-
-## Phase 2 Implementation Status (In Progress - Code Complete, Not Pushed Yet)
-Implemented in working tree:
-- DB-backed testimonials support with new SQL migration:
-   - supabase/sql/005_testimonials.sql
-- Catalog data layer enhancements:
-   - load testimonials from DB in src/lib/catalog.ts
-   - submit/update product review API in src/lib/catalog.ts
-- App bootstrap now hydrates testimonials from DB snapshot in src/hooks/use-initial-data.ts
-- Product review UI now allows logged-in users to submit/update reviews in src/components/ProductDetailDialog.tsx
-- Product dialog receives current logged-in user in src/App.tsx
-- Review type includes optional userId in src/lib/types.ts
-
-### Phase 2 Activation Steps
-1. Run SQL migration 005 in Supabase SQL Editor.
-2. Refresh/restart app.
-3. Validate testimonials are visible from DB data.
-4. Sign in and submit a product review from Product Details -> Reviews tab.
-5. Confirm row is added/updated in public.product_reviews.
-
-### Phase 2 Notes
-- product_reviews table enforces one review per user per product (upsert path used).
-- Rating summary fields on products are refreshed by DB triggers from migration 003.
-- Existing static fallback remains for resilience if DB read fails.
-
-### Admin/User Behavior Alignment
-- Admin login remains role-based via public.profiles.role = 'admin'.
-- Customers see only own orders (already implemented).
-- Admin sees all orders and can update order status/payment based on backend/RLS mode (already implemented).
-
-### Promote Admin User
-After signup and profile row exists:
+Promote admin (after user exists):
 
 ```sql
 update public.profiles
@@ -332,34 +133,35 @@ set role = 'admin'
 where email = 'you@example.com';
 ```
 
-Sign out and sign in again afterward.
+## Quick Recovery Checklist (If Starting Fresh)
+1. Clone repo and checkout `main`.
+2. Configure `.env` with Supabase values.
+3. Ensure all 001-006 SQL files are applied.
+4. Run `npm install` then `npm run build`.
+5. Smoke test:
+   - Home loads catalog.
+   - Product detail opens on mobile without clipping.
+   - Add to cart works.
+   - Checkout shipping changes by pincode.
+   - Sign-up/sign-in works and surfaces errors quickly.
+   - Review allowed only for paid purchased items.
+   - Contact links open correctly.
+6. Verify deploy secrets and push to `main` for Pages deploy.
 
-## Verification and SQL Snippets
-### Quick App Verification
-1. Confirm console log:
+## Deployment / Git Status Notes
+- Latest pushed commit: `07876d5`.
+- At time of last session, `package-lock.json` had a local modification not intentionally included in feature pushes.
+- If release reproducibility is needed, inspect and decide whether to commit that lockfile change separately.
 
-```text
-[auth] supabase module initialized { hasUrl: true, hasAnonKey: true, isSupabaseConfigured: true }
-```
+## Useful Verification Queries
 
-2. Customer flow:
-   - Sign in as customer and open tracking.
-   - Only own orders should be visible.
-3. Admin flow:
-   - Sign in as admin and open admin/tracking.
-   - All orders should be visible.
-4. Updates:
-   - Admin status/payment update should succeed (based on env mode + RLS).
-   - Customer update should be blocked.
-
-### Count users
+Count users:
 
 ```sql
-select count(*) as total_users
-from auth.users;
+select count(*) as total_users from auth.users;
 ```
 
-### Confirmed vs unconfirmed
+Confirmed vs unconfirmed:
 
 ```sql
 select
@@ -368,16 +170,7 @@ select
 from auth.users;
 ```
 
-### Users + confirmation info
-
-```sql
-select id, email, email_confirmed_at, last_sign_in_at
-from auth.users
-order by created_at desc
-limit 50;
-```
-
-### Profiles and roles
+Recent profiles and roles:
 
 ```sql
 select id, email, role, created_at
@@ -386,7 +179,7 @@ order by created_at desc
 limit 50;
 ```
 
-### Find admins
+Admins:
 
 ```sql
 select id, email, role
@@ -394,36 +187,11 @@ from public.profiles
 where role = 'admin';
 ```
 
-### Orders ownership mapping
+Recent orders:
 
 ```sql
-select id, user_id, customer_email, status, payment_status, created_at
+select id, user_id, customer_email, status, payment_status, total_amount, created_at
 from public.orders
 order by created_at desc
 limit 50;
-```
-
-### Re-run CLI confirmation test
-
-```bash
-SUPABASE_URL=https://ndjztlhfhupvydozuski.supabase.co \
-SUPABASE_ANON_KEY=sb_publishable_... \
-TEST_SIGNUP_EMAIL=you@example.com \
-npm run test:email-confirmation
-```
-
-### Cleanup e2e test users
-
-```sql
-delete from auth.users
-where email like 'smtp-e2e-%@example.com';
-```
-
-## Paste Into New Session
-
-```text
-Read CONTINUATION_CONTEXT.md first.
-Then verify deployment env values for Supabase, validate signup + email confirmation flow,
-and confirm customer-vs-admin order access with SQL checks.
-If env values are missing, ask me for each key one by one.
 ```
