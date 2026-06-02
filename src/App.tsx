@@ -103,6 +103,25 @@ function App() {
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [authMode, setAuthMode] = useState<"customer" | "admin">("customer")
   const [postAuthView, setPostAuthView] = useState<View>("store")
+
+  // Hash-based admin route: visiting /#admin opens admin login directly.
+  useEffect(() => {
+    function handleHash() {
+      if (window.location.hash === "#admin") {
+        if (profile?.role === "admin") {
+          setCurrentView("admin")
+        } else {
+          setAuthMode("admin")
+          setPostAuthView("admin")
+          setCurrentView("account")
+        }
+      }
+    }
+
+    handleHash()
+    window.addEventListener("hashchange", handleHash)
+    return () => window.removeEventListener("hashchange", handleHash)
+  }, [profile])
   const [cloudOrders, setCloudOrders] = useState<Order[]>([])
 
   useEffect(() => {
@@ -384,6 +403,15 @@ function App() {
     setCurrentView("admin")
   }
 
+  const handleBackToStore = () => {
+    // Clear admin hash when navigating back so reload doesn't re-trigger admin route.
+    if (window.location.hash === "#admin") {
+      history.replaceState(null, "", window.location.pathname)
+    }
+    setCurrentView("store")
+    setCurrentOrder(null)
+  }
+
   const handleAuthenticated = (nextProfile: UserProfile) => {
     setProfile(nextProfile)
     setCurrentView(postAuthView)
@@ -456,10 +484,7 @@ function App() {
     }
   }
 
-  const handleBackToStore = () => {
-    setCurrentView("store")
-    setCurrentOrder(null)
-  }
+
 
   const handleViewTracking = (orderId: string) => {
     const visibleOrders = profile?.role === "admin" ? adminOrders : customerOrders
@@ -680,6 +705,8 @@ function App() {
                   Admin
                 </Button>
               )}
+              {/* Admin login is intentionally not exposed here.
+                  Access via sukhdevialchemy.com/#admin */}
 
               {profile && (
                 <Button variant="outline" size="sm" onClick={handleOpenTracking} className="hidden sm:flex">
