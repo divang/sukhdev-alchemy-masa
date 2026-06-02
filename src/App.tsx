@@ -110,9 +110,9 @@ function App() {
   const [featureFlags, setFeatureFlags] = useState(defaultFeatureFlags)
   const [activeUpiConfig, setActiveUpiConfig] = useState(fallbackUpiConfig)
   const socialProfiles = [
-    { name: "Instagram", handle: "@sukhdevialchemy", url: "https://instagram.com" },
-    { name: "YouTube", handle: "@sukhdevialchemy", url: "https://youtube.com" },
-    { name: "WhatsApp", handle: "@sukhdevialchemy", url: "https://wa.me" },
+    { name: "Instagram", handle: "@sukhdevialchemy", url: "https://instagram.com/sukhdevialchemy" },
+    { name: "YouTube", handle: "@sukhdevialchemy", url: "https://youtube.com/@sukhdevialchemy" },
+    { name: "WhatsApp", handle: "Sukhdevi Alchemy", url: "https://wa.me/?text=Hi%20Sukhdevi%20Alchemy" },
   ]
 
   // Hash-based admin route: visiting /#admin opens admin login directly.
@@ -784,12 +784,12 @@ function App() {
                       target="_blank"
                       rel="noreferrer"
                       aria-label={`Open ${profile.name}`}
-                      className="rounded-full border px-2 py-1 text-muted-foreground transition hover:text-foreground flex items-center gap-1"
+                      title={`${profile.name} ${profile.handle}`}
+                      className="rounded-full border p-1.5 text-muted-foreground transition hover:text-foreground"
                     >
                       {profile.name === "Instagram" && <InstagramLogo size={14} weight="duotone" />}
                       {profile.name === "YouTube" && <YoutubeLogo size={14} weight="duotone" />}
                       {profile.name === "WhatsApp" && <WhatsappLogo size={14} weight="duotone" />}
-                      <span className="text-[11px] leading-none">{profile.handle}</span>
                     </a>
                   ))}
                 </div>

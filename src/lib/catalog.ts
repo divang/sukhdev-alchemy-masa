@@ -126,9 +126,21 @@ export async function loadCatalogFromSupabase(): Promise<CatalogSnapshot> {
     enabled: row.enabled,
   }))
 
+  const hasComboCategory = categories.some((category) => category.id === "combo-pack-masala")
+  if (!hasComboCategory) {
+    categories.push({
+      id: "combo-pack-masala",
+      name: "Combo Pack Masala",
+      slug: "combo-pack-masala",
+      enabled: true,
+    })
+  }
+
   const products = ((productsData as ProductRow[] | null) ?? []).map((row) => ({
     id: row.id,
-    category: row.category_id,
+    category: row.id === "sukhdevi-combo-pack" || row.sku === "PM-COMBO-001"
+      ? "combo-pack-masala"
+      : row.category_id,
     name: row.name,
     price: Number(row.price_per_100g),
     packGrams: inferPackGrams(row),

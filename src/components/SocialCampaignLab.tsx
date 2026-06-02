@@ -43,9 +43,9 @@ const reelDrafts: ReelDraft[] = [
 
 export function SocialCampaignLab({ showReels, showChefCta, showSocialIcons }: SocialCampaignLabProps) {
   const socialProfiles = [
-    { name: "Instagram", handle: "@sukhdevialchemy", url: "https://instagram.com" },
-    { name: "YouTube", handle: "@sukhdevialchemy", url: "https://youtube.com" },
-    { name: "WhatsApp", handle: "@sukhdevialchemy", url: "https://wa.me" },
+    { name: "Instagram", handle: "@sukhdevialchemy", url: "https://instagram.com/sukhdevialchemy" },
+    { name: "YouTube", handle: "@sukhdevialchemy", url: "https://youtube.com/@sukhdevialchemy" },
+    { name: "WhatsApp", handle: "Sukhdevi Alchemy", url: "https://wa.me/?text=Hi%20Sukhdevi%20Alchemy" },
   ]
 
   return (
@@ -60,7 +60,7 @@ export function SocialCampaignLab({ showReels, showChefCta, showSocialIcons }: S
         </div>
 
         {showSocialIcons && (
-          <div className="grid gap-2 sm:grid-cols-3">
+          <div className="flex items-center gap-2">
             {socialProfiles.map((profile) => (
               <a
                 key={profile.name}
@@ -68,17 +68,12 @@ export function SocialCampaignLab({ showReels, showChefCta, showSocialIcons }: S
                 target="_blank"
                 rel="noreferrer"
                 aria-label={`Open ${profile.name}`}
-                className="rounded-xl border border-orange-200 bg-white px-3 py-2 text-slate-700 transition hover:-translate-y-0.5 hover:text-orange-700"
+                title={`${profile.name} ${profile.handle}`}
+                className="rounded-full border border-orange-200 bg-white p-2 text-slate-700 transition hover:-translate-y-0.5 hover:text-orange-700"
               >
-                <div className="flex items-center gap-2">
-                  {profile.name === "Instagram" && <InstagramLogo size={18} weight="duotone" />}
-                  {profile.name === "YouTube" && <YoutubeLogo size={18} weight="duotone" />}
-                  {profile.name === "WhatsApp" && <WhatsappLogo size={18} weight="duotone" />}
-                  <div className="leading-tight">
-                    <p className="text-xs font-medium">{profile.name}</p>
-                    <p className="text-xs text-slate-500">{profile.handle}</p>
-                  </div>
-                </div>
+                {profile.name === "Instagram" && <InstagramLogo size={18} weight="duotone" />}
+                {profile.name === "YouTube" && <YoutubeLogo size={18} weight="duotone" />}
+                {profile.name === "WhatsApp" && <WhatsappLogo size={18} weight="duotone" />}
               </a>
             ))}
           </div>
