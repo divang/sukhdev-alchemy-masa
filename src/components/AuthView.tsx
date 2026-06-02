@@ -151,6 +151,10 @@ export function AuthView({ mode, onBack, onAuthenticated }: AuthViewProps) {
         return
       }
 
+      if (result.notice) {
+        toast.info(result.notice)
+      }
+
       toast.success("Account created. You can now continue to payment.")
       onAuthenticated(result.profile)
     } catch (error) {

@@ -271,9 +271,21 @@ async function buildAuthState(session: Session | null): Promise<AuthState> {
     return { user: null, profile: null }
   }
 
+  let profile: UserProfile | null = null
+
+  try {
+    profile = await withTimeout(fetchProfile(user), 10000, "buildAuthState profile timed out")
+  } catch (error) {
+    authDebug("buildAuthState profile timed out; using metadata fallback", {
+      userId: user.id,
+      error: error instanceof Error ? error.message : String(error),
+    })
+    profile = buildProfileFromMetadata(user)
+  }
+
   return {
     user,
-    profile: await fetchProfile(user),
+    profile,
   }
 }
 
@@ -433,7 +445,22 @@ export async function signUpCustomer(input: SignUpInput): Promise<AuthResult> {
     marketingOptIn: input.marketingOptIn,
   }
 
-  const saveError = await saveProfile(profile)
+  let saveError: string | undefined
+  try {
+    saveError = await withTimeout(saveProfile(profile), 8000, "Profile save timed out")
+  } catch (error) {
+    authDebug("signUpCustomer profile save timed out", {
+      userId: user.id,
+      error: error instanceof Error ? error.message : String(error),
+    })
+
+    return {
+      user,
+      profile,
+      notice: "Account created and signed in. Profile sync is still running in background.",
+    }
+  }
+
   if (saveError) {
     authDebug("signUpCustomer completed with profile sync error", {
       userId: user.id,
@@ -512,11 +539,18 @@ export async function signInCustomer(input: SignInInput): Promise<AuthResult> {
       notice = "Signed in successfully. We are syncing your profile in the background due to a temporary network delay."
 
       // Best-effort profile backfill so future sign-ins don't need fallback.
-      const saveError = await saveProfile(fallbackProfile)
-      if (saveError) {
-        authDebug("signInCustomer metadata fallback backfill failed", {
+      try {
+        const saveError = await withTimeout(saveProfile(fallbackProfile), 5000, "Fallback profile backfill timed out")
+        if (saveError) {
+          authDebug("signInCustomer metadata fallback backfill failed", {
+            userId: user.id,
+            saveError,
+          })
+        }
+      } catch (saveException) {
+        authDebug("signInCustomer metadata fallback backfill timed out", {
           userId: user.id,
-          saveError,
+          error: saveException instanceof Error ? saveException.message : String(saveException),
         })
       }
 
