@@ -46,6 +46,7 @@ jobs:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
           VITE_AUTH_REDIRECT_URL: ${{ secrets.VITE_AUTH_REDIRECT_URL }}
+          VITE_CATALOG_CACHE_BUSTER: ${{ github.sha }}-${{ secrets.VITE_CATALOG_CACHE_BUSTER }}
         run: npm run build
 
       - name: Setup Pages

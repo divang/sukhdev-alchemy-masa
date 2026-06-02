@@ -165,6 +165,7 @@ Important redirect setup:
 Optional frontend override:
 
 - Set `VITE_AUTH_REDIRECT_URL` to force the email confirmation redirect target from the app.
+- Set `VITE_CATALOG_CACHE_BUSTER` to invalidate 24-hour local catalog cache for all users on next deploy.
 
 No extra frontend env vars are needed beyond:
 
@@ -172,7 +173,15 @@ No extra frontend env vars are needed beyond:
 VITE_SUPABASE_URL=https://YOUR_PROJECT_REF.supabase.co
 VITE_SUPABASE_ANON_KEY=YOUR_SUPABASE_ANON_KEY
 VITE_AUTH_REDIRECT_URL=https://YOUR_PUBLIC_SITE_URL/
+VITE_CATALOG_CACHE_BUSTER=release-2026-06-02
 ```
+
+Catalog caching behavior:
+
+- The storefront caches categories/products/reviews/testimonials in browser storage for 24 hours.
+- While cache is fresh, the app does not hit Supabase for catalog reads.
+- Cache is automatically refreshed after TTL expiry.
+- To force refresh for everyone after a deployment, update `VITE_CATALOG_CACHE_BUSTER` (repository secret) and deploy.
 
 ### 3. Create the first admin
 

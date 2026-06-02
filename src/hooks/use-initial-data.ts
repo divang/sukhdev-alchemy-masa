@@ -3,18 +3,38 @@ import { useKV } from '@/hooks/use-kv'
 import type { Category, Product, Review, Testimonial } from '@/lib/types'
 import { loadCatalogFromSupabase } from '@/lib/catalog'
 
+const CATALOG_CACHE_TTL_MS = 24 * 60 * 60 * 1000
+const CATALOG_CACHE_FALLBACK_BUSTER = 'catalog-v1'
+
+type CatalogCacheMeta = {
+  fetchedAt: number
+  buster: string
+}
+
 export function useInitialData() {
   const [categories, setCategories] = useKV<Category[]>('categories', [])
   const [products, setProducts] = useKV<Product[]>('products', [])
   const [reviews, setReviews] = useKV<Review[]>('reviews', [])
   const [testimonials, setTestimonials] = useKV<Testimonial[]>('testimonials', [])
   const [dataVersion, setDataVersion] = useKV<number>('data-version', 0)
+  const [catalogCacheMeta, setCatalogCacheMeta] = useKV<CatalogCacheMeta | null>('catalog-cache-meta', null)
 
   useEffect(() => {
     const initializeData = async () => {
       const currentVersion = 15
+      const cacheBuster = (import.meta.env.VITE_CATALOG_CACHE_BUSTER as string | undefined)?.trim() || CATALOG_CACHE_FALLBACK_BUSTER
+      const now = Date.now()
+      const hasLocalCatalog = Boolean(categories?.length) && Boolean(products?.length)
+      const isVersionCurrent = (dataVersion ?? 0) >= currentVersion
+      const isFreshByTtl = Boolean(catalogCacheMeta?.fetchedAt) && now - (catalogCacheMeta?.fetchedAt ?? 0) < CATALOG_CACHE_TTL_MS
+      const isBusterCurrent = catalogCacheMeta?.buster === cacheBuster
+      const canUseLocalCache = hasLocalCatalog && isVersionCurrent && isFreshByTtl && isBusterCurrent
 
-      // Prefer DB catalog when available; fallback to static seed for resilience.
+      if (canUseLocalCache) {
+        return
+      }
+
+      // Prefer DB catalog when local cache is stale/missing; fallback to static seed for resilience.
       const remoteCatalog = await loadCatalogFromSupabase()
       if (remoteCatalog.source === 'supabase' && remoteCatalog.products.length > 0) {
         setCategories(remoteCatalog.categories)
@@ -22,6 +42,7 @@ export function useInitialData() {
         setReviews(remoteCatalog.reviews)
         setTestimonials(remoteCatalog.testimonials)
         setDataVersion(currentVersion)
+        setCatalogCacheMeta({ fetchedAt: now, buster: cacheBuster })
         return
       }
       
@@ -253,10 +274,11 @@ export function useInitialData() {
       }
 
       setDataVersion(currentVersion)
+      setCatalogCacheMeta({ fetchedAt: now, buster: cacheBuster })
     }
     
     initializeData()
-  }, [])
+  }, [categories, products, dataVersion, catalogCacheMeta, setCatalogCacheMeta, setCategories, setDataVersion, setProducts, setReviews, setTestimonials, testimonials, reviews])
 
   return { categories, products }
 }
