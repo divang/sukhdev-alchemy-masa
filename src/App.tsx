@@ -162,6 +162,10 @@ function App() {
         return
       }
 
+      // Stagger: wait 600ms after login so cart sync (profile?.id effect) fires first.
+      await new Promise((resolve) => setTimeout(resolve, 600))
+      if (!isActive) return
+
       const result = profile.role === "admin"
         ? await fetchOrdersForAdmin()
         : await fetchOrdersForCurrentUser()
@@ -198,6 +202,10 @@ function App() {
       if (!profile || !isSupabaseConfigured) {
         return
       }
+
+      // Small stagger so this and loadOrders don't slam PostgREST simultaneously.
+      await new Promise((resolve) => setTimeout(resolve, 200))
+      if (!isActive) return
 
       const result = await fetchCartForCurrentUser()
       if (!isActive) {
