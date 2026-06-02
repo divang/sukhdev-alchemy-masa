@@ -489,9 +489,12 @@ export async function signInCustomer(input: SignInInput): Promise<AuthResult> {
 
   try {
     const signInStart = Date.now()
+    // Use a generous timeout: HTTP round-trip is fast (~500ms), but the Supabase JS
+    // client may spend extra time persisting the session, which delays Promise resolution
+    // even after onAuthStateChange fires.  30 s catches most mobile/slow networks.
     const { data, error } = await withTimeout(
       supabase.auth.signInWithPassword(input),
-      12000,
+      30000,
       "Sign in request timed out"
     )
     authDebug("signInCustomer auth request completed", {
@@ -576,7 +579,51 @@ export async function signInCustomer(input: SignInInput): Promise<AuthResult> {
       notice,
     }
   } catch (error) {
-    const message = mapAuthErrorMessage(error instanceof Error ? error.message : "Sign in failed unexpectedly.")
+    const rawMessage = error instanceof Error ? error.message : "Sign in failed unexpectedly."
+
+    // If signInWithPassword timed out on the client but auth actually succeeded
+    // (onAuthStateChange already fired SIGNED_IN), recover using the active session
+    // rather than showing an error to the user.
+    if (rawMessage.includes("timed out") && supabase) {
+      authDebug("signInCustomer signInWithPassword timed out — checking for active session", {
+        email: maskEmail(input.email),
+      })
+
+      try {
+        const { data: sessionData } = await withTimeout(
+          supabase.auth.getSession(),
+          5000,
+          "getSession recovery timed out"
+        )
+        const recoveredUser = sessionData?.session?.user ?? null
+
+        if (recoveredUser) {
+          authDebug("signInCustomer: recovered active session after timeout — continuing", {
+            userId: recoveredUser.id,
+          })
+
+          let recoveredProfile: UserProfile | null = null
+          try {
+            recoveredProfile = await withTimeout(fetchProfile(recoveredUser), 8000, "Recovery fetchProfile timed out")
+          } catch {
+            recoveredProfile = buildProfileFromMetadata(recoveredUser)
+          }
+
+          return {
+            user: recoveredUser,
+            profile: recoveredProfile ?? buildProfileFromMetadata(recoveredUser),
+            notice: "Signed in. Your connection is a bit slow — profile synced from session.",
+          }
+        }
+      } catch (recoveryError) {
+        authDebug("signInCustomer session recovery also failed", {
+          email: maskEmail(input.email),
+          error: recoveryError instanceof Error ? recoveryError.message : String(recoveryError),
+        })
+      }
+    }
+
+    const message = mapAuthErrorMessage(rawMessage)
     authDebug("signInCustomer unexpected failure", {
       email: maskEmail(input.email),
       error: message,
