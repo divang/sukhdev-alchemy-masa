@@ -501,8 +501,12 @@ function App() {
     const transactionNote = `Order ${currentOrder.id}`
     const upiParams = `pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(upiName)}&am=${encodeURIComponent(amount)}&cu=INR&tn=${encodeURIComponent(transactionNote)}`
     const upiLink = `upi://pay?${upiParams}`
-    // Google Pay (Tez) deep-link — opens GPay directly on Android
+    // Google Pay (Tez) deep-link
     const gpayLink = `tez://upi/pay?${upiParams}`
+    // Android intent with explicit package greatly reduces other UPI apps intercepting the link.
+    const gpayIntentLink = `intent://upi/pay?${upiParams}#Intent;scheme=tez;package=com.google.android.apps.nbu.paisa.user;end`
+    const isAndroid = typeof navigator !== "undefined" && /Android/i.test(navigator.userAgent)
+    const preferredGpayLink = isAndroid ? gpayIntentLink : gpayLink
 
     return (
       <div className="min-h-screen bg-background">
@@ -545,7 +549,7 @@ function App() {
               </div>
 
               <Button asChild className="w-full mb-2">
-                <a href={gpayLink}>Open Google Pay</a>
+                <a href={preferredGpayLink}>Open Google Pay</a>
               </Button>
               <Button asChild variant="outline" className="w-full mb-3">
                 <a href={upiLink}>Other UPI App</a>
