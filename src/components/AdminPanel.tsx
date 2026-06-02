@@ -17,6 +17,11 @@ import {
   type PromoScope,
   upsertPromoCodeByAdmin,
 } from "@/lib/promo-codes"
+import {
+  fetchPaymentUpiAccountsForAdmin,
+  setPrimaryPaymentUpiAccount,
+  type AdminPaymentUpiAccount,
+} from "@/lib/payment-upi"
 
 type EditableProduct = {
   id: string
@@ -87,6 +92,8 @@ export function AdminPanel({ orders = [] }: AdminPanelProps) {
     validUntil: "",
     isActive: true,
   })
+  const [upiAccounts, setUpiAccounts] = useState<AdminPaymentUpiAccount[]>([])
+  const [switchingUpiId, setSwitchingUpiId] = useState<string | null>(null)
 
   const categoryOptions = useMemo(() => {
     if (categories && categories.length > 0) {
@@ -159,6 +166,20 @@ export function AdminPanel({ orders = [] }: AdminPanelProps) {
     }
 
     refreshPromoCodesForAdmin()
+  }, [])
+
+  useEffect(() => {
+    async function refreshUpiAccountsForAdmin() {
+      const result = await fetchPaymentUpiAccountsForAdmin()
+      if (result.error) {
+        console.warn("[admin] payment upi load skipped", result.error)
+        return
+      }
+
+      setUpiAccounts(result.accounts)
+    }
+
+    refreshUpiAccountsForAdmin()
   }, [])
 
   const updateEditableProduct = (productId: string, key: keyof EditableProduct, value: string | boolean) => {
@@ -360,6 +381,26 @@ export function AdminPanel({ orders = [] }: AdminPanelProps) {
     toast.success("Product updated successfully.")
   }
 
+  const handleSetPrimaryUpi = async (accountId: string) => {
+    setSwitchingUpiId(accountId)
+    const result = await setPrimaryPaymentUpiAccount(accountId)
+    setSwitchingUpiId(null)
+
+    if (!result.success) {
+      toast.error(result.error ?? "Failed to switch primary UPI account.")
+      return
+    }
+
+    const refreshed = await fetchPaymentUpiAccountsForAdmin()
+    if (refreshed.error) {
+      toast.error(refreshed.error)
+      return
+    }
+
+    setUpiAccounts(refreshed.accounts)
+    toast.success("Primary UPI account updated.")
+  }
+
   const handleCreateProduct = async () => {
     if (!isSupabaseConfigured) {
       toast.error("Supabase auth is not configured.")
@@ -399,6 +440,46 @@ export function AdminPanel({ orders = [] }: AdminPanelProps) {
 
   return (
     <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>Payment UPI Switch</CardTitle>
+          <CardDescription>Choose which UPI account is primary for new payment QR and links.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {upiAccounts.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No UPI accounts found yet. Run SQL migration 012 first.</p>
+          ) : (
+            <div className="space-y-3">
+              {upiAccounts.map((account, index) => {
+                const isPrimary = account.enabled && index === 0
+                const isSwitching = switchingUpiId === account.id
+
+                return (
+                  <div key={account.id} className="rounded-lg border p-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium">{account.displayName}</p>
+                        {isPrimary && <Badge>Primary</Badge>}
+                        {!account.enabled && <Badge variant="outline">Disabled</Badge>}
+                      </div>
+                      <p className="text-sm text-muted-foreground">{account.upiId}</p>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant={isPrimary ? "secondary" : "default"}
+                      onClick={() => handleSetPrimaryUpi(account.id)}
+                      disabled={isPrimary || isSwitching || !account.enabled}
+                    >
+                      {isPrimary ? "Current Primary" : isSwitching ? "Switching..." : "Make Primary"}
+                    </Button>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader>
           <CardTitle>Promo Code Management</CardTitle>
