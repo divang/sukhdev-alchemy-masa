@@ -499,7 +499,10 @@ function App() {
     const upiName = "Sukhdevi Alchemy"
     const amount = currentOrder.totalAmount.toFixed(2)
     const transactionNote = `Order ${currentOrder.id}`
-    const upiLink = `upi://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(upiName)}&am=${encodeURIComponent(amount)}&cu=INR&tn=${encodeURIComponent(transactionNote)}`
+    const upiParams = `pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(upiName)}&am=${encodeURIComponent(amount)}&cu=INR&tn=${encodeURIComponent(transactionNote)}`
+    const upiLink = `upi://pay?${upiParams}`
+    // Google Pay (Tez) deep-link — opens GPay directly on Android
+    const gpayLink = `tez://upi/pay?${upiParams}`
 
     return (
       <div className="min-h-screen bg-background">
@@ -541,12 +544,15 @@ function App() {
                 />
               </div>
 
-              <Button asChild variant="outline" className="mb-3">
-                <a href={upiLink}>Pay in UPI App</a>
+              <Button asChild className="w-full mb-2">
+                <a href={gpayLink}>Open Google Pay</a>
+              </Button>
+              <Button asChild variant="outline" className="w-full mb-3">
+                <a href={upiLink}>Other UPI App</a>
               </Button>
 
               <p className="text-sm text-muted-foreground">
-                <strong>Scan the QR code</strong> or use the button above to open your UPI app. The order ID is automatically included in the transaction.
+                Tap <strong>Open Google Pay</strong> to pay directly. Use <em>Other UPI App</em> if you prefer PhonePe, Paytm, etc. The order ID is auto-filled.
               </p>
             </div>
 
