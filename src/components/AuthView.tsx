@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { ArrowLeft, ShieldCheck, UserCircle } from "@phosphor-icons/react"
+import { ArrowLeft } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -32,6 +32,7 @@ async function withTimeout<T>(promise: Promise<T>, ms: number, message: string):
 }
 
 export function AuthView({ mode, onBack, onAuthenticated }: AuthViewProps) {
+  const brandLogoPath = "/images/products/SDA-Logo.png"
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isResending, setIsResending] = useState(false)
   const [authNotice, setAuthNotice] = useState<string | null>(null)
@@ -213,8 +214,13 @@ export function AuthView({ mode, onBack, onAuthenticated }: AuthViewProps) {
       <div className="container mx-auto px-4 py-10 max-w-xl">
         <Card>
           <CardHeader>
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary">
-              {mode === "admin" ? <ShieldCheck size={28} /> : <UserCircle size={28} />}
+            <div className="mx-auto flex h-16 w-16 items-center justify-center overflow-hidden rounded-full border bg-card">
+              <img
+                src={brandLogoPath}
+                alt="Sukhdevi Alchemy logo"
+                className="h-full w-full object-cover"
+                loading="lazy"
+              />
             </div>
             <CardTitle className="text-center text-2xl">
               {mode === "admin" ? "Admin Sign In" : "Your Account"}

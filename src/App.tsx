@@ -90,6 +90,7 @@ function normalizeCartItems(cartItems: CartItem[], products: Product[]) {
 
 function App() {
   useInitialData()
+  const brandLogoPath = "/images/products/SDA-Logo.png"
 
   const [categories, setCategories] = useKV<Category[]>("categories", [])
   const [products] = useKV<Product[]>("products", [])
@@ -711,7 +712,15 @@ function App() {
         <header className="border-b bg-card sticky top-0 z-10 shadow-sm">
           <div className="container mx-auto px-4 py-4">
             <div className="flex items-center justify-between">
-              <h1 className="text-2xl font-bold">Admin Panel</h1>
+              <div className="flex items-center gap-3 min-w-0">
+                <img
+                  src={brandLogoPath}
+                  alt="Sukhdevi Alchemy logo"
+                  className="h-10 w-10 rounded-full object-cover border"
+                  loading="lazy"
+                />
+                <h1 className="text-2xl font-bold truncate">Admin Panel</h1>
+              </div>
               <Button variant="outline" onClick={handleBackToStore}>
                 Back to Store
               </Button>
@@ -755,6 +764,12 @@ function App() {
                 </SheetContent>
               </Sheet>
 
+              <img
+                src={brandLogoPath}
+                alt="Sukhdevi Alchemy logo"
+                className="h-9 w-9 sm:h-10 sm:w-10 rounded-full object-cover border"
+                loading="lazy"
+              />
               <h1 className="truncate text-lg sm:text-2xl md:text-3xl font-bold">Sukhdevi Alchemy</h1>
               <Badge variant="secondary" className="hidden md:inline-flex text-xs sm:text-sm">Premium Masala</Badge>
               <div className="hidden xl:flex items-center gap-1.5 pl-1">
@@ -891,6 +906,12 @@ function App() {
 
       <footer className="border-t bg-card mt-16">
         <div className="container mx-auto px-4 py-8 text-center text-sm text-muted-foreground">
+          <img
+            src={brandLogoPath}
+            alt="Sukhdevi Alchemy logo"
+            className="mx-auto mb-3 h-12 w-12 rounded-full object-cover border"
+            loading="lazy"
+          />
           <p>© 2026 Sukhdevi Alchemy. Premium Masala & Organic Spices.</p>
         </div>
       </footer>
