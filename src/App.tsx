@@ -91,6 +91,7 @@ function normalizeCartItems(cartItems: CartItem[], products: Product[]) {
 function App() {
   useInitialData()
   const brandLogoPath = "/images/products/SDA-Logo.png"
+  const homeTopLeftLogoPath = "/branding/logo-header-256.png"
 
   const [categories, setCategories] = useKV<Category[]>("categories", [])
   const [products] = useKV<Product[]>("products", [])
@@ -765,7 +766,7 @@ function App() {
               </Sheet>
 
               <img
-                src={brandLogoPath}
+                src={homeTopLeftLogoPath}
                 alt="Sukhdevi Alchemy logo"
                 className="h-9 w-9 sm:h-10 sm:w-10 rounded-full object-cover border"
                 loading="lazy"
