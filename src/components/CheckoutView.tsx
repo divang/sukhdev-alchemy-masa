@@ -15,6 +15,7 @@ import {
   getProductPackLabel,
   getShippingZoneLabel,
 } from "@/lib/pricing"
+import { calculatePromoDiscountAmount, type PromoCode, validatePromoCode } from "@/lib/promo-codes"
 
 type CheckoutViewProps = {
   cartItems: CartItem[]
@@ -33,6 +34,9 @@ export function CheckoutView({ cartItems, products, accountProfile, onBack, onOr
     city: "",
     pincode: ""
   })
+  const [promoInput, setPromoInput] = useState("")
+  const [appliedPromo, setAppliedPromo] = useState<PromoCode | null>(null)
+  const [isApplyingPromo, setIsApplyingPromo] = useState(false)
 
   useEffect(() => {
     if (!accountProfile) {
@@ -50,7 +54,36 @@ export function CheckoutView({ cartItems, products, accountProfile, onBack, onOr
   const getProduct = (productId: string) => products.find(p => p.id === productId)
   const cartSubtotal = calculateCartSubtotal(cartItems, products)
   const shippingAmount = calculateShippingAmountByPincode(formData.pincode, cartSubtotal)
-  const cartTotal = cartSubtotal + shippingAmount
+  const promoDiscountAmount = appliedPromo
+    ? calculatePromoDiscountAmount(appliedPromo, cartSubtotal, shippingAmount)
+    : 0
+  const cartTotal = Math.max(0, cartSubtotal + shippingAmount - promoDiscountAmount)
+
+  const handleApplyPromo = async () => {
+    if (!promoInput.trim()) {
+      toast.error("Please enter a promo code.")
+      return
+    }
+
+    setIsApplyingPromo(true)
+    const result = await validatePromoCode(promoInput, cartSubtotal, shippingAmount)
+    setIsApplyingPromo(false)
+
+    if (!result.promo || result.error) {
+      toast.error(result.error ?? "Invalid promo code.")
+      return
+    }
+
+    setAppliedPromo(result.promo)
+    setPromoInput(result.promo.code)
+    toast.success(`Promo code ${result.promo.code} applied.`)
+  }
+
+  const handleRemovePromo = () => {
+    setAppliedPromo(null)
+    setPromoInput("")
+    toast.info("Promo code removed.")
+  }
   
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -75,6 +108,8 @@ export function CheckoutView({ cartItems, products, accountProfile, onBack, onOr
       customer: formData,
       subtotalAmount: cartSubtotal,
       shippingAmount,
+      discountAmount: promoDiscountAmount,
+      promoCode: appliedPromo?.code,
       totalAmount: cartTotal,
       status: "pending",
       paymentStatus: "pending",
@@ -231,6 +266,41 @@ export function CheckoutView({ cartItems, products, accountProfile, onBack, onOr
                 <p className="text-xs text-muted-foreground">
                   Shipping zone: {formData.pincode.length >= 2 ? getShippingZoneLabel(formData.pincode) : "Enter pincode to confirm zone"}
                 </p>
+
+                <div className="space-y-2 rounded-lg border border-dashed p-3">
+                  <Label htmlFor="promo-code" className="text-xs uppercase tracking-wide text-muted-foreground">Promo Code</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      id="promo-code"
+                      value={promoInput}
+                      onChange={(event) => setPromoInput(event.target.value.toUpperCase())}
+                      placeholder="e.g. SDAJUNE26"
+                      className="h-9"
+                    />
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      className="h-9"
+                      onClick={handleApplyPromo}
+                      disabled={isApplyingPromo}
+                    >
+                      {isApplyingPromo ? "Applying..." : "Apply"}
+                    </Button>
+                  </div>
+                  {appliedPromo && (
+                    <div className="flex items-center justify-between text-xs text-green-700">
+                      <span>{appliedPromo.code} applied ({appliedPromo.discountScope} discount)</span>
+                      <button type="button" className="underline" onClick={handleRemovePromo}>Remove</button>
+                    </div>
+                  )}
+                </div>
+
+                {promoDiscountAmount > 0 && (
+                  <div className="flex justify-between items-center text-sm text-green-700">
+                    <span>Promo Discount{appliedPromo?.code ? ` (${appliedPromo.code})` : ""}</span>
+                    <span>-₹{promoDiscountAmount.toFixed(2)}</span>
+                  </div>
+                )}
                 
                 <div className="flex justify-between items-center text-lg font-bold">
                   <span>Total:</span>

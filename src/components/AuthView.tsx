@@ -34,6 +34,7 @@ async function withTimeout<T>(promise: Promise<T>, ms: number, message: string):
 export function AuthView({ mode, onBack, onAuthenticated }: AuthViewProps) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isResending, setIsResending] = useState(false)
+  const [authNotice, setAuthNotice] = useState<string | null>(null)
   const [signInData, setSignInData] = useState({ email: "", password: "" })
   const [signUpData, setSignUpData] = useState({
     fullName: "",
@@ -48,6 +49,7 @@ export function AuthView({ mode, onBack, onAuthenticated }: AuthViewProps) {
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault()
     console.log("[auth-ui] handleSignIn submitted", { mode, email: signInData.email })
+    setAuthNotice(null)
     setIsSubmitting(true)
 
     try {
@@ -65,6 +67,11 @@ export function AuthView({ mode, onBack, onAuthenticated }: AuthViewProps) {
       if (result.error || !result.profile) {
         toast.error(result.error ?? "Unable to sign in.")
         return
+      }
+
+      if (result.notice) {
+        setAuthNotice(result.notice)
+        toast.info(result.notice)
       }
 
       toast.success(mode === "admin" ? "Admin access granted." : "Signed in successfully.")
@@ -215,6 +222,11 @@ export function AuthView({ mode, onBack, onAuthenticated }: AuthViewProps) {
             </CardDescription>
           </CardHeader>
           <CardContent>
+            {authNotice && (
+              <div className="mb-4 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                {authNotice}
+              </div>
+            )}
             {mode === "admin" ? (
               <form className="space-y-4" onSubmit={handleSignIn}>
                 <div>

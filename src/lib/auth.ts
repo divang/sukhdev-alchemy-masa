@@ -10,6 +10,7 @@ type AuthState = {
 type AuthResult = AuthState & {
   error?: string
   requiresEmailConfirmation?: boolean
+  notice?: string
 }
 
 type SignUpInput = {
@@ -492,6 +493,7 @@ export async function signInCustomer(input: SignInInput): Promise<AuthResult> {
 
     const profileStart = Date.now()
     let profile: UserProfile | null = null
+    let notice: string | undefined
 
     try {
       profile = await withTimeout(fetchProfile(user), 10000, "Profile sync timed out")
@@ -507,6 +509,7 @@ export async function signInCustomer(input: SignInInput): Promise<AuthResult> {
         durationMs: Date.now() - profileStart,
         profileError: profileError instanceof Error ? profileError.message : String(profileError),
       })
+      notice = "Signed in successfully. We are syncing your profile in the background due to a temporary network delay."
 
       // Best-effort profile backfill so future sign-ins don't need fallback.
       const saveError = await saveProfile(fallbackProfile)
@@ -525,6 +528,7 @@ export async function signInCustomer(input: SignInInput): Promise<AuthResult> {
       authDebug("signInCustomer profile empty; using metadata fallback", {
         userId: user.id,
       })
+      notice = "Signed in successfully. Profile details will finish syncing shortly."
     }
 
     authDebug("signInCustomer succeeded", {
@@ -535,6 +539,7 @@ export async function signInCustomer(input: SignInInput): Promise<AuthResult> {
     return {
       user,
       profile,
+      notice,
     }
   } catch (error) {
     const message = mapAuthErrorMessage(error instanceof Error ? error.message : "Sign in failed unexpectedly.")

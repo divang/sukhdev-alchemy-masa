@@ -59,6 +59,8 @@ export type Order = {
   }
   subtotalAmount?: number
   shippingAmount?: number
+  discountAmount?: number
+  promoCode?: string
   totalAmount: number
   status: 'pending' | 'processing' | 'shipped' | 'delivered'
   paymentStatus: 'pending' | 'paid'

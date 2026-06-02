@@ -11,6 +11,12 @@ import { toast } from "sonner"
 import type { Category, Order, Product } from "@/lib/types"
 import { createProductByAdmin, loadCatalogFromSupabase, type AdminProductInput, updateProductByAdmin } from "@/lib/catalog"
 import { isSupabaseConfigured } from "@/lib/supabase"
+import {
+  fetchActivePromoCodesForAdmin,
+  type PromoDiscountType,
+  type PromoScope,
+  upsertPromoCodeByAdmin,
+} from "@/lib/promo-codes"
 
 type EditableProduct = {
   id: string
@@ -24,6 +30,21 @@ type EditableProduct = {
   ingredientsCsv: string
   youtubeUrl: string
   inStock: boolean
+}
+
+type EditablePromoCode = {
+  id: string
+  code: string
+  description: string
+  discountScope: PromoScope
+  discountType: PromoDiscountType
+  discountValue: string
+  maxDiscountAmount: string
+  minOrderAmount: string
+  usageLimit: string
+  validFrom: string
+  validUntil: string
+  isActive: boolean
 }
 
 type AdminPanelProps = {
@@ -48,6 +69,23 @@ export function AdminPanel({ orders = [] }: AdminPanelProps) {
     ingredientsCsv: "",
     youtubeUrl: "",
     inStock: true,
+  })
+  const [editablePromoCodes, setEditablePromoCodes] = useState<EditablePromoCode[]>([])
+  const [savingPromoId, setSavingPromoId] = useState<string | null>(null)
+  const [isCreatingPromo, setIsCreatingPromo] = useState(false)
+  const [newPromoCode, setNewPromoCode] = useState<EditablePromoCode>({
+    id: "",
+    code: "SDAJUNE26",
+    description: "June promotion - shipping discount",
+    discountScope: "shipping",
+    discountType: "percent",
+    discountValue: "100",
+    maxDiscountAmount: "120",
+    minOrderAmount: "0",
+    usageLimit: "",
+    validFrom: "",
+    validUntil: "",
+    isActive: true,
   })
 
   const categoryOptions = useMemo(() => {
@@ -94,6 +132,35 @@ export function AdminPanel({ orders = [] }: AdminPanelProps) {
     refreshCatalogForAdmin()
   }, [setCategories, setProducts])
 
+  useEffect(() => {
+    async function refreshPromoCodesForAdmin() {
+      const result = await fetchActivePromoCodesForAdmin()
+      if (result.error) {
+        console.warn("[admin] promo code load skipped", result.error)
+        return
+      }
+
+      setEditablePromoCodes(
+        result.promoCodes.map((promo) => ({
+          id: promo.id,
+          code: promo.code,
+          description: promo.description ?? "",
+          discountScope: promo.discountScope,
+          discountType: promo.discountType,
+          discountValue: String(promo.discountValue),
+          maxDiscountAmount: promo.maxDiscountAmount != null ? String(promo.maxDiscountAmount) : "",
+          minOrderAmount: promo.minOrderAmount != null ? String(promo.minOrderAmount) : "",
+          usageLimit: promo.usageLimit != null ? String(promo.usageLimit) : "",
+          validFrom: promo.validFrom ? promo.validFrom.slice(0, 10) : "",
+          validUntil: promo.validUntil ? promo.validUntil.slice(0, 10) : "",
+          isActive: promo.isActive,
+        }))
+      )
+    }
+
+    refreshPromoCodesForAdmin()
+  }, [])
+
   const updateEditableProduct = (productId: string, key: keyof EditableProduct, value: string | boolean) => {
     setEditableProducts((current) =>
       current.map((item) => (item.id === productId ? { ...item, [key]: value } : item))
@@ -126,6 +193,142 @@ export function AdminPanel({ orders = [] }: AdminPanelProps) {
       inStock: input.inStock,
       isActive: true,
     }
+  }
+
+  const buildPromoPayload = (input: EditablePromoCode) => {
+    const discountValue = Number(input.discountValue)
+    if (!Number.isFinite(discountValue) || discountValue <= 0) {
+      toast.error("Promo discount value must be a positive number.")
+      return undefined
+    }
+
+    const maxDiscountAmount = input.maxDiscountAmount.trim() ? Number(input.maxDiscountAmount) : undefined
+    const minOrderAmount = input.minOrderAmount.trim() ? Number(input.minOrderAmount) : undefined
+    const usageLimit = input.usageLimit.trim() ? Number(input.usageLimit) : undefined
+
+    if (maxDiscountAmount != null && (!Number.isFinite(maxDiscountAmount) || maxDiscountAmount < 0)) {
+      toast.error("Max discount must be a valid non-negative number.")
+      return undefined
+    }
+
+    if (minOrderAmount != null && (!Number.isFinite(minOrderAmount) || minOrderAmount < 0)) {
+      toast.error("Minimum order must be a valid non-negative number.")
+      return undefined
+    }
+
+    if (usageLimit != null && (!Number.isFinite(usageLimit) || usageLimit < 1)) {
+      toast.error("Usage limit must be at least 1.")
+      return undefined
+    }
+
+    const code = input.code.trim().toUpperCase()
+    if (!code) {
+      toast.error("Promo code is required.")
+      return undefined
+    }
+
+    return {
+      id: input.id || undefined,
+      code,
+      description: input.description.trim() || undefined,
+      discountScope: input.discountScope,
+      discountType: input.discountType,
+      discountValue,
+      maxDiscountAmount,
+      minOrderAmount,
+      usageLimit,
+      validFrom: input.validFrom ? `${input.validFrom}T00:00:00.000Z` : undefined,
+      validUntil: input.validUntil ? `${input.validUntil}T23:59:59.999Z` : undefined,
+      isActive: input.isActive,
+    }
+  }
+
+  const updateEditablePromo = (promoId: string, key: keyof EditablePromoCode, value: string | boolean) => {
+    setEditablePromoCodes((current) => current.map((promo) => (promo.id === promoId ? { ...promo, [key]: value } : promo)))
+  }
+
+  const handleSavePromoCode = async (promoId: string) => {
+    const editable = editablePromoCodes.find((promo) => promo.id === promoId)
+    if (!editable) {
+      return
+    }
+
+    const payload = buildPromoPayload(editable)
+    if (!payload) {
+      return
+    }
+
+    setSavingPromoId(promoId)
+    const result = await upsertPromoCodeByAdmin(payload)
+    setSavingPromoId(null)
+
+    if (!result.promoCode || result.error) {
+      toast.error(result.error ?? "Failed to save promo code.")
+      return
+    }
+
+    setEditablePromoCodes((current) =>
+      current.map((promo) =>
+        promo.id === promoId
+          ? {
+              ...promo,
+              code: result.promoCode?.code ?? promo.code,
+            }
+          : promo
+      )
+    )
+    toast.success(`Promo code ${result.promoCode.code} saved.`)
+  }
+
+  const handleCreatePromoCode = async () => {
+    const payload = buildPromoPayload(newPromoCode)
+    if (!payload) {
+      return
+    }
+
+    setIsCreatingPromo(true)
+    const result = await upsertPromoCodeByAdmin(payload)
+    setIsCreatingPromo(false)
+
+    if (!result.promoCode || result.error) {
+      toast.error(result.error ?? "Failed to create promo code.")
+      return
+    }
+
+    setEditablePromoCodes((current) => [
+      {
+        id: result.promoCode.id,
+        code: result.promoCode.code,
+        description: result.promoCode.description ?? "",
+        discountScope: result.promoCode.discountScope,
+        discountType: result.promoCode.discountType,
+        discountValue: String(result.promoCode.discountValue),
+        maxDiscountAmount: result.promoCode.maxDiscountAmount != null ? String(result.promoCode.maxDiscountAmount) : "",
+        minOrderAmount: result.promoCode.minOrderAmount != null ? String(result.promoCode.minOrderAmount) : "",
+        usageLimit: result.promoCode.usageLimit != null ? String(result.promoCode.usageLimit) : "",
+        validFrom: result.promoCode.validFrom ? result.promoCode.validFrom.slice(0, 10) : "",
+        validUntil: result.promoCode.validUntil ? result.promoCode.validUntil.slice(0, 10) : "",
+        isActive: result.promoCode.isActive,
+      },
+      ...current,
+    ])
+
+    setNewPromoCode({
+      id: "",
+      code: "",
+      description: "",
+      discountScope: "shipping",
+      discountType: "fixed",
+      discountValue: "",
+      maxDiscountAmount: "",
+      minOrderAmount: "",
+      usageLimit: "",
+      validFrom: "",
+      validUntil: "",
+      isActive: true,
+    })
+
+    toast.success(`Promo code ${result.promoCode.code} created.`)
   }
 
   const handleSaveProduct = async (productId: string) => {
@@ -196,6 +399,140 @@ export function AdminPanel({ orders = [] }: AdminPanelProps) {
 
   return (
     <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>Promo Code Management</CardTitle>
+          <CardDescription>Create and update discount codes for checkout. Example: SDAJUNE26 can be configured for shipping discounts.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="rounded-lg border p-4 space-y-4">
+            <p className="text-sm font-medium">Create Promo Code</p>
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              <div>
+                <Label>Code</Label>
+                <Input value={newPromoCode.code} onChange={(event) => setNewPromoCode((c) => ({ ...c, code: event.target.value.toUpperCase() }))} placeholder="SDAJUNE26" />
+              </div>
+              <div>
+                <Label>Description</Label>
+                <Input value={newPromoCode.description} onChange={(event) => setNewPromoCode((c) => ({ ...c, description: event.target.value }))} placeholder="June shipping promo" />
+              </div>
+              <div>
+                <Label>Discount Value</Label>
+                <Input type="number" value={newPromoCode.discountValue} onChange={(event) => setNewPromoCode((c) => ({ ...c, discountValue: event.target.value }))} placeholder="100" />
+              </div>
+              <div>
+                <Label>Scope</Label>
+                <select className="h-9 w-full rounded-md border bg-background px-3 text-sm" value={newPromoCode.discountScope} onChange={(event) => setNewPromoCode((c) => ({ ...c, discountScope: event.target.value as PromoScope }))}>
+                  <option value="shipping">Shipping</option>
+                  <option value="subtotal">Subtotal</option>
+                  <option value="total">Total</option>
+                </select>
+              </div>
+              <div>
+                <Label>Type</Label>
+                <select className="h-9 w-full rounded-md border bg-background px-3 text-sm" value={newPromoCode.discountType} onChange={(event) => setNewPromoCode((c) => ({ ...c, discountType: event.target.value as PromoDiscountType }))}>
+                  <option value="fixed">Fixed Amount</option>
+                  <option value="percent">Percentage</option>
+                </select>
+              </div>
+              <div>
+                <Label>Max Discount (optional)</Label>
+                <Input type="number" value={newPromoCode.maxDiscountAmount} onChange={(event) => setNewPromoCode((c) => ({ ...c, maxDiscountAmount: event.target.value }))} placeholder="120" />
+              </div>
+              <div>
+                <Label>Min Order (optional)</Label>
+                <Input type="number" value={newPromoCode.minOrderAmount} onChange={(event) => setNewPromoCode((c) => ({ ...c, minOrderAmount: event.target.value }))} placeholder="500" />
+              </div>
+              <div>
+                <Label>Usage Limit (optional)</Label>
+                <Input type="number" value={newPromoCode.usageLimit} onChange={(event) => setNewPromoCode((c) => ({ ...c, usageLimit: event.target.value }))} placeholder="500" />
+              </div>
+              <div>
+                <Label>Valid From (optional)</Label>
+                <Input type="date" value={newPromoCode.validFrom} onChange={(event) => setNewPromoCode((c) => ({ ...c, validFrom: event.target.value }))} />
+              </div>
+              <div>
+                <Label>Valid Until (optional)</Label>
+                <Input type="date" value={newPromoCode.validUntil} onChange={(event) => setNewPromoCode((c) => ({ ...c, validUntil: event.target.value }))} />
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <Switch checked={newPromoCode.isActive} onCheckedChange={(checked) => setNewPromoCode((c) => ({ ...c, isActive: checked }))} />
+              <span className="text-sm">Active</span>
+            </div>
+            <Button onClick={handleCreatePromoCode} disabled={isCreatingPromo}>{isCreatingPromo ? "Creating..." : "Create Promo Code"}</Button>
+          </div>
+
+          <div className="space-y-4">
+            {editablePromoCodes.length === 0 && (
+              <p className="text-sm text-muted-foreground">No promo codes found yet. Create one above.</p>
+            )}
+            {editablePromoCodes.map((promo) => {
+              const isSavingPromo = savingPromoId === promo.id
+              return (
+                <div key={promo.id} className="rounded-lg border p-4 space-y-4">
+                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                    <div>
+                      <Label>Code</Label>
+                      <Input value={promo.code} onChange={(event) => updateEditablePromo(promo.id, "code", event.target.value.toUpperCase())} />
+                    </div>
+                    <div>
+                      <Label>Description</Label>
+                      <Input value={promo.description} onChange={(event) => updateEditablePromo(promo.id, "description", event.target.value)} />
+                    </div>
+                    <div>
+                      <Label>Discount Value</Label>
+                      <Input type="number" value={promo.discountValue} onChange={(event) => updateEditablePromo(promo.id, "discountValue", event.target.value)} />
+                    </div>
+                    <div>
+                      <Label>Scope</Label>
+                      <select className="h-9 w-full rounded-md border bg-background px-3 text-sm" value={promo.discountScope} onChange={(event) => updateEditablePromo(promo.id, "discountScope", event.target.value as PromoScope)}>
+                        <option value="shipping">Shipping</option>
+                        <option value="subtotal">Subtotal</option>
+                        <option value="total">Total</option>
+                      </select>
+                    </div>
+                    <div>
+                      <Label>Type</Label>
+                      <select className="h-9 w-full rounded-md border bg-background px-3 text-sm" value={promo.discountType} onChange={(event) => updateEditablePromo(promo.id, "discountType", event.target.value as PromoDiscountType)}>
+                        <option value="fixed">Fixed Amount</option>
+                        <option value="percent">Percentage</option>
+                      </select>
+                    </div>
+                    <div>
+                      <Label>Max Discount</Label>
+                      <Input type="number" value={promo.maxDiscountAmount} onChange={(event) => updateEditablePromo(promo.id, "maxDiscountAmount", event.target.value)} />
+                    </div>
+                    <div>
+                      <Label>Min Order</Label>
+                      <Input type="number" value={promo.minOrderAmount} onChange={(event) => updateEditablePromo(promo.id, "minOrderAmount", event.target.value)} />
+                    </div>
+                    <div>
+                      <Label>Usage Limit</Label>
+                      <Input type="number" value={promo.usageLimit} onChange={(event) => updateEditablePromo(promo.id, "usageLimit", event.target.value)} />
+                    </div>
+                    <div>
+                      <Label>Valid From</Label>
+                      <Input type="date" value={promo.validFrom} onChange={(event) => updateEditablePromo(promo.id, "validFrom", event.target.value)} />
+                    </div>
+                    <div>
+                      <Label>Valid Until</Label>
+                      <Input type="date" value={promo.validUntil} onChange={(event) => updateEditablePromo(promo.id, "validUntil", event.target.value)} />
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-3">
+                    <Switch checked={promo.isActive} onCheckedChange={(checked) => updateEditablePromo(promo.id, "isActive", checked)} />
+                    <span className="text-sm">Active</span>
+                    <Button size="sm" onClick={() => handleSavePromoCode(promo.id)} disabled={isSavingPromo}>{isSavingPromo ? "Saving..." : "Save Promo"}</Button>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader>
           <CardTitle>Recent Orders</CardTitle>
