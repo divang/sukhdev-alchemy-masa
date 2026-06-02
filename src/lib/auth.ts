@@ -491,12 +491,41 @@ export async function signInCustomer(input: SignInInput): Promise<AuthResult> {
     }
 
     const profileStart = Date.now()
-    const profile = await withTimeout(fetchProfile(user), 10000, "Profile sync timed out")
-    authDebug("signInCustomer profile load completed", {
-      userId: user.id,
-      durationMs: Date.now() - profileStart,
-      hasProfile: Boolean(profile),
-    })
+    let profile: UserProfile | null = null
+
+    try {
+      profile = await withTimeout(fetchProfile(user), 10000, "Profile sync timed out")
+      authDebug("signInCustomer profile load completed", {
+        userId: user.id,
+        durationMs: Date.now() - profileStart,
+        hasProfile: Boolean(profile),
+      })
+    } catch (profileError) {
+      const fallbackProfile = buildProfileFromMetadata(user)
+      authDebug("signInCustomer profile load failed after auth success; using metadata fallback", {
+        userId: user.id,
+        durationMs: Date.now() - profileStart,
+        profileError: profileError instanceof Error ? profileError.message : String(profileError),
+      })
+
+      // Best-effort profile backfill so future sign-ins don't need fallback.
+      const saveError = await saveProfile(fallbackProfile)
+      if (saveError) {
+        authDebug("signInCustomer metadata fallback backfill failed", {
+          userId: user.id,
+          saveError,
+        })
+      }
+
+      profile = fallbackProfile
+    }
+
+    if (!profile) {
+      profile = buildProfileFromMetadata(user)
+      authDebug("signInCustomer profile empty; using metadata fallback", {
+        userId: user.id,
+      })
+    }
 
     authDebug("signInCustomer succeeded", {
       userId: user.id,
