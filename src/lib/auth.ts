@@ -120,17 +120,18 @@ function mapAuthErrorMessage(message: string) {
   return message
 }
 
+const PRODUCTION_ORIGIN = "https://sukhdevialchemy.com"
+
 function getEmailRedirectTo() {
   const configured = import.meta.env.VITE_AUTH_REDIRECT_URL as string | undefined
   if (configured && configured.trim()) {
     return configured.trim()
   }
 
-  if (typeof window !== "undefined" && window.location?.origin) {
-    return `${window.location.origin}/`
-  }
-
-  return undefined
+  // Never derive the redirect from window.location — in dev/preview environments
+  // (Codespaces, GitHub Pages preview URLs) this would embed a non-production URL
+  // in confirmation emails. Always fall back to the canonical production origin.
+  return `${PRODUCTION_ORIGIN}/`
 }
 
 function buildProfileFromMetadata(user: User): UserProfile {
