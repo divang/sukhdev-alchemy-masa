@@ -4,7 +4,8 @@
 insert into public.categories (id, name, slug, enabled, sort_order)
 values
   ('premium-masala', 'Premium Masala', 'premium-masala', true, 1),
-  ('raw-organic-spices', 'Raw Organic Spices', 'raw-organic-spices', false, 2)
+  ('combo-pack-masala', 'Combo Pack Masala', 'combo-pack-masala', true, 2),
+  ('raw-organic-spices', 'Raw Organic Spices', 'raw-organic-spices', false, 3)
 on conflict (id) do update
 set
   name = excluded.name,
@@ -95,12 +96,12 @@ values
   ),
   (
     'sukhdevi-combo-pack',
-    'premium-masala',
+    'combo-pack-masala',
     'PM-COMBO-001',
     'Sukhdevi Combo Pack',
     'All four signature 50g masalas in one order: Bharwa Masala, Chaat Masala, Chole Masala, and Mix Masala Premium Blend. Free shipping applies automatically because the combo subtotal is above ₹500.',
     640,
-    'images/products/garam-masala-premium.png',
+    'images/products/SDA-Combo-Pack.jpeg',
     5,
     0,
     array['1 x Bharwa Masala 50g','1 x Chaat Masala 50g','1 x Chole Masala 50g','1 x Mix Masala Premium Blend 50g'],

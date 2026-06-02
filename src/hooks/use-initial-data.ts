@@ -21,7 +21,7 @@ export function useInitialData() {
 
   useEffect(() => {
     const initializeData = async () => {
-      const currentVersion = 15
+      const currentVersion = 17
       const cacheBuster = (import.meta.env.VITE_CATALOG_CACHE_BUSTER as string | undefined)?.trim() || CATALOG_CACHE_FALLBACK_BUSTER
       const now = Date.now()
       const hasLocalCatalog = Boolean(categories?.length) && Boolean(products?.length)
@@ -52,6 +52,12 @@ export function useInitialData() {
             id: 'premium-masala',
             name: 'Premium Masala',
             slug: 'premium-masala',
+            enabled: true,
+          },
+          {
+            id: 'combo-pack-masala',
+            name: 'Combo Pack Masala',
+            slug: 'combo-pack-masala',
             enabled: true,
           },
           {
@@ -192,7 +198,7 @@ export function useInitialData() {
         {
           id: 'sukhdevi-combo-pack',
           name: 'Sukhdevi Combo Pack',
-          category: 'premium-masala',
+          category: 'combo-pack-masala',
           price: 640,
           packGrams: 200,
           image: 'images/products/SDA-Combo-Pack.jpeg',
