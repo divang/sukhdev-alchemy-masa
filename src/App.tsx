@@ -103,6 +103,7 @@ function App() {
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [authMode, setAuthMode] = useState<"customer" | "admin">("customer")
   const [postAuthView, setPostAuthView] = useState<View>("store")
+  const [cloudOrders, setCloudOrders] = useState<Order[]>([])
 
   // Hash-based admin route: visiting /#admin opens admin login directly.
   useEffect(() => {
@@ -122,7 +123,6 @@ function App() {
     window.addEventListener("hashchange", handleHash)
     return () => window.removeEventListener("hashchange", handleHash)
   }, [profile])
-  const [cloudOrders, setCloudOrders] = useState<Order[]>([])
 
   useEffect(() => {
     if (categories && categories.length > 0) {
