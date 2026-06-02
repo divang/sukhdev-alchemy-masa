@@ -645,7 +645,7 @@ function App() {
             <div className="border-2 border-dashed border-border p-6 rounded-lg">
               <p className="font-semibold mb-2">Pay using UPI:</p>
               <p className="text-xs text-muted-foreground mb-3">
-                Active account: {activeUpiConfig.displayName} ({activeUpiConfig.upiId})
+                Scan the QR or use Google Pay to complete payment.
               </p>
 
               <div className="mx-auto mb-4 w-fit rounded-lg border bg-white p-3">
@@ -845,6 +845,26 @@ function App() {
               </Button>
             </div>
           </div>
+
+          {featureFlags.enableSocialIcons && (
+            <div className="mt-2 flex items-center gap-2 xl:hidden">
+              {socialProfiles.map((profile) => (
+                <a
+                  key={`mobile-${profile.name}`}
+                  href={profile.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  aria-label={`Open ${profile.name}`}
+                  title={`${profile.name} ${profile.handle}`}
+                  className="rounded-full border p-1.5 text-muted-foreground transition hover:text-foreground"
+                >
+                  {profile.name === "Instagram" && <InstagramLogo size={14} weight="duotone" />}
+                  {profile.name === "YouTube" && <YoutubeLogo size={14} weight="duotone" />}
+                  {profile.name === "WhatsApp" && <WhatsappLogo size={14} weight="duotone" />}
+                </a>
+              ))}
+            </div>
+          )}
         </div>
       </header>
 
