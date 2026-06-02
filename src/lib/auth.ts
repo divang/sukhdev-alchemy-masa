@@ -68,8 +68,26 @@ function authDebug(message: string, details?: Record<string, unknown>) {
 }
 
 function mapSignupErrorMessage(message: string) {
+  const normalized = message.toLowerCase()
+  if (normalized.includes("rate limit") || normalized.includes("too many requests") || normalized.includes("429")) {
+    return "Too many auth requests from this device or IP. Please wait a minute and retry. If this continues during pre-launch traffic, increase Supabase Auth rate limits in project settings."
+  }
+
   if (message.toLowerCase().includes("error sending confirmation email")) {
     return "We could not send the confirmation email right now. Please retry after 60 seconds, verify SMTP settings/sender domain, or use another recipient inbox."
+  }
+
+  return message
+}
+
+function mapAuthErrorMessage(message: string) {
+  const normalized = message.toLowerCase()
+  if (normalized.includes("rate limit") || normalized.includes("too many requests") || normalized.includes("429")) {
+    return "Too many auth requests from this device or IP. Please wait a minute and retry."
+  }
+
+  if (normalized.includes("timed out") || normalized.includes("timeout")) {
+    return "Auth request timed out. Please retry. If this keeps happening, check Supabase region/network latency."
   }
 
   return message
@@ -247,20 +265,39 @@ export async function signUpCustomer(input: SignUpInput): Promise<AuthResult> {
     redirectTo: getEmailRedirectTo() ?? "none",
   })
 
-  const { data, error } = await supabase.auth.signUp({
-    email: input.email,
-    password: input.password,
-    options: {
-      emailRedirectTo: getEmailRedirectTo(),
-      data: {
-        full_name: input.fullName,
-        phone: input.phone,
-        role: "customer",
-        review_opt_in: input.reviewOptIn,
-        marketing_opt_in: input.marketingOptIn,
-      },
-    },
-  })
+  let data: Awaited<ReturnType<typeof supabase.auth.signUp>>["data"] | undefined
+  let error: Awaited<ReturnType<typeof supabase.auth.signUp>>["error"] | undefined
+
+  try {
+    const result = await withTimeout(
+      supabase.auth.signUp({
+        email: input.email,
+        password: input.password,
+        options: {
+          emailRedirectTo: getEmailRedirectTo(),
+          data: {
+            full_name: input.fullName,
+            phone: input.phone,
+            role: "customer",
+            review_opt_in: input.reviewOptIn,
+            marketing_opt_in: input.marketingOptIn,
+          },
+        },
+      }),
+      12000,
+      "Sign up request timed out"
+    )
+
+    data = result.data
+    error = result.error
+  } catch (exception) {
+    const mappedError = mapAuthErrorMessage(exception instanceof Error ? exception.message : String(exception))
+    authDebug("signUpCustomer failed unexpectedly", {
+      email: maskEmail(input.email),
+      error: mappedError,
+    })
+    return { user: null, profile: null, error: mappedError }
+  }
 
   if (error) {
     const mappedError = mapSignupErrorMessage(error.message)
@@ -269,6 +306,14 @@ export async function signUpCustomer(input: SignUpInput): Promise<AuthResult> {
       error: mappedError,
     })
     return { user: null, profile: null, error: mappedError }
+  }
+
+  if (!data) {
+    return {
+      user: null,
+      profile: null,
+      error: "Sign up failed without a response payload.",
+    }
   }
 
   const user = data.user
@@ -336,7 +381,11 @@ export async function signInCustomer(input: SignInInput): Promise<AuthResult> {
 
   try {
     const signInStart = Date.now()
-    const { data, error } = await supabase.auth.signInWithPassword(input)
+    const { data, error } = await withTimeout(
+      supabase.auth.signInWithPassword(input),
+      12000,
+      "Sign in request timed out"
+    )
     authDebug("signInCustomer auth request completed", {
       email: maskEmail(input.email),
       durationMs: Date.now() - signInStart,
@@ -345,11 +394,12 @@ export async function signInCustomer(input: SignInInput): Promise<AuthResult> {
     })
 
     if (error) {
+      const mappedError = mapAuthErrorMessage(error.message)
       authDebug("signInCustomer failed", {
         email: maskEmail(input.email),
-        error: error.message,
+        error: mappedError,
       })
-      return { user: null, profile: null, error: error.message }
+      return { user: null, profile: null, error: mappedError }
     }
 
     const user = data.user
@@ -361,7 +411,7 @@ export async function signInCustomer(input: SignInInput): Promise<AuthResult> {
     }
 
     const profileStart = Date.now()
-    const profile = await fetchProfile(user)
+    const profile = await withTimeout(fetchProfile(user), 10000, "Profile sync timed out")
     authDebug("signInCustomer profile load completed", {
       userId: user.id,
       durationMs: Date.now() - profileStart,
@@ -378,7 +428,7 @@ export async function signInCustomer(input: SignInInput): Promise<AuthResult> {
       profile,
     }
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Sign in failed unexpectedly."
+    const message = mapAuthErrorMessage(error instanceof Error ? error.message : "Sign in failed unexpectedly.")
     authDebug("signInCustomer unexpected failure", {
       email: maskEmail(input.email),
       error: message,

@@ -8,7 +8,13 @@ import { Separator } from "@/components/ui/separator"
 import { ArrowLeft } from "@phosphor-icons/react"
 import type { CartItem, Product, Order, UserProfile } from "@/lib/types"
 import { toast } from "sonner"
-import { calculateCartItemTotal, calculateCartSubtotal, calculateShippingAmount, FREE_SHIPPING_THRESHOLD, getProductPackLabel } from "@/lib/pricing"
+import {
+  calculateCartItemTotal,
+  calculateCartSubtotal,
+  calculateShippingAmountByPincode,
+  getProductPackLabel,
+  getShippingZoneLabel,
+} from "@/lib/pricing"
 
 type CheckoutViewProps = {
   cartItems: CartItem[]
@@ -43,7 +49,7 @@ export function CheckoutView({ cartItems, products, accountProfile, onBack, onOr
   
   const getProduct = (productId: string) => products.find(p => p.id === productId)
   const cartSubtotal = calculateCartSubtotal(cartItems, products)
-  const shippingAmount = calculateShippingAmount(cartSubtotal)
+  const shippingAmount = calculateShippingAmountByPincode(formData.pincode, cartSubtotal)
   const cartTotal = cartSubtotal + shippingAmount
   
   const handleSubmit = async (e: React.FormEvent) => {
@@ -169,10 +175,16 @@ export function CheckoutView({ cartItems, products, accountProfile, onBack, onOr
                       <Input
                         id="pincode"
                         value={formData.pincode}
-                        onChange={(e) => setFormData(f => ({ ...f, pincode: e.target.value }))}
+                        onChange={(e) => setFormData(f => ({ ...f, pincode: e.target.value.replace(/\D/g, "").slice(0, 6) }))}
                         placeholder="000000"
+                        inputMode="numeric"
+                        maxLength={6}
                       />
                     </div>
+                  </div>
+
+                  <div className="rounded-lg border bg-muted/40 p-3 text-xs text-muted-foreground">
+                    Shipping policy: Karnataka pincodes are charged ₹60. Rest of India is charged ₹120.
                   </div>
                   
                   <Button type="submit" className="w-full mt-6" size="lg">
@@ -217,7 +229,7 @@ export function CheckoutView({ cartItems, products, accountProfile, onBack, onOr
                   <span>{shippingAmount === 0 ? "Free" : `₹${shippingAmount.toFixed(2)}`}</span>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Shipping is free when the subtotal is above ₹{FREE_SHIPPING_THRESHOLD}. The combo pack qualifies automatically.
+                  Shipping zone: {formData.pincode.length >= 2 ? getShippingZoneLabel(formData.pincode) : "Enter pincode to confirm zone"}
                 </p>
                 
                 <div className="flex justify-between items-center text-lg font-bold">

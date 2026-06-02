@@ -5,7 +5,7 @@ import { X, Minus, Plus, ShoppingCart } from "@phosphor-icons/react"
 import type { CartItem, Product } from "@/lib/types"
 import { useKV } from "@/hooks/use-kv"
 import { getProductImage } from "@/lib/product-images"
-import { calculateCartItemTotal, calculateCartSubtotal, calculateShippingAmount, getProductPackLabel } from "@/lib/pricing"
+import { calculateCartItemTotal, calculateCartSubtotal, getProductPackLabel } from "@/lib/pricing"
 
 type CartDrawerProps = {
   open: boolean
@@ -31,20 +31,19 @@ export function CartDrawer({
   const getProduct = (productId: string) => products.find(p => p.id === productId)
   
   const cartSubtotal = calculateCartSubtotal(cartItems, products)
-  const shippingAmount = calculateShippingAmount(cartSubtotal)
-  const cartTotal = cartSubtotal + shippingAmount
+  const cartTotal = cartSubtotal
   
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full sm:max-w-lg flex flex-col">
+      <SheetContent className="w-full sm:max-w-lg flex flex-col p-0">
         <SheetHeader>
-          <SheetTitle className="flex items-center gap-2">
+          <SheetTitle className="flex items-center gap-2 px-6 pt-6">
             <ShoppingCart size={24} />
             Shopping Cart ({cartItems.length})
           </SheetTitle>
         </SheetHeader>
         
-        <div className="flex-1 overflow-y-auto py-4">
+        <div className="flex-1 overflow-y-auto px-6 py-4">
           {cartItems.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-center">
               <ShoppingCart size={64} className="text-muted-foreground mb-4" />
@@ -116,17 +115,17 @@ export function CartDrawer({
         {cartItems.length > 0 && (
           <>
             <Separator />
-            <div className="py-4 space-y-4">
+            <div className="space-y-4 px-6 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
               <div className="flex justify-between items-center text-sm text-muted-foreground">
                 <span>Subtotal</span>
                 <span>₹{cartSubtotal.toFixed(2)}</span>
               </div>
               <div className="flex justify-between items-center text-sm text-muted-foreground">
                 <span>Shipping</span>
-                <span>{shippingAmount === 0 ? "Free" : `₹${shippingAmount.toFixed(2)}`}</span>
+                <span>Calculated at checkout by pincode</span>
               </div>
               <div className="flex justify-between items-center text-lg font-bold">
-                <span>Total:</span>
+                <span>Estimated Total:</span>
                 <span className="text-primary">₹{cartTotal.toFixed(2)}</span>
               </div>
               <Button 

@@ -81,9 +81,9 @@ export function ProductDetailDialog({ product, currentUser, canReview, open, onO
   
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[90vh]">
+      <DialogContent className="max-w-[calc(100vw-1rem)] sm:max-w-3xl max-h-[95svh] sm:max-h-[90vh] overflow-y-auto p-4 sm:p-6 pb-[calc(1rem+env(safe-area-inset-bottom))]">
         <DialogHeader>
-          <DialogTitle className="text-2xl">{product.name}</DialogTitle>
+          <DialogTitle className="text-xl sm:text-2xl pr-8">{product.name}</DialogTitle>
         </DialogHeader>
         
         <div className="grid md:grid-cols-2 gap-6">
