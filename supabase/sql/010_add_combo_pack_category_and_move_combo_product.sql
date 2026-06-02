@@ -10,8 +10,7 @@ set
   sort_order = excluded.sort_order;
 
 update public.categories
-set sort_order = 3,
-    updated_at = now()
+set sort_order = 3
 where id = 'raw-organic-spices';
 
 update public.products
