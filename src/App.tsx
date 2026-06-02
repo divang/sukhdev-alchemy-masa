@@ -109,6 +109,8 @@ function App() {
   const [cloudOrders, setCloudOrders] = useState<Order[]>([])
   const [featureFlags, setFeatureFlags] = useKV("feature-flags", defaultFeatureFlags)
   const [activeUpiConfig, setActiveUpiConfig] = useState(fallbackUpiConfig)
+  const forceShowCampaignLab = true
+  const isCampaignLabVisible = forceShowCampaignLab || featureFlags.enableSocialExperimentSection
   const socialProfiles = [
     { name: "Instagram", handle: "@sukhdevialchemy", url: "https://instagram.com/sukhdevialchemy" },
     { name: "YouTube", handle: "@sukhdevialchemy", url: "https://youtube.com/@sukhdevialchemy" },
@@ -765,7 +767,7 @@ function App() {
                         setSelectedCategory(category)
                         setMobileMenuOpen(false)
                       }}
-                      showCampaignLab={featureFlags.enableSocialExperimentSection}
+                      showCampaignLab={isCampaignLabVisible}
                       onOpenCampaignLab={() => {
                         handleOpenCampaignLab()
                         setMobileMenuOpen(false)
@@ -876,14 +878,14 @@ function App() {
                 categories={categories || []}
                 selectedCategory={selectedCategory}
                 onSelectCategory={setSelectedCategory}
-                showCampaignLab={featureFlags.enableSocialExperimentSection}
+                showCampaignLab={isCampaignLabVisible}
                 onOpenCampaignLab={handleOpenCampaignLab}
               />
             </div>
           </aside>
 
           <main className="flex-1">
-            {featureFlags.enableSocialExperimentSection && (
+            {isCampaignLabVisible && (
               <SocialCampaignLab
                 showReels={featureFlags.enableRestaurantToHomeReels}
                 showChefCta={featureFlags.enableChefSampleCta}
