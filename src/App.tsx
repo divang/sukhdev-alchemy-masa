@@ -107,7 +107,7 @@ function App() {
   const [authMode, setAuthMode] = useState<"customer" | "admin">("customer")
   const [postAuthView, setPostAuthView] = useState<View>("store")
   const [cloudOrders, setCloudOrders] = useState<Order[]>([])
-  const [featureFlags, setFeatureFlags] = useState(defaultFeatureFlags)
+  const [featureFlags, setFeatureFlags] = useKV("feature-flags", defaultFeatureFlags)
   const [activeUpiConfig, setActiveUpiConfig] = useState(fallbackUpiConfig)
   const socialProfiles = [
     { name: "Instagram", handle: "@sukhdevialchemy", url: "https://instagram.com/sukhdevialchemy" },
@@ -252,6 +252,8 @@ function App() {
 
       if (result.error) {
         console.error("Failed to load feature flags", result.error)
+        // Keep last known local value instead of reverting to defaults.
+        return
       }
 
       setFeatureFlags(result.flags)
