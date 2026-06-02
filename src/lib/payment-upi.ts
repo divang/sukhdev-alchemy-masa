@@ -114,3 +114,20 @@ export async function setPrimaryPaymentUpiAccount(accountId: string): Promise<{ 
 
   return { success: true }
 }
+
+export async function setPaymentUpiAccountEnabled(accountId: string, enabled: boolean): Promise<{ success: boolean; error?: string }> {
+  if (!supabase || !isSupabaseConfigured) {
+    return { success: false, error: "Supabase is not configured." }
+  }
+
+  const { error } = await supabase
+    .from("payment_upi_accounts")
+    .update({ enabled })
+    .eq("id", accountId)
+
+  if (error) {
+    return { success: false, error: error.message }
+  }
+
+  return { success: true }
+}

@@ -19,6 +19,7 @@ import {
 } from "@/lib/promo-codes"
 import {
   fetchPaymentUpiAccountsForAdmin,
+  setPaymentUpiAccountEnabled,
   setPrimaryPaymentUpiAccount,
   type AdminPaymentUpiAccount,
 } from "@/lib/payment-upi"
@@ -94,6 +95,7 @@ export function AdminPanel({ orders = [] }: AdminPanelProps) {
   })
   const [upiAccounts, setUpiAccounts] = useState<AdminPaymentUpiAccount[]>([])
   const [switchingUpiId, setSwitchingUpiId] = useState<string | null>(null)
+  const [togglingUpiId, setTogglingUpiId] = useState<string | null>(null)
 
   const categoryOptions = useMemo(() => {
     if (categories && categories.length > 0) {
@@ -401,6 +403,32 @@ export function AdminPanel({ orders = [] }: AdminPanelProps) {
     toast.success("Primary UPI account updated.")
   }
 
+  const handleToggleUpiEnabled = async (accountId: string, enabled: boolean) => {
+    const currentlyEnabledCount = upiAccounts.filter((account) => account.enabled).length
+    if (!enabled && currentlyEnabledCount <= 1) {
+      toast.error("At least one UPI account must remain enabled.")
+      return
+    }
+
+    setTogglingUpiId(accountId)
+    const result = await setPaymentUpiAccountEnabled(accountId, enabled)
+    setTogglingUpiId(null)
+
+    if (!result.success) {
+      toast.error(result.error ?? "Failed to update UPI account status.")
+      return
+    }
+
+    const refreshed = await fetchPaymentUpiAccountsForAdmin()
+    if (refreshed.error) {
+      toast.error(refreshed.error)
+      return
+    }
+
+    setUpiAccounts(refreshed.accounts)
+    toast.success(`UPI account ${enabled ? "enabled" : "disabled"}.`)
+  }
+
   const handleCreateProduct = async () => {
     if (!isSupabaseConfigured) {
       toast.error("Supabase auth is not configured.")
@@ -464,14 +492,24 @@ export function AdminPanel({ orders = [] }: AdminPanelProps) {
                       </div>
                       <p className="text-sm text-muted-foreground">{account.upiId}</p>
                     </div>
-                    <Button
-                      size="sm"
-                      variant={isPrimary ? "secondary" : "default"}
-                      onClick={() => handleSetPrimaryUpi(account.id)}
-                      disabled={isPrimary || isSwitching || !account.enabled}
-                    >
-                      {isPrimary ? "Current Primary" : isSwitching ? "Switching..." : "Make Primary"}
-                    </Button>
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          checked={account.enabled}
+                          onCheckedChange={(checked) => handleToggleUpiEnabled(account.id, checked)}
+                          disabled={togglingUpiId === account.id}
+                        />
+                        <span className="text-sm">Enabled</span>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant={isPrimary ? "secondary" : "default"}
+                        onClick={() => handleSetPrimaryUpi(account.id)}
+                        disabled={isPrimary || isSwitching || !account.enabled}
+                      >
+                        {isPrimary ? "Current Primary" : isSwitching ? "Switching..." : "Make Primary"}
+                      </Button>
+                    </div>
                   </div>
                 )
               })}
