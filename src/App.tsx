@@ -634,12 +634,6 @@ function App() {
     const transactionNote = `Order ${currentOrder.id}`
     const upiParams = `pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(upiName)}&am=${encodeURIComponent(amount)}&cu=INR&tn=${encodeURIComponent(transactionNote)}`
     const upiLink = `upi://pay?${upiParams}`
-    // Google Pay (Tez) deep-link
-    const gpayLink = `tez://upi/pay?${upiParams}`
-    // Android intent with explicit package greatly reduces other UPI apps intercepting the link.
-    const gpayIntentLink = `intent://upi/pay?${upiParams}#Intent;scheme=tez;package=com.google.android.apps.nbu.paisa.user;end`
-    const isAndroid = typeof navigator !== "undefined" && /Android/i.test(navigator.userAgent)
-    const preferredGpayLink = isAndroid ? gpayIntentLink : gpayLink
 
     return (
       <div className="min-h-screen bg-background">
@@ -673,8 +667,8 @@ function App() {
 
             <div className="border-2 border-dashed border-border p-6 rounded-lg">
               <p className="font-semibold mb-2">Pay using UPI:</p>
-              <p className="text-xs text-muted-foreground mb-3">
-                Scan the QR or use Google Pay to complete payment.
+              <p className="text-xs text-muted-foreground mb-4">
+                Scan the QR code and pay using any UPI app. Your payment will be verified through our bank transaction records. <em>Payment gateway integration is in progress.</em>
               </p>
 
               <div className="mx-auto mb-4 w-fit rounded-lg border bg-white p-3">
@@ -686,15 +680,8 @@ function App() {
                 />
               </div>
 
-              <Button asChild className="w-full mb-2">
-                <a href={preferredGpayLink}>Open Google Pay</a>
-              </Button>
-              <Button asChild variant="outline" className="w-full mb-3">
-                <a href={upiLink}>Other UPI App</a>
-              </Button>
-
               <p className="text-sm text-muted-foreground">
-                Tap <strong>Open Google Pay</strong> to pay directly. Use <em>Other UPI App</em> if you prefer PhonePe, Paytm, etc. The order ID is auto-filled.
+                Your Order ID is auto-generated and can be used to track your order. Transaction status will be updated after verification.
               </p>
             </div>
 
