@@ -35,6 +35,7 @@ import { isSupabaseConfigured } from "@/lib/supabase"
 import { getProductPackGrams, hasPurchasedProduct } from "@/lib/pricing"
 import { defaultFeatureFlags, fetchFeatureFlags } from "@/lib/feature-flags"
 import { fallbackUpiConfig, fetchActiveUpiConfig } from "@/lib/payment-upi"
+import { isPaymentGatewayEnabled, startRazorpayCheckout } from "@/lib/payment-gateway"
 import { getRequestedRuntimeModeFromSearch, resolveRuntimeMode } from "@/lib/runtime-mode"
 
 type View = "store" | "account" | "checkout" | "payment" | "tracking" | "admin"
@@ -115,6 +116,7 @@ function App() {
   const [cloudOrders, setCloudOrders] = useState<Order[]>([])
   const [featureFlags, setFeatureFlags] = useKV("feature-flags", defaultFeatureFlags)
   const [activeUpiConfig, setActiveUpiConfig] = useState(fallbackUpiConfig)
+  const [isProcessingGatewayPayment, setIsProcessingGatewayPayment] = useState(false)
   const socialProfiles = [
     { name: "Instagram", handle: "@sukhdevialchemy", url: "https://instagram.com/sukhdevialchemy" },
     { name: "YouTube", handle: "@sukhdevialchemy", url: "https://youtube.com/@sukhdevialchemy" },
@@ -551,21 +553,19 @@ function App() {
     }
   }
 
-  const handlePaymentComplete = async () => {
-    if (!currentOrder) return
-
+  const markOrderPaidAndNavigate = async (order: Order) => {
     const updatedOrder: Order = {
-      ...currentOrder,
+      ...order,
       paymentStatus: "paid",
       status: "processing",
       updatedAt: new Date().toISOString(),
     }
 
     setOrders((current = []) =>
-      current.map((order) => (order.id === updatedOrder.id ? updatedOrder : order))
+      current.map((entry) => (entry.id === updatedOrder.id ? updatedOrder : entry))
     )
     setCloudOrders((current) =>
-      current.map((order) => (order.id === updatedOrder.id ? updatedOrder : order))
+      current.map((entry) => (entry.id === updatedOrder.id ? updatedOrder : entry))
     )
     setCurrentOrder(updatedOrder)
     setCurrentView("tracking")
@@ -581,6 +581,37 @@ function App() {
     } else {
       toast.success("Payment status updated!")
     }
+  }
+
+  const handleGatewayPayment = async () => {
+    if (!currentOrder) return
+
+    setIsProcessingGatewayPayment(true)
+    const gatewayResult = await startRazorpayCheckout(currentOrder)
+    setIsProcessingGatewayPayment(false)
+
+    if (gatewayResult.cancelled) {
+      toast.info("Payment was cancelled.")
+      return
+    }
+
+    if (gatewayResult.error) {
+      toast.error(gatewayResult.error)
+      return
+    }
+
+    if (!gatewayResult.verified) {
+      toast.error("Payment signature verification failed. Please try again.")
+      return
+    }
+
+    await markOrderPaidAndNavigate(currentOrder)
+  }
+
+  const handleManualPaymentComplete = async () => {
+    if (!currentOrder) return
+
+    await markOrderPaidAndNavigate(currentOrder)
   }
 
 
@@ -666,23 +697,43 @@ function App() {
             </div>
 
             <div className="border-2 border-dashed border-border p-6 rounded-lg">
-              <p className="font-semibold mb-2">Pay using UPI:</p>
-              <p className="text-xs text-muted-foreground mb-4">
-                Scan the QR code and pay using any UPI app. Your payment will be verified through our bank transaction records. <em>Payment gateway integration is in progress.</em>
-              </p>
+              {isPaymentGatewayEnabled() ? (
+                <>
+                  <p className="font-semibold mb-2">Pay securely with Razorpay:</p>
+                  <p className="text-xs text-muted-foreground mb-4">
+                    Tap below to open Razorpay checkout. Your payment is marked successful only after server-side signature verification.
+                  </p>
+                  <Button
+                    className="w-full"
+                    onClick={handleGatewayPayment}
+                    disabled={isProcessingGatewayPayment}
+                  >
+                    {isProcessingGatewayPayment
+                      ? "Opening payment..."
+                      : `Pay Rs ${currentOrder.totalAmount.toFixed(2)} with Razorpay`}
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <p className="font-semibold mb-2">Pay using UPI:</p>
+                  <p className="text-xs text-muted-foreground mb-4">
+                    Scan the QR code and pay using any UPI app. This is a manual fallback flow when Razorpay is not configured.
+                  </p>
 
-              <div className="mx-auto mb-4 w-fit rounded-lg border bg-white p-3">
-                <QRCode
-                  value={upiLink}
-                  size={224}
-                  level="H"
-                  includeMargin={true}
-                />
-              </div>
+                  <div className="mx-auto mb-4 w-fit rounded-lg border bg-white p-3">
+                    <QRCode
+                      value={upiLink}
+                      size={224}
+                      level="H"
+                      includeMargin={true}
+                    />
+                  </div>
 
-              <p className="text-sm text-muted-foreground">
-                Your Order ID is auto-generated and can be used to track your order. Transaction status will be updated after verification.
-              </p>
+                  <p className="text-sm text-muted-foreground">
+                    Your Order ID is auto-generated and can be used to track your order.
+                  </p>
+                </>
+              )}
             </div>
 
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm">
@@ -695,9 +746,11 @@ function App() {
               <Button variant="outline" className="w-full sm:flex-1" onClick={handleBackToStore}>
                 Back to Store
               </Button>
-              <Button className="w-full sm:flex-1" onClick={handlePaymentComplete}>
-                I have completed payment
-              </Button>
+              {!isPaymentGatewayEnabled() && (
+                <Button className="w-full sm:flex-1" onClick={handleManualPaymentComplete}>
+                  I have completed payment
+                </Button>
+              )}
             </div>
           </div>
         </div>
