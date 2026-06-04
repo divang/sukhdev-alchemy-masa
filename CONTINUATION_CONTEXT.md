@@ -2,7 +2,7 @@
 
 Last updated: 2026-06-04 UTC
 Branch: main
-Latest pushed commit: e02a2bb
+Latest pushed commit: 1fb8dff
 Previous major feature commit: d6ef491
 
 ## Why This File Exists
@@ -150,6 +150,54 @@ Execution order agreed for production hardening:
   - Admin panel actions to send WhatsApp/email with user/order details
 - Checkout promo UI is now disabled by default; enable with env `VITE_ENABLE_CHECKOUT_PROMO=true` when needed.
 
+### Phase 2 Verification Checklist (Merged)
+Run these checks in both `dev` and `prod` Supabase projects before any promotion:
+
+1. Table parity:
+
+```sql
+select table_name
+from information_schema.tables
+where table_schema = 'public'
+order by table_name;
+```
+
+2. Critical column parity:
+
+```sql
+select table_name, column_name, data_type
+from information_schema.columns
+where table_schema = 'public'
+and table_name in ('orders', 'profiles', 'categories', 'products', 'product_reviews', 'testimonials', 'cart_items', 'promo_codes', 'feature_flags', 'payment_upi_accounts')
+order by table_name, ordinal_position;
+```
+
+3. RLS status:
+
+```sql
+select schemaname, tablename, rowsecurity
+from pg_tables
+where schemaname = 'public'
+and tablename in ('orders', 'profiles', 'product_reviews', 'cart_items')
+order by tablename;
+```
+
+4. Policy inventory:
+
+```sql
+select schemaname, tablename, policyname, permissive, roles, cmd
+from pg_policies
+where schemaname = 'public'
+order by tablename, policyname;
+```
+
+5. Change control:
+   - Apply DB change on dev
+   - Smoke test on dev
+   - Record migration notes
+   - Apply on prod
+   - Re-run parity queries
+
 ### Phase 3 Target
 - Implement verified payment with Razorpay through server-side functions:
   - create gateway order (server secret)
@@ -197,6 +245,18 @@ Professional contact section is live with:
 - Facebook: https://www.facebook.com/people/Sukhdevi-Alchemy/61590206949388/
 - YouTube: https://www.youtube.com/@sukhdevialchemy
 - WhatsApp: +91 78894 80171 (wa.me link)
+
+### Product Image Asset Filenames (Merged)
+If replacing product images, keep these filenames unless you also update `src/hooks/use-initial-data.ts` image paths:
+- `garam-masala-premium.png`
+- `bharwa-masala-premium.png`
+- `chat-masala-premium.png`
+- `chhole-masala-premium.png`
+
+After replacing images:
+- `npm run dev`
+- `npm run build`
+- `npm run preview`
 
 ## Files Added/Updated in Recent Sessions
 - src/lib/pricing.ts
@@ -309,7 +369,7 @@ where email = 'you@example.com';
 6. Verify deploy secrets and push to `main` for Pages deploy.
 
 ## Deployment / Git Status Notes
-- Latest pushed commit: `07876d5`.
+- Latest pushed commit: `1fb8dff`.
 - At time of last session, `package-lock.json` had a local modification not intentionally included in feature pushes.
 - If release reproducibility is needed, inspect and decide whether to commit that lockfile change separately.
 
