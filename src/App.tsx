@@ -4,7 +4,6 @@ import { ShoppingCart, List, Package, CreditCard, Gear, SignOut, UserCircle, Ins
 import { QRCodeSVG as QRCode } from "qrcode.react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Skeleton } from "@/components/ui/skeleton"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 import { CategorySidebar } from "@/components/CategorySidebar"
 import { ProductCard } from "@/components/ProductCard"
@@ -37,6 +36,7 @@ import { getProductPackGrams, hasPurchasedProduct } from "@/lib/pricing"
 import { defaultFeatureFlags, fetchFeatureFlags } from "@/lib/feature-flags"
 import { fallbackUpiConfig, fetchActiveUpiConfig } from "@/lib/payment-upi"
 import { BRAND_LOGO_PATH } from "@/lib/brand"
+import { CATALOG_SEED_CATEGORIES, CATALOG_SEED_PRODUCTS } from "@/lib/catalog-seed"
 import { isPaymentGatewayEnabled, startRazorpayCheckout } from "@/lib/payment-gateway"
 import { getRequestedRuntimeModeFromSearch, resolveRuntimeMode } from "@/lib/runtime-mode"
 
@@ -93,10 +93,10 @@ function normalizeCartItems(cartItems: CartItem[], products: Product[]) {
 }
 
 function App() {
-  const { isHydrated: isCatalogHydrated } = useInitialData()
+  useInitialData()
 
-  const [categories, setCategories] = useKV<Category[]>("categories", [])
-  const [products] = useKV<Product[]>("products", [])
+  const [categories, setCategories] = useKV<Category[]>("categories", CATALOG_SEED_CATEGORIES)
+  const [products] = useKV<Product[]>("products", CATALOG_SEED_PRODUCTS)
   const [cartItems, setCartItems] = useKV<CartItem[]>("cart", [])
   const [orders, setOrders] = useKV<Order[]>("orders", [])
 
@@ -634,56 +634,6 @@ function App() {
       setCurrentOrder(order)
       setCurrentView("tracking")
     }
-  }
-
-  if (!isCatalogHydrated) {
-    return (
-      <div className="min-h-screen bg-background">
-        <header className="border-b bg-card sticky top-0 z-10 shadow-sm">
-          <div className="container mx-auto px-3 sm:px-4 py-3 sm:py-4">
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-3 min-w-0">
-                <Skeleton className="h-9 w-9 rounded-full" />
-                <div className="space-y-2">
-                  <Skeleton className="h-6 w-40 sm:w-56" />
-                  <Skeleton className="h-4 w-24" />
-                </div>
-              </div>
-              <Skeleton className="h-10 w-24 rounded-full" />
-            </div>
-          </div>
-        </header>
-
-        <main className="container mx-auto px-3 sm:px-4 py-6 sm:py-8">
-          <div className="grid lg:grid-cols-[260px_minmax(0,1fr)] gap-6">
-            <aside className="hidden lg:block space-y-3">
-              <Skeleton className="h-8 w-32" />
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-10 w-full" />
-            </aside>
-
-            <section className="space-y-6">
-              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                {Array.from({ length: 6 }).map((_, index) => (
-                  <div key={index} className="rounded-lg border bg-card p-4 space-y-3">
-                    <Skeleton className="h-44 w-full rounded-md" />
-                    <Skeleton className="h-5 w-3/4" />
-                    <Skeleton className="h-4 w-1/2" />
-                    <Skeleton className="h-4 w-full" />
-                    <div className="flex gap-2 pt-2">
-                      <Skeleton className="h-9 flex-1 rounded-md" />
-                      <Skeleton className="h-9 flex-1 rounded-md" />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </section>
-          </div>
-        </main>
-      </div>
-    )
   }
 
   if (currentView === "account") {

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useKV } from '@/hooks/use-kv'
 import type { Category, Product, Review, Testimonial } from '@/lib/types'
 import { loadCatalogFromSupabase } from '@/lib/catalog'
+import { CATALOG_SEED_CATEGORIES, CATALOG_SEED_PRODUCTS } from '@/lib/catalog-seed'
 
 const CATALOG_CACHE_TTL_MS = 24 * 60 * 60 * 1000
 const CATALOG_CACHE_FALLBACK_BUSTER = 'catalog-v1'
@@ -12,8 +13,8 @@ type CatalogCacheMeta = {
 }
 
 export function useInitialData() {
-  const [categories, setCategories] = useKV<Category[]>('categories', [])
-  const [products, setProducts] = useKV<Product[]>('products', [])
+  const [categories, setCategories] = useKV<Category[]>('categories', CATALOG_SEED_CATEGORIES)
+  const [products, setProducts] = useKV<Product[]>('products', CATALOG_SEED_PRODUCTS)
   const [reviews, setReviews] = useKV<Review[]>('reviews', [])
   const [testimonials, setTestimonials] = useKV<Testimonial[]>('testimonials', [])
   const [dataVersion, setDataVersion] = useKV<number>('data-version', 0)
