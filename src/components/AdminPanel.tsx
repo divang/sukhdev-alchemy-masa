@@ -63,6 +63,8 @@ type EditablePromoCode = {
   usageLimit: string
   validFrom: string
   validUntil: string
+  assignedEmail: string
+  assignedPhone: string
   isActive: boolean
   usageCount: number
 }
@@ -112,6 +114,8 @@ export function AdminPanel({ orders = [], runtimeMode = "prod" }: AdminPanelProp
     usageLimit: "1",
     validFrom: "",
     validUntil: "",
+    assignedEmail: "",
+    assignedPhone: "",
     isActive: true,
     usageCount: 0,
   })
@@ -212,6 +216,8 @@ export function AdminPanel({ orders = [], runtimeMode = "prod" }: AdminPanelProp
           usageLimit: promo.usageLimit != null ? String(promo.usageLimit) : "",
           validFrom: promo.validFrom ? promo.validFrom.slice(0, 10) : "",
           validUntil: promo.validUntil ? promo.validUntil.slice(0, 10) : "",
+          assignedEmail: promo.assignedEmail ?? "",
+          assignedPhone: promo.assignedPhone ?? "",
           isActive: promo.isActive,
           usageCount: promo.usageCount,
         }))
@@ -301,6 +307,19 @@ export function AdminPanel({ orders = [], runtimeMode = "prod" }: AdminPanelProp
       return undefined
     }
 
+    const assignedEmail = input.assignedEmail.trim().toLowerCase()
+    const assignedPhone = input.assignedPhone.replace(/\D/g, "")
+
+    if (assignedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(assignedEmail)) {
+      toast.error("Assigned email must be a valid email address.")
+      return undefined
+    }
+
+    if (assignedPhone && assignedPhone.length < 10) {
+      toast.error("Assigned phone must have at least 10 digits.")
+      return undefined
+    }
+
     return {
       id: input.id || undefined,
       code,
@@ -313,6 +332,8 @@ export function AdminPanel({ orders = [], runtimeMode = "prod" }: AdminPanelProp
       usageLimit,
       validFrom: input.validFrom ? `${input.validFrom}T00:00:00.000Z` : undefined,
       validUntil: input.validUntil ? `${input.validUntil}T23:59:59.999Z` : undefined,
+      assignedEmail: assignedEmail || undefined,
+      assignedPhone: assignedPhone || undefined,
       isActive: input.isActive,
     }
   }
@@ -491,6 +512,8 @@ export function AdminPanel({ orders = [], runtimeMode = "prod" }: AdminPanelProp
         usageLimit: result.promoCode.usageLimit != null ? String(result.promoCode.usageLimit) : "",
         validFrom: result.promoCode.validFrom ? result.promoCode.validFrom.slice(0, 10) : "",
         validUntil: result.promoCode.validUntil ? result.promoCode.validUntil.slice(0, 10) : "",
+        assignedEmail: result.promoCode.assignedEmail ?? "",
+        assignedPhone: result.promoCode.assignedPhone ?? "",
         isActive: result.promoCode.isActive,
         usageCount: result.promoCode.usageCount,
       },
@@ -509,6 +532,8 @@ export function AdminPanel({ orders = [], runtimeMode = "prod" }: AdminPanelProp
       usageLimit: "",
       validFrom: "",
       validUntil: "",
+      assignedEmail: "",
+      assignedPhone: "",
       isActive: true,
       usageCount: 0,
     })
@@ -872,6 +897,23 @@ export function AdminPanel({ orders = [], runtimeMode = "prod" }: AdminPanelProp
                 <Label>Valid Until (optional)</Label>
                 <Input type="date" value={newPromoCode.validUntil} onChange={(event) => setNewPromoCode((c) => ({ ...c, validUntil: event.target.value }))} />
               </div>
+              <div>
+                <Label>Assigned Email (optional)</Label>
+                <Input
+                  type="email"
+                  value={newPromoCode.assignedEmail}
+                  onChange={(event) => setNewPromoCode((c) => ({ ...c, assignedEmail: event.target.value }))}
+                  placeholder="customer@example.com"
+                />
+              </div>
+              <div>
+                <Label>Assigned Phone (optional)</Label>
+                <Input
+                  value={newPromoCode.assignedPhone}
+                  onChange={(event) => setNewPromoCode((c) => ({ ...c, assignedPhone: event.target.value.replace(/\D/g, "").slice(0, 15) }))}
+                  placeholder="9876543210"
+                />
+              </div>
             </div>
             <div className="flex items-center gap-3">
               <Switch checked={newPromoCode.isActive} onCheckedChange={(checked) => setNewPromoCode((c) => ({ ...c, isActive: checked }))} />
@@ -947,6 +989,23 @@ export function AdminPanel({ orders = [], runtimeMode = "prod" }: AdminPanelProp
                     <div>
                       <Label>Valid Until</Label>
                       <Input type="date" value={promo.validUntil} onChange={(event) => updateEditablePromo(promo.id, "validUntil", event.target.value)} />
+                    </div>
+                    <div>
+                      <Label>Assigned Email</Label>
+                      <Input
+                        type="email"
+                        value={promo.assignedEmail}
+                        onChange={(event) => updateEditablePromo(promo.id, "assignedEmail", event.target.value)}
+                        placeholder="customer@example.com"
+                      />
+                    </div>
+                    <div>
+                      <Label>Assigned Phone</Label>
+                      <Input
+                        value={promo.assignedPhone}
+                        onChange={(event) => updateEditablePromo(promo.id, "assignedPhone", event.target.value.replace(/\D/g, "").slice(0, 15))}
+                        placeholder="9876543210"
+                      />
                     </div>
                   </div>
 

@@ -18,6 +18,8 @@ export type PromoCode = {
   validUntil?: string
   usageLimit?: number
   usageCount: number
+  assignedEmail?: string
+  assignedPhone?: string
   createdAt: string
   updatedAt: string
 }
@@ -36,6 +38,8 @@ type PromoCodeRow = {
   valid_until: string | null
   usage_limit: number | null
   usage_count: number
+  assigned_email: string | null
+  assigned_phone: string | null
   created_at: string
   updated_at: string
 }
@@ -81,6 +85,11 @@ type ConsumePromoCodeRpcRow = {
   usage_limit: number | null
 }
 
+type ValidatePromoCustomerInput = {
+  email?: string
+  phone?: string
+}
+
 const PROMO_TOKEN_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 
 function normalizeCode(code: string) {
@@ -123,6 +132,8 @@ function mapPromoCodeRow(row: PromoCodeRow): PromoCode {
     validUntil: row.valid_until ?? undefined,
     usageLimit: row.usage_limit ?? undefined,
     usageCount: Number(row.usage_count ?? 0),
+    assignedEmail: row.assigned_email ?? undefined,
+    assignedPhone: row.assigned_phone ?? undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }
@@ -305,7 +316,7 @@ export async function fetchActivePromoCodesForAdmin(): Promise<{ promoCodes: Pro
 
   const { data, error } = await supabase
     .from("promo_codes")
-    .select("id, code, description, discount_scope, discount_type, discount_value, max_discount_amount, min_order_amount, is_active, valid_from, valid_until, usage_limit, usage_count, created_at, updated_at")
+    .select("id, code, description, discount_scope, discount_type, discount_value, max_discount_amount, min_order_amount, is_active, valid_from, valid_until, usage_limit, usage_count, assigned_email, assigned_phone, created_at, updated_at")
     .order("created_at", { ascending: false })
 
   if (error) {
@@ -327,6 +338,8 @@ export type UpsertPromoCodeInput = {
   validFrom?: string
   validUntil?: string
   usageLimit?: number
+  assignedEmail?: string
+  assignedPhone?: string
   isActive: boolean
 }
 
@@ -356,6 +369,8 @@ export async function upsertPromoCodeByAdmin(input: UpsertPromoCodeInput): Promi
     valid_from: input.validFrom ?? null,
     valid_until: input.validUntil ?? null,
     usage_limit: input.usageLimit ?? null,
+    assigned_email: input.assignedEmail?.trim().toLowerCase() || null,
+    assigned_phone: input.assignedPhone?.replace(/\D/g, "") || null,
     is_active: input.isActive,
     updated_at: new Date().toISOString(),
   }
@@ -363,7 +378,7 @@ export async function upsertPromoCodeByAdmin(input: UpsertPromoCodeInput): Promi
   const { data, error } = await supabase
     .from("promo_codes")
     .upsert(payload, { onConflict: "id" })
-    .select("id, code, description, discount_scope, discount_type, discount_value, max_discount_amount, min_order_amount, is_active, valid_from, valid_until, usage_limit, usage_count, created_at, updated_at")
+    .select("id, code, description, discount_scope, discount_type, discount_value, max_discount_amount, min_order_amount, is_active, valid_from, valid_until, usage_limit, usage_count, assigned_email, assigned_phone, created_at, updated_at")
     .single()
 
   if (error || !data) {
@@ -373,7 +388,10 @@ export async function upsertPromoCodeByAdmin(input: UpsertPromoCodeInput): Promi
   return { promoCode: mapPromoCodeRow(data as PromoCodeRow) }
 }
 
-export async function consumePromoCodeUsage(inputCode: string): Promise<{ success: boolean; error?: string; usageCount?: number; usageLimit?: number }> {
+export async function consumePromoCodeUsage(
+  inputCode: string,
+  customer?: ValidatePromoCustomerInput
+): Promise<{ success: boolean; error?: string; usageCount?: number; usageLimit?: number }> {
   if (!supabase || !isSupabaseConfigured) {
     return { success: false, error: "Supabase is not configured." }
   }
@@ -384,7 +402,11 @@ export async function consumePromoCodeUsage(inputCode: string): Promise<{ succes
   }
 
   const { data, error } = await supabase
-    .rpc("consume_promo_code_usage", { p_code: code })
+    .rpc("consume_promo_code_usage", {
+      p_code: code,
+      p_customer_email: customer?.email?.trim().toLowerCase() || null,
+      p_customer_phone: customer?.phone?.replace(/\D/g, "") || null,
+    })
     .maybeSingle()
 
   if (error) {
@@ -411,7 +433,8 @@ export async function validatePromoCode(
   inputCode: string,
   subtotal: number,
   shipping: number,
-  runtimeMode: RuntimeMode = "prod"
+  runtimeMode: RuntimeMode = "prod",
+  customer?: ValidatePromoCustomerInput
 ): Promise<PromoValidationResult> {
   if (!supabase || !isSupabaseConfigured) {
     return { error: "Supabase is not configured." }
@@ -433,7 +456,7 @@ export async function validatePromoCode(
 
   const { data, error } = await supabase
     .from("promo_codes")
-    .select("id, code, description, discount_scope, discount_type, discount_value, max_discount_amount, min_order_amount, is_active, valid_from, valid_until, usage_limit, usage_count, created_at, updated_at")
+    .select("id, code, description, discount_scope, discount_type, discount_value, max_discount_amount, min_order_amount, is_active, valid_from, valid_until, usage_limit, usage_count, assigned_email, assigned_phone, created_at, updated_at")
     .eq("code", code)
     .eq("is_active", true)
     .maybeSingle()
@@ -459,6 +482,17 @@ export async function validatePromoCode(
 
   if (promo.usageLimit != null && promo.usageCount >= promo.usageLimit) {
     return { error: "This promo code has reached its usage limit." }
+  }
+
+  const normalizedCustomerEmail = customer?.email?.trim().toLowerCase()
+  const normalizedCustomerPhone = customer?.phone?.replace(/\D/g, "")
+
+  if (promo.assignedEmail && normalizedCustomerEmail !== promo.assignedEmail.toLowerCase()) {
+    return { error: "This promo code is assigned to a different email." }
+  }
+
+  if (promo.assignedPhone && normalizedCustomerPhone !== promo.assignedPhone.replace(/\D/g, "")) {
+    return { error: "This promo code is assigned to a different phone number." }
   }
 
   if (promo.minOrderAmount != null && subtotal < promo.minOrderAmount) {
