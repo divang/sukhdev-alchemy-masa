@@ -315,23 +315,30 @@ export async function startRazorpayCheckout(order: Order): Promise<GatewayChecko
         },
       },
       handler: async (payload) => {
-        const verification = await requestPaymentVerification(order, payload)
-        if (verification.error) {
+        try {
+          const verification = await requestPaymentVerification(order, payload)
+          if (verification.error) {
+            settle({
+              verified: false,
+              error: verification.error,
+            })
+            return
+          }
+
+          settle({
+            verified: Boolean(verification.verified),
+            razorpayPaymentId: payload.razorpay_payment_id,
+            razorpayOrderId: payload.razorpay_order_id,
+            paymentStatus: verification.paymentStatus,
+            orderStatus: verification.orderStatus,
+            error: verification.verified ? undefined : verification.message || "Payment signature validation failed.",
+          })
+        } catch (error) {
           settle({
             verified: false,
-            error: verification.error,
+            error: error instanceof Error ? error.message : "Payment verification failed unexpectedly.",
           })
-          return
         }
-
-        settle({
-          verified: Boolean(verification.verified),
-          razorpayPaymentId: paymentPayload.razorpay_payment_id,
-          razorpayOrderId: paymentPayload.razorpay_order_id,
-          paymentStatus: verification.paymentStatus,
-          orderStatus: verification.orderStatus,
-          error: verification.verified ? undefined : verification.message || "Payment signature validation failed.",
-        })
       },
     })
 
