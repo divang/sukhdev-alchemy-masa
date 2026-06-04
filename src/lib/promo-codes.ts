@@ -74,8 +74,38 @@ export type PromoValidationResult = {
   error?: string
 }
 
+type ConsumePromoCodeRpcRow = {
+  success: boolean
+  error: string | null
+  usage_count: number | null
+  usage_limit: number | null
+}
+
+const PROMO_TOKEN_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+
 function normalizeCode(code: string) {
   return code.trim().toUpperCase()
+}
+
+export function generatePromoCodeToken(prefix = "SDA", tokenLength = 8): string {
+  const normalizedPrefix = prefix.replace(/[^a-z0-9]/gi, "").toUpperCase().slice(0, 8) || "SDA"
+  const normalizedLength = Math.min(Math.max(Math.trunc(tokenLength), 4), 20)
+
+  if (typeof crypto !== "undefined" && typeof crypto.getRandomValues === "function") {
+    const randomValues = new Uint32Array(normalizedLength)
+    crypto.getRandomValues(randomValues)
+    const token = Array.from(randomValues)
+      .map((value) => PROMO_TOKEN_ALPHABET[value % PROMO_TOKEN_ALPHABET.length])
+      .join("")
+    return `${normalizedPrefix}${token}`
+  }
+
+  const token = Array.from({ length: normalizedLength }, () => {
+    const index = Math.floor(Math.random() * PROMO_TOKEN_ALPHABET.length)
+    return PROMO_TOKEN_ALPHABET[index]
+  }).join("")
+
+  return `${normalizedPrefix}${token}`
 }
 
 function mapPromoCodeRow(row: PromoCodeRow): PromoCode {
@@ -341,6 +371,40 @@ export async function upsertPromoCodeByAdmin(input: UpsertPromoCodeInput): Promi
   }
 
   return { promoCode: mapPromoCodeRow(data as PromoCodeRow) }
+}
+
+export async function consumePromoCodeUsage(inputCode: string): Promise<{ success: boolean; error?: string; usageCount?: number; usageLimit?: number }> {
+  if (!supabase || !isSupabaseConfigured) {
+    return { success: false, error: "Supabase is not configured." }
+  }
+
+  const code = normalizeCode(inputCode)
+  if (!code) {
+    return { success: false, error: "Please enter a promo code." }
+  }
+
+  const { data, error } = await supabase
+    .rpc("consume_promo_code_usage", { p_code: code })
+    .maybeSingle()
+
+  if (error) {
+    return { success: false, error: error.message }
+  }
+
+  const result = data as ConsumePromoCodeRpcRow | null
+  if (!result) {
+    return { success: false, error: "Promo code could not be consumed." }
+  }
+
+  if (!result.success) {
+    return { success: false, error: result.error ?? "Promo code is no longer available." }
+  }
+
+  return {
+    success: true,
+    usageCount: result.usage_count ?? undefined,
+    usageLimit: result.usage_limit ?? undefined,
+  }
 }
 
 export async function validatePromoCode(

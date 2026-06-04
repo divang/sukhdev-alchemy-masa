@@ -15,7 +15,7 @@ import {
   getProductPackLabel,
   getShippingZoneLabel,
 } from "@/lib/pricing"
-import { calculatePromoDiscountAmount, fetchPromoCodeChannelState, type PromoCode, validatePromoCode } from "@/lib/promo-codes"
+import { calculatePromoDiscountAmount, consumePromoCodeUsage, fetchPromoCodeChannelState, type PromoCode, validatePromoCode } from "@/lib/promo-codes"
 import type { RuntimeMode } from "@/lib/runtime-mode"
 
 type CheckoutViewProps = {
@@ -118,6 +118,15 @@ export function CheckoutView({ cartItems, products, accountProfile, runtimeMode 
     if (!formData.name || !formData.email || !formData.phone || !formData.address || !formData.city || !formData.pincode) {
       toast.error("Please fill in all fields")
       return
+    }
+
+    if (isPromoUiEnabled && appliedPromo?.code) {
+      const consumeResult = await consumePromoCodeUsage(appliedPromo.code)
+      if (!consumeResult.success) {
+        setAppliedPromo(null)
+        toast.error(consumeResult.error ?? "Promo code has already been used. Please request a new one.")
+        return
+      }
     }
     
     const order: Order = {

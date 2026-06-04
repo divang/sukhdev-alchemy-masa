@@ -21,6 +21,7 @@ import {
 import {
   fetchPromoCodeChannelState,
   fetchActivePromoCodesForAdmin,
+  generatePromoCodeToken,
   promotePromoCodeDevToProdByAdmin,
   rollbackPromoCodeProdByAdmin,
   setPromoCodeDevEnabledByAdmin,
@@ -63,6 +64,7 @@ type EditablePromoCode = {
   validFrom: string
   validUntil: string
   isActive: boolean
+  usageCount: number
 }
 
 type AdminPanelProps = {
@@ -100,17 +102,18 @@ export function AdminPanel({ orders = [], runtimeMode = "prod" }: AdminPanelProp
   const [isRollingBackPromoChannel, setIsRollingBackPromoChannel] = useState(false)
   const [newPromoCode, setNewPromoCode] = useState<EditablePromoCode>({
     id: "",
-    code: "SDAJUNE26",
-    description: "June promotion - shipping discount",
-    discountScope: "shipping",
+    code: "",
+    description: "",
+    discountScope: "total",
     discountType: "percent",
-    discountValue: "100",
-    maxDiscountAmount: "120",
+    discountValue: "10",
+    maxDiscountAmount: "",
     minOrderAmount: "0",
-    usageLimit: "",
+    usageLimit: "1",
     validFrom: "",
     validUntil: "",
     isActive: true,
+    usageCount: 0,
   })
   const [upiAccounts, setUpiAccounts] = useState<AdminPaymentUpiAccount[]>([])
   const [switchingUpiId, setSwitchingUpiId] = useState<string | null>(null)
@@ -210,6 +213,7 @@ export function AdminPanel({ orders = [], runtimeMode = "prod" }: AdminPanelProp
           validFrom: promo.validFrom ? promo.validFrom.slice(0, 10) : "",
           validUntil: promo.validUntil ? promo.validUntil.slice(0, 10) : "",
           isActive: promo.isActive,
+          usageCount: promo.usageCount,
         }))
       )
     }
@@ -488,6 +492,7 @@ export function AdminPanel({ orders = [], runtimeMode = "prod" }: AdminPanelProp
         validFrom: result.promoCode.validFrom ? result.promoCode.validFrom.slice(0, 10) : "",
         validUntil: result.promoCode.validUntil ? result.promoCode.validUntil.slice(0, 10) : "",
         isActive: result.promoCode.isActive,
+        usageCount: result.promoCode.usageCount,
       },
       ...current,
     ])
@@ -505,9 +510,33 @@ export function AdminPanel({ orders = [], runtimeMode = "prod" }: AdminPanelProp
       validFrom: "",
       validUntil: "",
       isActive: true,
+      usageCount: 0,
     })
 
     toast.success(`Promo code ${result.promoCode.code} created.`)
+  }
+
+  const handleGenerateOneTimePromoToken = () => {
+    const now = new Date()
+    const validFrom = now.toISOString().slice(0, 10)
+    const validUntilDate = new Date(now)
+    validUntilDate.setDate(validUntilDate.getDate() + 7)
+    const validUntil = validUntilDate.toISOString().slice(0, 10)
+
+    setNewPromoCode((current) => ({
+      ...current,
+      code: generatePromoCodeToken("SDA", 8),
+      description: current.description.trim() || "Single-use promo token",
+      discountType: "percent",
+      discountScope: current.discountScope || "total",
+      discountValue: current.discountValue.trim() || "10",
+      usageLimit: "1",
+      validFrom: current.validFrom || validFrom,
+      validUntil: current.validUntil || validUntil,
+      isActive: true,
+    }))
+
+    toast.success("Single-use token generated. Review and click Create Promo Code.")
   }
 
   const handleSaveProduct = async (productId: string) => {
@@ -833,7 +862,7 @@ export function AdminPanel({ orders = [], runtimeMode = "prod" }: AdminPanelProp
               </div>
               <div>
                 <Label>Usage Limit (optional)</Label>
-                <Input type="number" value={newPromoCode.usageLimit} onChange={(event) => setNewPromoCode((c) => ({ ...c, usageLimit: event.target.value }))} placeholder="500" />
+                <Input type="number" value={newPromoCode.usageLimit} onChange={(event) => setNewPromoCode((c) => ({ ...c, usageLimit: event.target.value }))} placeholder="1" />
               </div>
               <div>
                 <Label>Valid From (optional)</Label>
@@ -848,7 +877,12 @@ export function AdminPanel({ orders = [], runtimeMode = "prod" }: AdminPanelProp
               <Switch checked={newPromoCode.isActive} onCheckedChange={(checked) => setNewPromoCode((c) => ({ ...c, isActive: checked }))} />
               <span className="text-sm">Active</span>
             </div>
-            <Button onClick={handleCreatePromoCode} disabled={isCreatingPromo}>{isCreatingPromo ? "Creating..." : "Create Promo Code"}</Button>
+            <div className="flex flex-wrap items-center gap-3">
+              <Button type="button" variant="outline" onClick={handleGenerateOneTimePromoToken}>
+                Generate One-Time Token
+              </Button>
+              <Button onClick={handleCreatePromoCode} disabled={isCreatingPromo}>{isCreatingPromo ? "Creating..." : "Create Promo Code"}</Button>
+            </div>
           </div>
 
           <div className="space-y-4">
@@ -857,8 +891,15 @@ export function AdminPanel({ orders = [], runtimeMode = "prod" }: AdminPanelProp
             )}
             {editablePromoCodes.map((promo) => {
               const isSavingPromo = savingPromoId === promo.id
+              const usageLabel = promo.usageLimit
+                ? `${promo.usageCount}/${promo.usageLimit}`
+                : `${promo.usageCount}`
+
               return (
                 <div key={promo.id} className="rounded-lg border p-4 space-y-4">
+                  <div className="text-xs text-muted-foreground">
+                    Usage: {usageLabel}
+                  </div>
                   <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                     <div>
                       <Label>Code</Label>
