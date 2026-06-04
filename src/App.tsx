@@ -750,7 +750,11 @@ function App() {
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm">
               <p className="font-semibold text-blue-900 mb-2">✓ Order Created</p>
               <p className="text-blue-800">Your order (ID: {currentOrder.id}) was created successfully during checkout and is stored in our system.</p>
-              <p className="text-blue-800 mt-2">Complete your UPI payment above, then confirm to update the order status. Your account keeps this order tied to your login for future tracking and review requests.</p>
+              <p className="text-blue-800 mt-2">
+                {isPaymentGatewayEnabled()
+                  ? "Complete payment in Razorpay. After successful verification, you will be redirected to tracking with payment details and receipt options."
+                  : "Complete your UPI payment above, then tap confirmation to update order status. Your account keeps this order tied to your login for future tracking and review requests."}
+              </p>
             </div>
 
             <div className="flex flex-col sm:flex-row gap-3 w-full">
