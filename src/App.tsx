@@ -620,6 +620,7 @@ function App() {
         cartItems={cartItems || []}
         products={products || []}
         accountProfile={profile}
+        runtimeMode={runtimeMode}
         onBack={handleBackToStore}
         onOrderComplete={handleOrderComplete}
       />
@@ -772,7 +773,7 @@ function App() {
         </header>
 
         <div className="container mx-auto px-4 py-8">
-          <AdminPanel orders={adminOrders} />
+          <AdminPanel orders={adminOrders} runtimeMode={runtimeMode} />
         </div>
       </div>
     )

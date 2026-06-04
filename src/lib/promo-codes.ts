@@ -1,4 +1,5 @@
 import { isSupabaseConfigured, supabase } from "@/lib/supabase"
+import type { RuntimeMode } from "@/lib/runtime-mode"
 
 export type PromoScope = "shipping" | "subtotal" | "total"
 export type PromoDiscountType = "fixed" | "percent"
@@ -39,6 +40,34 @@ type PromoCodeRow = {
   updated_at: string
 }
 
+type PromoChannelStateRow = {
+  key: string
+  dev_enabled: boolean
+  prod_enabled: boolean
+  previous_prod_enabled: boolean | null
+  updated_at: string
+  promoted_at: string | null
+}
+
+export type PromoCodeChannelState = {
+  key: string
+  devEnabled: boolean
+  prodEnabled: boolean
+  previousProdEnabled: boolean | null
+  updatedAt: string
+  promotedAt?: string
+}
+
+const PROMO_CHANNEL_KEY = "promo_codes"
+
+const defaultPromoChannelState: PromoCodeChannelState = {
+  key: PROMO_CHANNEL_KEY,
+  devEnabled: false,
+  prodEnabled: true,
+  previousProdEnabled: true,
+  updatedAt: new Date(0).toISOString(),
+}
+
 export type PromoValidationResult = {
   promo?: PromoCode
   discountAmount?: number
@@ -67,6 +96,145 @@ function mapPromoCodeRow(row: PromoCodeRow): PromoCode {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   }
+}
+
+function mapPromoChannelStateRow(row: PromoChannelStateRow): PromoCodeChannelState {
+  return {
+    key: row.key,
+    devEnabled: Boolean(row.dev_enabled),
+    prodEnabled: Boolean(row.prod_enabled),
+    previousProdEnabled: row.previous_prod_enabled,
+    updatedAt: row.updated_at,
+    promotedAt: row.promoted_at ?? undefined,
+  }
+}
+
+function isPromoEnabledForMode(channelState: PromoCodeChannelState, runtimeMode: RuntimeMode) {
+  return runtimeMode === "dev" ? channelState.devEnabled : channelState.prodEnabled
+}
+
+export async function fetchPromoCodeChannelState(): Promise<{ state: PromoCodeChannelState; error?: string }> {
+  if (!supabase || !isSupabaseConfigured) {
+    return { state: defaultPromoChannelState }
+  }
+
+  const { data, error } = await supabase
+    .from("feature_channel_states")
+    .select("key, dev_enabled, prod_enabled, previous_prod_enabled, updated_at, promoted_at")
+    .eq("key", PROMO_CHANNEL_KEY)
+    .maybeSingle()
+
+  if (error) {
+    return { state: defaultPromoChannelState, error: error.message }
+  }
+
+  if (!data) {
+    return { state: defaultPromoChannelState }
+  }
+
+  return { state: mapPromoChannelStateRow(data as PromoChannelStateRow) }
+}
+
+export async function setPromoCodeDevEnabledByAdmin(enabled: boolean): Promise<{ state?: PromoCodeChannelState; error?: string }> {
+  if (!supabase || !isSupabaseConfigured) {
+    return { error: "Supabase is not configured." }
+  }
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  const { data, error } = await supabase
+    .from("feature_channel_states")
+    .upsert(
+      {
+        key: PROMO_CHANNEL_KEY,
+        dev_enabled: enabled,
+        updated_by: user?.id ?? null,
+      },
+      { onConflict: "key" }
+    )
+    .select("key, dev_enabled, prod_enabled, previous_prod_enabled, updated_at, promoted_at")
+    .single()
+
+  if (error || !data) {
+    return { error: error?.message ?? "Failed to update dev promo visibility." }
+  }
+
+  return { state: mapPromoChannelStateRow(data as PromoChannelStateRow) }
+}
+
+export async function promotePromoCodeDevToProdByAdmin(): Promise<{ state?: PromoCodeChannelState; error?: string }> {
+  if (!supabase || !isSupabaseConfigured) {
+    return { error: "Supabase is not configured." }
+  }
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  const current = await fetchPromoCodeChannelState()
+  if (current.error) {
+    return { error: current.error }
+  }
+
+  const { data, error } = await supabase
+    .from("feature_channel_states")
+    .upsert(
+      {
+        key: PROMO_CHANNEL_KEY,
+        dev_enabled: current.state.devEnabled,
+        previous_prod_enabled: current.state.prodEnabled,
+        prod_enabled: current.state.devEnabled,
+        promoted_at: new Date().toISOString(),
+        promoted_by: user?.id ?? null,
+        updated_by: user?.id ?? null,
+      },
+      { onConflict: "key" }
+    )
+    .select("key, dev_enabled, prod_enabled, previous_prod_enabled, updated_at, promoted_at")
+    .single()
+
+  if (error || !data) {
+    return { error: error?.message ?? "Failed to promote dev promo visibility to prod." }
+  }
+
+  return { state: mapPromoChannelStateRow(data as PromoChannelStateRow) }
+}
+
+export async function rollbackPromoCodeProdByAdmin(): Promise<{ state?: PromoCodeChannelState; error?: string }> {
+  if (!supabase || !isSupabaseConfigured) {
+    return { error: "Supabase is not configured." }
+  }
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  const current = await fetchPromoCodeChannelState()
+  if (current.error) {
+    return { error: current.error }
+  }
+
+  if (current.state.previousProdEnabled == null) {
+    return { error: "No previous production state available for rollback." }
+  }
+
+  const { data, error } = await supabase
+    .from("feature_channel_states")
+    .update({
+      prod_enabled: current.state.previousProdEnabled,
+      updated_by: user?.id ?? null,
+    })
+    .eq("key", PROMO_CHANNEL_KEY)
+    .select("key, dev_enabled, prod_enabled, previous_prod_enabled, updated_at, promoted_at")
+    .single()
+
+  if (error || !data) {
+    return { error: error?.message ?? "Failed to rollback production promo visibility." }
+  }
+
+  return { state: mapPromoChannelStateRow(data as PromoChannelStateRow) }
 }
 
 export function calculatePromoDiscountAmount(promo: PromoCode, subtotal: number, shipping: number): number {
@@ -175,9 +343,23 @@ export async function upsertPromoCodeByAdmin(input: UpsertPromoCodeInput): Promi
   return { promoCode: mapPromoCodeRow(data as PromoCodeRow) }
 }
 
-export async function validatePromoCode(inputCode: string, subtotal: number, shipping: number): Promise<PromoValidationResult> {
+export async function validatePromoCode(
+  inputCode: string,
+  subtotal: number,
+  shipping: number,
+  runtimeMode: RuntimeMode = "prod"
+): Promise<PromoValidationResult> {
   if (!supabase || !isSupabaseConfigured) {
     return { error: "Supabase is not configured." }
+  }
+
+  const channelStateResult = await fetchPromoCodeChannelState()
+  if (!isPromoEnabledForMode(channelStateResult.state, runtimeMode)) {
+    return {
+      error: runtimeMode === "dev"
+        ? "Promo codes are disabled in dev mode. Enable it in Admin -> Promo Channel Controls."
+        : "Promo codes are currently unavailable.",
+    }
   }
 
   const code = normalizeCode(inputCode)

@@ -25,6 +25,7 @@ Apply migrations in order for both environments:
 10. `supabase/sql/010_add_combo_pack_category_and_move_combo_product.sql`
 11. `supabase/sql/011_feature_flags_social_experiment.sql`
 12. `supabase/sql/012_payment_upi_accounts.sql`
+13. `supabase/sql/013_feature_channel_states.sql`
 
 Important:
 - Keep object names identical.

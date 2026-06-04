@@ -15,17 +15,19 @@ import {
   getProductPackLabel,
   getShippingZoneLabel,
 } from "@/lib/pricing"
-import { calculatePromoDiscountAmount, type PromoCode, validatePromoCode } from "@/lib/promo-codes"
+import { calculatePromoDiscountAmount, fetchPromoCodeChannelState, type PromoCode, validatePromoCode } from "@/lib/promo-codes"
+import type { RuntimeMode } from "@/lib/runtime-mode"
 
 type CheckoutViewProps = {
   cartItems: CartItem[]
   products: Product[]
   accountProfile?: UserProfile | null
+  runtimeMode?: RuntimeMode
   onBack: () => void
   onOrderComplete: (order: Order) => void | Promise<void>
 }
 
-export function CheckoutView({ cartItems, products, accountProfile, onBack, onOrderComplete }: CheckoutViewProps) {
+export function CheckoutView({ cartItems, products, accountProfile, runtimeMode = "prod", onBack, onOrderComplete }: CheckoutViewProps) {
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -37,6 +39,25 @@ export function CheckoutView({ cartItems, products, accountProfile, onBack, onOr
   const [promoInput, setPromoInput] = useState("")
   const [appliedPromo, setAppliedPromo] = useState<PromoCode | null>(null)
   const [isApplyingPromo, setIsApplyingPromo] = useState(false)
+  const [promoEnabledInMode, setPromoEnabledInMode] = useState(runtimeMode === "prod")
+
+  useEffect(() => {
+    let isActive = true
+
+    async function loadPromoChannelState() {
+      const result = await fetchPromoCodeChannelState()
+      if (!isActive) {
+        return
+      }
+
+      setPromoEnabledInMode(runtimeMode === "dev" ? result.state.devEnabled : result.state.prodEnabled)
+    }
+
+    void loadPromoChannelState()
+    return () => {
+      isActive = false
+    }
+  }, [runtimeMode])
 
   useEffect(() => {
     if (!accountProfile) {
@@ -66,7 +87,7 @@ export function CheckoutView({ cartItems, products, accountProfile, onBack, onOr
     }
 
     setIsApplyingPromo(true)
-    const result = await validatePromoCode(promoInput, cartSubtotal, shippingAmount)
+    const result = await validatePromoCode(promoInput, cartSubtotal, shippingAmount, runtimeMode)
     setIsApplyingPromo(false)
 
     if (!result.promo || result.error) {
@@ -276,20 +297,27 @@ export function CheckoutView({ cartItems, products, accountProfile, onBack, onOr
                       onChange={(event) => setPromoInput(event.target.value.toUpperCase())}
                         placeholder="SDAJUNE26"
                       className="h-9"
+                      disabled={!promoEnabledInMode}
                     />
                     <Button
                       type="button"
                       variant="secondary"
                       className="h-9"
                       onClick={handleApplyPromo}
-                      disabled={isApplyingPromo}
+                      disabled={isApplyingPromo || !promoEnabledInMode}
                     >
                       {isApplyingPromo ? "Applying..." : "Apply"}
                     </Button>
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    Example promo code: SDAJUNE26
-                  </p>
+                  {promoEnabledInMode ? (
+                    <p className="text-xs text-muted-foreground">
+                      Example promo code: SDAJUNE26
+                    </p>
+                  ) : (
+                    <p className="text-xs text-amber-700">
+                      Promo codes are disabled in {runtimeMode === "dev" ? "dev" : "prod"} mode.
+                    </p>
+                  )}
                   {appliedPromo && (
                     <div className="flex items-center justify-between text-xs text-green-700">
                       <span>{appliedPromo.code} applied ({appliedPromo.discountScope} discount)</span>

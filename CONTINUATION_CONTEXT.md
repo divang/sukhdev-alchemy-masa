@@ -41,6 +41,10 @@ Execution order agreed for production hardening:
   - `build-dev.yml` (development channel) runs on `develop` and uses GitHub Environment `development`.
 - Development workflow builds and uploads artifact only; it does **not** deploy to Pages, so production site remains untouched.
 - This provides secret isolation for DB credentials between dev/prod channels.
+- Added channel-state model for promo feature rollout (dev/prod + promote + rollback):
+  - SQL migration: `supabase/sql/013_feature_channel_states.sql`
+  - Admin controls: Promo Channel Controls card in `src/components/AdminPanel.tsx`
+  - Checkout enforcement by channel in `src/components/CheckoutView.tsx`
 
 ### Phase 3 Target
 - Implement verified payment with Razorpay through server-side functions:
@@ -114,6 +118,13 @@ Apply in this order:
 4. supabase/sql/004_catalog_seed_data.sql
 5. supabase/sql/005_testimonials.sql
 6. supabase/sql/006_cart_items_and_review_purchase_gate.sql
+7. supabase/sql/007_promo_codes.sql
+8. supabase/sql/008_fix_rls_performance.sql
+9. supabase/sql/009_fix_combo_pack_image_path.sql
+10. supabase/sql/010_add_combo_pack_category_and_move_combo_product.sql
+11. supabase/sql/011_feature_flags_social_experiment.sql
+12. supabase/sql/012_payment_upi_accounts.sql
+13. supabase/sql/013_feature_channel_states.sql
 
 ## Environment Configuration
 

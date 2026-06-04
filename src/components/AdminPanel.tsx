@@ -9,10 +9,16 @@ import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
 import { toast } from "sonner"
 import type { Category, Order, Product } from "@/lib/types"
+import type { RuntimeMode } from "@/lib/runtime-mode"
 import { createProductByAdmin, loadCatalogFromSupabase, type AdminProductInput, updateProductByAdmin } from "@/lib/catalog"
 import { isSupabaseConfigured } from "@/lib/supabase"
 import {
+  fetchPromoCodeChannelState,
   fetchActivePromoCodesForAdmin,
+  promotePromoCodeDevToProdByAdmin,
+  rollbackPromoCodeProdByAdmin,
+  setPromoCodeDevEnabledByAdmin,
+  type PromoCodeChannelState,
   type PromoDiscountType,
   type PromoScope,
   upsertPromoCodeByAdmin,
@@ -55,9 +61,10 @@ type EditablePromoCode = {
 
 type AdminPanelProps = {
   orders?: Order[]
+  runtimeMode?: RuntimeMode
 }
 
-export function AdminPanel({ orders = [] }: AdminPanelProps) {
+export function AdminPanel({ orders = [], runtimeMode = "prod" }: AdminPanelProps) {
   const [products, setProducts] = useKV<Product[]>("products", [])
   const [categories, setCategories] = useKV<Category[]>("categories", [])
   const [editableProducts, setEditableProducts] = useState<EditableProduct[]>([])
@@ -79,6 +86,10 @@ export function AdminPanel({ orders = [] }: AdminPanelProps) {
   const [editablePromoCodes, setEditablePromoCodes] = useState<EditablePromoCode[]>([])
   const [savingPromoId, setSavingPromoId] = useState<string | null>(null)
   const [isCreatingPromo, setIsCreatingPromo] = useState(false)
+  const [promoChannelState, setPromoChannelState] = useState<PromoCodeChannelState | null>(null)
+  const [isSavingPromoChannel, setIsSavingPromoChannel] = useState(false)
+  const [isPromotingPromoChannel, setIsPromotingPromoChannel] = useState(false)
+  const [isRollingBackPromoChannel, setIsRollingBackPromoChannel] = useState(false)
   const [newPromoCode, setNewPromoCode] = useState<EditablePromoCode>({
     id: "",
     code: "SDAJUNE26",
@@ -140,6 +151,19 @@ export function AdminPanel({ orders = [] }: AdminPanelProps) {
 
     refreshCatalogForAdmin()
   }, [setCategories, setProducts])
+
+  useEffect(() => {
+    async function refreshPromoChannelState() {
+      const result = await fetchPromoCodeChannelState()
+      if (result.error) {
+        console.warn("[admin] promo channel state load skipped", result.error)
+      }
+
+      setPromoChannelState(result.state)
+    }
+
+    refreshPromoChannelState()
+  }, [])
 
   useEffect(() => {
     async function refreshPromoCodesForAdmin() {
@@ -268,6 +292,48 @@ export function AdminPanel({ orders = [] }: AdminPanelProps) {
 
   const updateEditablePromo = (promoId: string, key: keyof EditablePromoCode, value: string | boolean) => {
     setEditablePromoCodes((current) => current.map((promo) => (promo.id === promoId ? { ...promo, [key]: value } : promo)))
+  }
+
+  const handleSetPromoChannelDevEnabled = async (enabled: boolean) => {
+    setIsSavingPromoChannel(true)
+    const result = await setPromoCodeDevEnabledByAdmin(enabled)
+    setIsSavingPromoChannel(false)
+
+    if (!result.state || result.error) {
+      toast.error(result.error ?? "Failed to update dev promo channel state.")
+      return
+    }
+
+    setPromoChannelState(result.state)
+    toast.success(`Promo codes ${enabled ? "enabled" : "disabled"} for dev mode.`)
+  }
+
+  const handlePromotePromoDevToProd = async () => {
+    setIsPromotingPromoChannel(true)
+    const result = await promotePromoCodeDevToProdByAdmin()
+    setIsPromotingPromoChannel(false)
+
+    if (!result.state || result.error) {
+      toast.error(result.error ?? "Failed to promote dev promo state to prod.")
+      return
+    }
+
+    setPromoChannelState(result.state)
+    toast.success("Promoted promo channel dev state to production.")
+  }
+
+  const handleRollbackPromoProd = async () => {
+    setIsRollingBackPromoChannel(true)
+    const result = await rollbackPromoCodeProdByAdmin()
+    setIsRollingBackPromoChannel(false)
+
+    if (!result.state || result.error) {
+      toast.error(result.error ?? "Failed to rollback promo channel production state.")
+      return
+    }
+
+    setPromoChannelState(result.state)
+    toast.success("Rolled back promo channel production state.")
   }
 
   const handleSavePromoCode = async (promoId: string) => {
@@ -515,6 +581,56 @@ export function AdminPanel({ orders = [] }: AdminPanelProps) {
               })}
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Promo Channel Controls</CardTitle>
+          <CardDescription>Control promo-code visibility by channel, then promote dev state to production or rollback.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="rounded-lg border p-4">
+            <div className="flex flex-wrap items-center gap-3">
+              <Badge variant={runtimeMode === "dev" ? "destructive" : "secondary"}>
+                Active Channel: {runtimeMode.toUpperCase()}
+              </Badge>
+              <Badge variant={promoChannelState?.devEnabled ? "default" : "outline"}>
+                Dev Promo: {promoChannelState?.devEnabled ? "Enabled" : "Disabled"}
+              </Badge>
+              <Badge variant={promoChannelState?.prodEnabled ? "default" : "outline"}>
+                Prod Promo: {promoChannelState?.prodEnabled ? "Enabled" : "Disabled"}
+              </Badge>
+            </div>
+
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              <div className="flex items-center gap-2">
+                <Switch
+                  checked={Boolean(promoChannelState?.devEnabled)}
+                  onCheckedChange={handleSetPromoChannelDevEnabled}
+                  disabled={isSavingPromoChannel || isPromotingPromoChannel || isRollingBackPromoChannel}
+                />
+                <span className="text-sm">Enable promo in dev</span>
+              </div>
+
+              <Button
+                size="sm"
+                onClick={handlePromotePromoDevToProd}
+                disabled={!promoChannelState || isPromotingPromoChannel || isSavingPromoChannel || isRollingBackPromoChannel}
+              >
+                {isPromotingPromoChannel ? "Promoting..." : "Promote Dev -> Prod"}
+              </Button>
+
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleRollbackPromoProd}
+                disabled={!promoChannelState || promoChannelState.previousProdEnabled == null || isRollingBackPromoChannel || isSavingPromoChannel || isPromotingPromoChannel}
+              >
+                {isRollingBackPromoChannel ? "Rolling back..." : "Rollback Prod"}
+              </Button>
+            </div>
+          </div>
         </CardContent>
       </Card>
 
