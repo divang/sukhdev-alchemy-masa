@@ -206,6 +206,7 @@ export function useInitialData() {
           tags: ['combo-pack', 'free-shipping', 'giftable'],
         },
       ])
+      setIsHydrated(true)
       }
 
       if (!testimonials || testimonials.length === 0) {
@@ -278,6 +279,7 @@ export function useInitialData() {
         setTestimonials(remoteCatalog.testimonials)
         setDataVersion(currentVersion)
         setCatalogCacheMeta({ fetchedAt: now, buster: cacheBuster })
+        setIsHydrated(true)
         return
       }
 
