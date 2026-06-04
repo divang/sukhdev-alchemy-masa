@@ -31,6 +31,8 @@ export function OrderTrackingView({ order, orders, onBack, onSelectOrder }: Orde
       window.print()
     }
   }
+
+  const formatAmount = (amount?: number) => `₹${(amount ?? 0).toFixed(2)}`
   
   const handleTrack = () => {
     if (!trackingId.trim()) return
@@ -137,7 +139,7 @@ export function OrderTrackingView({ order, orders, onBack, onSelectOrder }: Orde
                         </p>
                       </div>
                       <p className="font-semibold">
-                        ₹{(item.pricePerUnit * (item.grams / 100) * item.quantity).toFixed(2)}
+                        {formatAmount(item.pricePerUnit * item.quantity)}
                       </p>
                     </div>
                   ))}
@@ -155,30 +157,30 @@ export function OrderTrackingView({ order, orders, onBack, onSelectOrder }: Orde
                         Download / Print Receipt
                       </Button>
                     </div>
-                    <div className="rounded-lg border p-4 space-y-2 text-sm">
-                      <div className="flex justify-between gap-4">
+                    <div className="rounded-lg border p-4 space-y-3 text-sm">
+                      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 sm:gap-4">
                         <span className="text-muted-foreground">Payment Gateway</span>
                         <span className="font-medium">Razorpay</span>
                       </div>
-                      <div className="flex justify-between gap-4">
+                      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 sm:gap-4">
                         <span className="text-muted-foreground">Payment Status</span>
                         <span className="font-medium capitalize">{order.paymentDetails.status ?? "paid"}</span>
                       </div>
                       {order.paymentDetails.razorpayPaymentId && (
-                        <div className="flex justify-between gap-4">
+                        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-1 sm:gap-4">
                           <span className="text-muted-foreground">Razorpay Payment ID</span>
-                          <span className="font-mono text-xs sm:text-sm break-all text-right">{order.paymentDetails.razorpayPaymentId}</span>
+                          <span className="font-mono text-[11px] sm:text-sm break-all sm:text-right leading-5">{order.paymentDetails.razorpayPaymentId}</span>
                         </div>
                       )}
                       {order.paymentDetails.razorpayOrderId && (
-                        <div className="flex justify-between gap-4">
+                        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-1 sm:gap-4">
                           <span className="text-muted-foreground">Razorpay Order ID</span>
-                          <span className="font-mono text-xs sm:text-sm break-all text-right">{order.paymentDetails.razorpayOrderId}</span>
+                          <span className="font-mono text-[11px] sm:text-sm break-all sm:text-right leading-5">{order.paymentDetails.razorpayOrderId}</span>
                         </div>
                       )}
-                      <div className="flex justify-between gap-4">
+                      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 sm:gap-4">
                         <span className="text-muted-foreground">Payment Time</span>
-                        <span className="font-medium text-right">
+                        <span className="font-medium sm:text-right">
                           {new Date(order.paymentDetails.paidAt ?? order.updatedAt).toLocaleString()}
                         </span>
                       </div>
@@ -204,12 +206,20 @@ export function OrderTrackingView({ order, orders, onBack, onSelectOrder }: Orde
                   <div className="text-sm space-y-1">
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Subtotal:</span>
-                      <span>₹{order.totalAmount.toFixed(2)}</span>
+                      <span>{formatAmount(order.subtotalAmount ?? order.totalAmount)}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Delivery:</span>
-                      <span className="text-green-600">Free</span>
+                      <span className={order.shippingAmount ? "" : "text-green-600"}>
+                        {order.shippingAmount && order.shippingAmount > 0 ? formatAmount(order.shippingAmount) : "Free"}
+                      </span>
                     </div>
+                    {typeof order.discountAmount === "number" && order.discountAmount > 0 && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Discount:</span>
+                        <span className="text-green-600">- {formatAmount(order.discountAmount)}</span>
+                      </div>
+                    )}
                     <Separator className="my-2" />
                     <div className="flex justify-between font-bold text-base">
                       <span>Total:</span>
