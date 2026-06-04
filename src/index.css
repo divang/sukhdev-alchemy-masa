@@ -15,6 +15,26 @@
   }
 }
 
+@media print {
+  .no-print {
+    display: none !important;
+  }
+
+  .print-page-break-avoid {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .print-receipt-card {
+    box-shadow: none !important;
+    border-color: rgb(228 228 231) !important;
+  }
+
+  body {
+    background: white !important;
+  }
+}
+
 :root {
   --background: oklch(1.00 0 0);
   --foreground: oklch(0.09 0.005 286);

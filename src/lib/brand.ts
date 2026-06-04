@@ -1,0 +1,1 @@
+export const BRAND_LOGO_PATH = "/branding/logo-header-256.png"

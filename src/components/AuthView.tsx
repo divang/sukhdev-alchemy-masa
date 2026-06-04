@@ -8,6 +8,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { toast } from "sonner"
 import type { UserProfile } from "@/lib/types"
+import { BRAND_LOGO_PATH } from "@/lib/brand"
 import { resendSignupConfirmation, signInAdmin, signInCustomer, signUpCustomer } from "@/lib/auth"
 
 type AuthViewProps = {
@@ -32,7 +33,6 @@ async function withTimeout<T>(promise: Promise<T>, ms: number, message: string):
 }
 
 export function AuthView({ mode, onBack, onAuthenticated }: AuthViewProps) {
-  const brandLogoPath = "/images/products/SDA-Logo.png"
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isResending, setIsResending] = useState(false)
   const [authNotice, setAuthNotice] = useState<string | null>(null)
@@ -216,7 +216,7 @@ export function AuthView({ mode, onBack, onAuthenticated }: AuthViewProps) {
           <CardHeader>
             <div className="mx-auto flex h-16 w-16 items-center justify-center overflow-hidden rounded-full border bg-card">
               <img
-                src={brandLogoPath}
+                src={BRAND_LOGO_PATH}
                 alt="Sukhdevi Alchemy logo"
                 className="h-full w-full object-cover"
                 loading="lazy"

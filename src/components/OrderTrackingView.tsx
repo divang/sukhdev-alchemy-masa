@@ -25,6 +25,7 @@ const statusSteps = [
 
 export function OrderTrackingView({ order, orders, onBack, onSelectOrder }: OrderTrackingViewProps) {
   const [trackingId, setTrackingId] = useState("")
+  const recentOrders = orders.slice(0, 5)
 
   const handlePrintReceipt = () => {
     if (typeof window !== "undefined") {
@@ -48,7 +49,7 @@ export function OrderTrackingView({ order, orders, onBack, onSelectOrder }: Orde
   
   return (
     <div className="min-h-screen bg-background">
-      <header className="border-b bg-card sticky top-0 z-10">
+      <header className="border-b bg-card sticky top-0 z-10 no-print">
         <div className="container mx-auto px-4 py-4">
           <Button variant="ghost" onClick={onBack}>
             <ArrowLeft size={20} className="mr-2" />
@@ -59,6 +60,42 @@ export function OrderTrackingView({ order, orders, onBack, onSelectOrder }: Orde
       
       <div className="container mx-auto px-4 py-8 max-w-4xl">
         <h1 className="text-3xl font-bold mb-8">Track Your Order</h1>
+
+        {recentOrders.length > 0 && (
+          <Card className="mb-8 no-print">
+            <CardHeader>
+              <CardTitle>Recent Orders</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {recentOrders.map((item) => {
+                  const isSelected = item.id === order?.id
+                  return (
+                    <button
+                      key={item.id}
+                      onClick={() => onSelectOrder(item.id)}
+                      className={cn(
+                        "w-full text-left p-4 border rounded-lg transition-colors",
+                        isSelected ? "border-primary bg-primary/5" : "hover:bg-muted"
+                      )}
+                    >
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                        <div>
+                          <p className="font-semibold break-all">Order ID: {item.id}</p>
+                          <p className="text-sm text-muted-foreground">{new Date(item.createdAt).toLocaleDateString()}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-semibold text-primary">₹{item.totalAmount.toFixed(2)}</p>
+                          <p className="text-sm text-muted-foreground capitalize">{item.status}</p>
+                        </div>
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        )}
         
         <Card className="mb-8">
           <CardContent className="pt-6">
@@ -81,7 +118,7 @@ export function OrderTrackingView({ order, orders, onBack, onSelectOrder }: Orde
         </Card>
         
         {order && (
-          <Card>
+          <Card className="print-receipt-card">
             <CardHeader>
               <CardTitle className="flex items-center justify-between">
                 <span>Order #{order.id}</span>
@@ -91,12 +128,12 @@ export function OrderTrackingView({ order, orders, onBack, onSelectOrder }: Orde
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-8">
-              <div>
+              <div className="print-page-break-avoid">
                 <div className="mb-6">
                   <Progress value={progressPercentage} className="h-2" />
                 </div>
                 
-                <div className="grid grid-cols-4 gap-4">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 print:grid-cols-4 print:gap-2">
                   {statusSteps.map((step, index) => {
                     const Icon = step.icon
                     const isActive = index <= currentStatusIndex
@@ -106,15 +143,15 @@ export function OrderTrackingView({ order, orders, onBack, onSelectOrder }: Orde
                       <div key={step.key} className="flex flex-col items-center text-center">
                         <div
                           className={cn(
-                            "w-12 h-12 rounded-full flex items-center justify-center mb-2 transition-colors",
+                            "w-12 h-12 rounded-full flex items-center justify-center mb-2 transition-colors print:w-10 print:h-10 print:mb-1",
                             isActive ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground",
                             isCurrent && "ring-2 ring-primary ring-offset-2"
                           )}
                         >
-                          <Icon size={24} weight={isActive ? "fill" : "regular"} />
+                          <Icon size={20} weight={isActive ? "fill" : "regular"} />
                         </div>
                         <p className={cn(
-                          "text-xs font-medium",
+                          "text-xs font-medium leading-tight print:text-[10px]",
                           isActive ? "text-foreground" : "text-muted-foreground"
                         )}>
                           {step.label}
@@ -157,7 +194,7 @@ export function OrderTrackingView({ order, orders, onBack, onSelectOrder }: Orde
                         Download / Print Receipt
                       </Button>
                     </div>
-                    <div className="rounded-lg border p-4 space-y-3 text-sm">
+                    <div className="rounded-lg border p-4 space-y-3 text-sm print-page-break-avoid">
                       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 sm:gap-4">
                         <span className="text-muted-foreground">Payment Gateway</span>
                         <span className="font-medium">Razorpay</span>
@@ -233,7 +270,7 @@ export function OrderTrackingView({ order, orders, onBack, onSelectOrder }: Orde
         )}
         
         {!order && orders.length > 0 && (
-          <Card>
+          <Card className="no-print">
             <CardHeader>
               <CardTitle>Your Recent Orders</CardTitle>
             </CardHeader>

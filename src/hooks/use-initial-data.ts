@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useKV } from '@/hooks/use-kv'
 import type { Category, Product, Review, Testimonial } from '@/lib/types'
 import { loadCatalogFromSupabase } from '@/lib/catalog'
@@ -18,6 +18,7 @@ export function useInitialData() {
   const [testimonials, setTestimonials] = useKV<Testimonial[]>('testimonials', [])
   const [dataVersion, setDataVersion] = useKV<number>('data-version', 0)
   const [catalogCacheMeta, setCatalogCacheMeta] = useKV<CatalogCacheMeta | null>('catalog-cache-meta', null)
+  const [isHydrated, setIsHydrated] = useState(false)
 
   useEffect(() => {
     const initializeData = async () => {
@@ -31,6 +32,7 @@ export function useInitialData() {
       const canUseLocalCache = hasLocalCatalog && isVersionCurrent && isFreshByTtl && isBusterCurrent
 
       if (canUseLocalCache) {
+        setIsHydrated(true)
         return
       }
       
@@ -285,10 +287,11 @@ export function useInitialData() {
 
       setDataVersion(currentVersion)
       setCatalogCacheMeta({ fetchedAt: now, buster: cacheBuster })
+      setIsHydrated(true)
     }
     
     initializeData()
   }, [categories, products, dataVersion, catalogCacheMeta, setCatalogCacheMeta, setCategories, setDataVersion, setProducts, setReviews, setTestimonials, testimonials, reviews])
 
-  return { categories, products }
+  return { categories, products, isHydrated }
 }

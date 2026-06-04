@@ -239,6 +239,10 @@ order by tablename, policyname;
 - Product details dialog uses viewport-safe heights and safe-area padding.
 - Cart drawer bottom/actions adjusted for mobile safe-area.
 
+### Brand Image Consistency
+- Use a single shared logo asset across all pages: `/branding/logo-header-256.png`.
+- Avoid mixing `/images/products/SDA-Logo.png` and `/branding/logo-header-256.png` so header, auth, payment, and tracking screens stay visually consistent.
+
 ### Contact Us
 Professional contact section is live with:
 - Instagram: https://www.instagram.com/sukhdevialchemy/
