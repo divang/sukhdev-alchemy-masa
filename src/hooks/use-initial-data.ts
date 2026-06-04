@@ -33,20 +33,8 @@ export function useInitialData() {
       if (canUseLocalCache) {
         return
       }
-
-      // Prefer DB catalog when local cache is stale/missing; fallback to static seed for resilience.
-      const remoteCatalog = await loadCatalogFromSupabase()
-      if (remoteCatalog.source === 'supabase' && remoteCatalog.products.length > 0) {
-        setCategories(remoteCatalog.categories)
-        setProducts(remoteCatalog.products)
-        setReviews(remoteCatalog.reviews)
-        setTestimonials(remoteCatalog.testimonials)
-        setDataVersion(currentVersion)
-        setCatalogCacheMeta({ fetchedAt: now, buster: cacheBuster })
-        return
-      }
       
-      if (!categories || categories.length === 0 || (dataVersion ?? 0) < currentVersion) {
+      if (!categories || categories.length === 0) {
         setCategories([
           {
             id: 'premium-masala',
@@ -69,7 +57,7 @@ export function useInitialData() {
         ])
       }
 
-      if (!products || products.length === 0 || (dataVersion ?? 0) < currentVersion) {
+      if (!products || products.length === 0) {
         setProducts([
           {
             id: 'garam-masala-premium',
@@ -218,7 +206,7 @@ export function useInitialData() {
       ])
       }
 
-      if (!testimonials || testimonials.length === 0 || (dataVersion ?? 0) < currentVersion) {
+      if (!testimonials || testimonials.length === 0) {
         setTestimonials([
           {
             id: 'testimonial-aditi',
@@ -247,7 +235,7 @@ export function useInitialData() {
         ])
       }
 
-      if (!reviews || reviews.length === 0 || (dataVersion ?? 0) < currentVersion) {
+      if (!reviews || reviews.length === 0) {
         setReviews([
           {
             id: 'review-aditi-garam',
@@ -277,6 +265,22 @@ export function useInitialData() {
             verified: true,
           },
         ])
+      }
+
+      // After a fast local/fallback paint, refresh from DB and replace if remote data is available.
+      const remoteCatalog = await loadCatalogFromSupabase()
+      if (remoteCatalog.source === 'supabase' && remoteCatalog.products.length > 0) {
+        setCategories(remoteCatalog.categories)
+        setProducts(remoteCatalog.products)
+        setReviews(remoteCatalog.reviews)
+        setTestimonials(remoteCatalog.testimonials)
+        setDataVersion(currentVersion)
+        setCatalogCacheMeta({ fetchedAt: now, buster: cacheBuster })
+        return
+      }
+
+      if (remoteCatalog.source === 'supabase' && remoteCatalog.products.length === 0) {
+        console.warn('[catalog] Supabase returned empty products. Serving stale/local snapshot to avoid empty storefront.')
       }
 
       setDataVersion(currentVersion)
