@@ -28,7 +28,7 @@ type CheckoutViewProps = {
 }
 
 export function CheckoutView({ cartItems, products, accountProfile, runtimeMode = "prod", onBack, onOrderComplete }: CheckoutViewProps) {
-  const isPromoUiEnabled = import.meta.env.VITE_ENABLE_CHECKOUT_PROMO === "true"
+  const isPromoUiEnabled = import.meta.env.VITE_ENABLE_CHECKOUT_PROMO !== "false"
   const [formData, setFormData] = useState({
     name: "",
     email: "",
