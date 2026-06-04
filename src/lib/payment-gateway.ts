@@ -73,6 +73,8 @@ type GatewayVerifyResponse = {
 type GatewayCheckoutResult = {
   verified: boolean
   cancelled?: boolean
+  razorpayPaymentId?: string
+  razorpayOrderId?: string
   paymentStatus?: Order["paymentStatus"]
   orderStatus?: Order["status"]
   error?: string
@@ -324,6 +326,8 @@ export async function startRazorpayCheckout(order: Order): Promise<GatewayChecko
 
         settle({
           verified: Boolean(verification.verified),
+          razorpayPaymentId: paymentPayload.razorpay_payment_id,
+          razorpayOrderId: paymentPayload.razorpay_order_id,
           paymentStatus: verification.paymentStatus,
           orderStatus: verification.orderStatus,
           error: verification.verified ? undefined : verification.message || "Payment signature validation failed.",

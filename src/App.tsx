@@ -605,7 +605,18 @@ function App() {
       return
     }
 
-    await markOrderPaidAndNavigate(currentOrder)
+    const paidOrder: Order = {
+      ...currentOrder,
+      paymentDetails: {
+        gateway: "razorpay",
+        razorpayPaymentId: gatewayResult.razorpayPaymentId,
+        razorpayOrderId: gatewayResult.razorpayOrderId,
+        paidAt: new Date().toISOString(),
+        status: "paid",
+      },
+    }
+
+    await markOrderPaidAndNavigate(paidOrder)
   }
 
   const handleManualPaymentComplete = async () => {

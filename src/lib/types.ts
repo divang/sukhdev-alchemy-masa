@@ -64,6 +64,13 @@ export type Order = {
   totalAmount: number
   status: 'pending' | 'processing' | 'shipped' | 'delivered'
   paymentStatus: 'pending' | 'paid'
+  paymentDetails?: {
+    gateway: "razorpay"
+    razorpayPaymentId?: string
+    razorpayOrderId?: string
+    paidAt?: string
+    status?: "paid" | "failed" | "pending"
+  }
   createdAt: string
   updatedAt: string
 }

@@ -25,6 +25,12 @@ const statusSteps = [
 
 export function OrderTrackingView({ order, orders, onBack, onSelectOrder }: OrderTrackingViewProps) {
   const [trackingId, setTrackingId] = useState("")
+
+  const handlePrintReceipt = () => {
+    if (typeof window !== "undefined") {
+      window.print()
+    }
+  }
   
   const handleTrack = () => {
     if (!trackingId.trim()) return
@@ -139,6 +145,48 @@ export function OrderTrackingView({ order, orders, onBack, onSelectOrder }: Orde
               </div>
               
               <Separator />
+
+              {order.paymentStatus === "paid" && order.paymentDetails?.gateway === "razorpay" && (
+                <>
+                  <div>
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
+                      <h3 className="font-semibold">Payment Details</h3>
+                      <Button variant="outline" size="sm" onClick={handlePrintReceipt}>
+                        Download / Print Receipt
+                      </Button>
+                    </div>
+                    <div className="rounded-lg border p-4 space-y-2 text-sm">
+                      <div className="flex justify-between gap-4">
+                        <span className="text-muted-foreground">Payment Gateway</span>
+                        <span className="font-medium">Razorpay</span>
+                      </div>
+                      <div className="flex justify-between gap-4">
+                        <span className="text-muted-foreground">Payment Status</span>
+                        <span className="font-medium capitalize">{order.paymentDetails.status ?? "paid"}</span>
+                      </div>
+                      {order.paymentDetails.razorpayPaymentId && (
+                        <div className="flex justify-between gap-4">
+                          <span className="text-muted-foreground">Razorpay Payment ID</span>
+                          <span className="font-mono text-xs sm:text-sm break-all text-right">{order.paymentDetails.razorpayPaymentId}</span>
+                        </div>
+                      )}
+                      {order.paymentDetails.razorpayOrderId && (
+                        <div className="flex justify-between gap-4">
+                          <span className="text-muted-foreground">Razorpay Order ID</span>
+                          <span className="font-mono text-xs sm:text-sm break-all text-right">{order.paymentDetails.razorpayOrderId}</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between gap-4">
+                        <span className="text-muted-foreground">Payment Time</span>
+                        <span className="font-medium text-right">
+                          {new Date(order.paymentDetails.paidAt ?? order.updatedAt).toLocaleString()}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <Separator />
+                </>
+              )}
               
               <div className="grid md:grid-cols-2 gap-6">
                 <div>
