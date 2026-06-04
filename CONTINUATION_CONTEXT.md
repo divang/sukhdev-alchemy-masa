@@ -15,6 +15,105 @@ It captures what is already shipped, what infrastructure is required, and what t
 - Transactional auth email: Resend SMTP via Supabase Auth.
 - Domain/DNS: Squarespace DNS -> GitHub Pages.
 
+## Backend + Payment Integration (Merged Reference)
+
+This section consolidates the implementation guidance previously split across backend and payment setup docs.
+
+### Current vs Target
+- Current checkout payment flow is client-confirmed (manual UPI deep-link + user confirmation).
+- Target production payment flow must be server-verified (gateway order + signature verify + webhook reconciliation).
+
+### Target System Shape
+- Frontend: this React app.
+- Backend: payment/order endpoints (Java microservices or equivalent) with secure gateway credentials.
+- Database: Supabase/Postgres remains source of truth for order/payment business states.
+
+### Required Backend API Contracts
+
+Product API:
+- `GET /api/products`
+- `GET /api/products/{id}`
+- `GET /api/products/category/{categoryId}`
+- `GET /api/categories`
+
+Order API:
+- `POST /api/orders`
+- `GET /api/orders/{id}`
+- `GET /api/orders/user/{userId}`
+- `PATCH /api/orders/{id}/status` (admin)
+
+Payment API:
+- `POST /api/payments/order` (create gateway order)
+- `POST /api/payments/verify` (verify checkout callback signature)
+- `POST /api/payments/webhook` (gateway event reconciliation; idempotent)
+- Optional: `GET /api/payments/status/{orderId}`
+
+Review API:
+- `GET /api/reviews/product/{productId}`
+- `POST /api/reviews`
+- `GET /api/testimonials`
+
+### Razorpay Production Requirements
+- Create Razorpay live account and finish KYC.
+- Generate:
+  - `RAZORPAY_KEY_ID`
+  - `RAZORPAY_KEY_SECRET`
+  - `RAZORPAY_WEBHOOK_SECRET`
+- Never expose `RAZORPAY_KEY_SECRET` or webhook secret to frontend.
+- Frontend only receives publishable key id (`VITE_RAZORPAY_KEY_ID`).
+
+### Backend Environment Variables (Server Only)
+- `RAZORPAY_KEY_ID`
+- `RAZORPAY_KEY_SECRET`
+- `RAZORPAY_WEBHOOK_SECRET`
+- `APP_BASE_URL`
+- `FRONTEND_BASE_URL`
+
+### Frontend Environment Variables (Public)
+- `VITE_RAZORPAY_KEY_ID`
+- `VITE_API_BASE_URL`
+
+### Order Table Gateway Fields (Recommended)
+Maintain business flags (`payment_status`, `status`) and store gateway audit references:
+- `payment_gateway`
+- `gateway_order_id`
+- `gateway_payment_id`
+- `gateway_signature`
+- `payment_method`
+- `payment_verified_at`
+- `payment_gateway_status`
+- `payment_payload` (jsonb)
+
+### Payment State Rules (Critical)
+- Browser must never be source of truth for paid status.
+- Only backend verification/webhook can mark order paid.
+- Verify signature (`order_id|payment_id`) before updates.
+- Enforce idempotent webhook handling.
+- Reject amount/order mismatch and duplicate fraud attempts.
+
+### Frontend Refactor Needed for Phase 3
+- Replace manual payment confirmation in `src/App.tsx` with gateway flow:
+  1. Create app order (`pending`).
+  2. Call backend `POST /api/payments/order`.
+  3. Open Razorpay checkout.
+  4. Send callback payload to backend `POST /api/payments/verify`.
+  5. Update UI state only after backend confirms.
+- Keep manual UPI flow only as optional fallback (`manual_upi`) and do not auto-mark paid.
+
+### Payment Reconciliation Events
+Handle at least:
+- `payment.captured`
+- `payment.failed`
+- `order.paid`
+
+### Go-Live Payment Checklist
+1. Verify amount tampering is blocked server-side.
+2. Verify signature mismatch is rejected.
+3. Verify duplicate webhook delivery is idempotent.
+4. Verify failed payment keeps order `pending`.
+5. Verify captured payment updates once (`pending` -> `paid`, `pending` -> `processing`).
+6. Verify admin can view gateway refs for support/reconciliation.
+
 ## Delivery Plan (Dev/Prod + Payments)
 Execution order agreed for production hardening:
 
