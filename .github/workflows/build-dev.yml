@@ -1,24 +1,22 @@
-name: Deploy To GitHub Pages
+name: Build Dev Channel
 
 on:
   push:
     branches:
-      - main
+      - develop
   workflow_dispatch:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
-  group: pages
+  group: dev-build
   cancel-in-progress: true
 
 jobs:
-  build:
+  build-dev:
     runs-on: ubuntu-latest
-    environment: production
+    environment: development
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -32,41 +30,28 @@ jobs:
       - name: Install Dependencies
         run: npm install
 
-      - name: Validate Required Build Env
+      - name: Validate Required Dev Build Env
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
         run: |
           if [ -z "$VITE_SUPABASE_URL" ] || [ -z "$VITE_SUPABASE_ANON_KEY" ]; then
-            echo "Missing required GitHub repository secrets: VITE_SUPABASE_URL and/or VITE_SUPABASE_ANON_KEY"
+            echo "Missing required development environment secrets: VITE_SUPABASE_URL and/or VITE_SUPABASE_ANON_KEY"
             exit 1
           fi
 
-      - name: Build
+      - name: Build Dev Bundle
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
           VITE_AUTH_REDIRECT_URL: ${{ secrets.VITE_AUTH_REDIRECT_URL }}
-          VITE_CATALOG_CACHE_BUSTER: ${{ github.sha }}-${{ secrets.VITE_CATALOG_CACHE_BUSTER }}
+          VITE_DEV_MODE_ADMIN_EMAIL: ${{ secrets.VITE_DEV_MODE_ADMIN_EMAIL }}
+          VITE_CATALOG_CACHE_BUSTER: dev-${{ github.sha }}-${{ secrets.VITE_CATALOG_CACHE_BUSTER }}
         run: npm run build
 
-      - name: Setup Pages
-        uses: actions/configure-pages@v5
+      - name: Upload Dev Artifact
+        uses: actions/upload-artifact@v4
         with:
-          enablement: true
-
-      - name: Upload Artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
+          name: dev-dist
           path: dist
-
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    runs-on: ubuntu-latest
-    needs: build
-    steps:
-      - name: Deploy To Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+          if-no-files-found: error

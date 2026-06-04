@@ -35,6 +35,7 @@ import { isSupabaseConfigured } from "@/lib/supabase"
 import { getProductPackGrams, hasPurchasedProduct } from "@/lib/pricing"
 import { defaultFeatureFlags, fetchFeatureFlags } from "@/lib/feature-flags"
 import { fallbackUpiConfig, fetchActiveUpiConfig } from "@/lib/payment-upi"
+import { getRequestedRuntimeModeFromSearch, resolveRuntimeMode } from "@/lib/runtime-mode"
 
 type View = "store" | "account" | "checkout" | "payment" | "tracking" | "admin"
 
@@ -105,6 +106,10 @@ function App() {
   const [currentView, setCurrentView] = useState<View>("store")
   const [currentOrder, setCurrentOrder] = useState<Order | null>(null)
   const [profile, setProfile] = useState<UserProfile | null>(null)
+  const [requestedRuntimeMode, setRequestedRuntimeMode] = useState(() =>
+    typeof window === "undefined" ? "prod" : getRequestedRuntimeModeFromSearch(window.location.search)
+  )
+  const [hasShownModeLockNotice, setHasShownModeLockNotice] = useState(false)
   const [authMode, setAuthMode] = useState<"customer" | "admin">("customer")
   const [postAuthView, setPostAuthView] = useState<View>("store")
   const [cloudOrders, setCloudOrders] = useState<Order[]>([])
@@ -115,6 +120,39 @@ function App() {
     { name: "YouTube", handle: "@sukhdevialchemy", url: "https://youtube.com/@sukhdevialchemy" },
     { name: "WhatsApp", handle: "Sukhdevi Alchemy", url: "https://wa.me/?text=Hi%20Sukhdevi%20Alchemy" },
   ]
+  const runtimeMode = resolveRuntimeMode(requestedRuntimeMode, profile)
+  const devModeRequested = requestedRuntimeMode === "dev"
+  const devModeLocked = devModeRequested && runtimeMode !== "dev"
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return
+    }
+
+    function syncRequestedModeFromUrl() {
+      setRequestedRuntimeMode(getRequestedRuntimeModeFromSearch(window.location.search))
+    }
+
+    syncRequestedModeFromUrl()
+    window.addEventListener("popstate", syncRequestedModeFromUrl)
+    return () => window.removeEventListener("popstate", syncRequestedModeFromUrl)
+  }, [])
+
+  useEffect(() => {
+    if (!devModeLocked) {
+      if (hasShownModeLockNotice) {
+        setHasShownModeLockNotice(false)
+      }
+      return
+    }
+
+    if (hasShownModeLockNotice) {
+      return
+    }
+
+    toast.info("mode=dev is restricted to the configured admin account. Running in production mode.")
+    setHasShownModeLockNotice(true)
+  }, [devModeLocked, hasShownModeLockNotice])
 
   // Hash-based admin route: visiting /#admin opens admin login directly.
   useEffect(() => {
@@ -606,7 +644,10 @@ function App() {
       <div className="min-h-screen bg-background">
         <header className="border-b bg-card sticky top-0 z-10">
           <div className="container mx-auto px-4 py-4">
-            <h1 className="text-2xl font-bold">Payment</h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl font-bold">Payment</h1>
+              {runtimeMode === "dev" && <Badge variant="destructive">DEV MODE</Badge>}
+            </div>
           </div>
         </header>
 
@@ -721,6 +762,7 @@ function App() {
                   loading="lazy"
                 />
                 <h1 className="text-2xl font-bold truncate">Admin Panel</h1>
+                {runtimeMode === "dev" && <Badge variant="destructive">DEV MODE</Badge>}
               </div>
               <Button variant="outline" onClick={handleBackToStore}>
                 Back to Store
@@ -773,6 +815,8 @@ function App() {
               />
               <h1 className="truncate text-lg sm:text-2xl md:text-3xl font-bold">Sukhdevi Alchemy</h1>
               <Badge variant="secondary" className="hidden md:inline-flex text-xs sm:text-sm">Premium Masala</Badge>
+              {runtimeMode === "dev" && <Badge variant="destructive" className="hidden md:inline-flex">DEV MODE</Badge>}
+              {devModeLocked && <Badge variant="outline" className="hidden md:inline-flex">PROD LOCKED</Badge>}
               <div className="hidden xl:flex items-center gap-1.5 pl-1">
                 {socialProfiles.map((profile) => (
                   <a

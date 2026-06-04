@@ -1,8 +1,8 @@
 # Continuation Context
 
-Last updated: 2026-06-02 UTC
+Last updated: 2026-06-04 UTC
 Branch: main
-Latest pushed commit: 07876d5
+Latest pushed commit: e02a2bb
 Previous major feature commit: d6ef491
 
 ## Why This File Exists
@@ -14,6 +14,40 @@ It captures what is already shipped, what infrastructure is required, and what t
 - Backend: Supabase Auth + Postgres with RLS.
 - Transactional auth email: Resend SMTP via Supabase Auth.
 - Domain/DNS: Squarespace DNS -> GitHub Pages.
+
+## Delivery Plan (Dev/Prod + Payments)
+Execution order agreed for production hardening:
+
+1. Phase 1: Dev/Prod segregation in codebase/runtime channeling.
+2. Phase 2: Dev/Prod segregation in database (separate Supabase projects preferred).
+3. Phase 3: Real Razorpay verification flow (server-verified, webhook-driven status updates).
+
+### Phase 1 Status (Started)
+- Added runtime mode gating with URL param support:
+  - `?mode=dev` requests dev mode.
+  - Effective dev mode is allowed only for configured admin identity (current intended admin email: `divang.s@gmail.com`).
+  - Non-authorized users are forced to production mode.
+- Added UI badges to indicate active mode in key headers.
+- This is runtime channel segregation only; it does not yet switch to separate Supabase projects.
+
+### Phase 2 Target
+- Use two Supabase projects: `dev` and `prod`.
+- Keep schema migration parity across both.
+- Wire deploy pipelines so production deploy always points to prod Supabase secrets.
+
+### Phase 2 Status (In Progress)
+- Added workflow segregation in `.github/workflows`:
+  - `deploy-pages.yml` (production publish) now runs with GitHub Environment `production`.
+  - `build-dev.yml` (development channel) runs on `develop` and uses GitHub Environment `development`.
+- Development workflow builds and uploads artifact only; it does **not** deploy to Pages, so production site remains untouched.
+- This provides secret isolation for DB credentials between dev/prod channels.
+
+### Phase 3 Target
+- Implement verified payment with Razorpay through server-side functions:
+  - create gateway order (server secret)
+  - verify signature
+  - webhook reconciliation (idempotent)
+  - update order status in DB, then reflect in UI
 
 ## What Is Already Shipped (Important)
 
@@ -61,6 +95,7 @@ Professional contact section is live with:
 - src/lib/cart-persistence.ts
 - src/lib/catalog.ts
 - src/lib/auth.ts
+- src/lib/runtime-mode.ts
 - src/hooks/use-initial-data.ts
 - src/App.tsx
 - src/components/CartDrawer.tsx
@@ -86,12 +121,20 @@ Apply in this order:
 - VITE_SUPABASE_URL
 - VITE_SUPABASE_ANON_KEY
 - VITE_AUTH_REDIRECT_URL
+- Optional: VITE_DEV_MODE_ADMIN_EMAIL (default in code is `divang.s@gmail.com`)
 - Optional: VITE_ALLOW_CLIENT_ORDER_UPDATES (keep false for production unless explicitly required)
 
 ### GitHub Actions Secrets (Pages deploy)
 - VITE_SUPABASE_URL
 - VITE_SUPABASE_ANON_KEY
 - VITE_AUTH_REDIRECT_URL
+
+### GitHub Environments Required
+- Environment: `production`
+  - Secrets: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `VITE_AUTH_REDIRECT_URL`, optional `VITE_CATALOG_CACHE_BUSTER`, optional `VITE_DEV_MODE_ADMIN_EMAIL`.
+- Environment: `development`
+  - Secrets: `VITE_SUPABASE_URL` (dev Supabase URL), `VITE_SUPABASE_ANON_KEY` (dev anon key), `VITE_AUTH_REDIRECT_URL` (dev callback URL), optional `VITE_CATALOG_CACHE_BUSTER`, optional `VITE_DEV_MODE_ADMIN_EMAIL`.
+- Keep prod and dev values strictly separate.
 
 ### Supabase Auth URL Config
 - Site URL must match deployed domain.
