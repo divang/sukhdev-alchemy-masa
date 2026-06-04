@@ -36,9 +36,10 @@ jobs:
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_RAZORPAY_KEY_ID: ${{ secrets.VITE_RAZORPAY_KEY_ID }}
         run: |
-          if [ -z "$VITE_SUPABASE_URL" ] || [ -z "$VITE_SUPABASE_ANON_KEY" ]; then
-            echo "Missing required GitHub repository secrets: VITE_SUPABASE_URL and/or VITE_SUPABASE_ANON_KEY"
+          if [ -z "$VITE_SUPABASE_URL" ] || [ -z "$VITE_SUPABASE_ANON_KEY" ] || [ -z "$VITE_RAZORPAY_KEY_ID" ]; then
+            echo "Missing required GitHub repository secrets: VITE_SUPABASE_URL and/or VITE_SUPABASE_ANON_KEY and/or VITE_RAZORPAY_KEY_ID"
             exit 1
           fi
 
@@ -46,6 +47,7 @@ jobs:
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_RAZORPAY_KEY_ID: ${{ secrets.VITE_RAZORPAY_KEY_ID }}
           VITE_AUTH_REDIRECT_URL: ${{ secrets.VITE_AUTH_REDIRECT_URL }}
           VITE_CATALOG_CACHE_BUSTER: ${{ github.sha }}-${{ secrets.VITE_CATALOG_CACHE_BUSTER }}
         run: npm run build
