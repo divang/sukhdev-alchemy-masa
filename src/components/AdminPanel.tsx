@@ -671,6 +671,17 @@ export function AdminPanel({ orders = [] }: AdminPanelProps) {
                       <p className="font-semibold">#{order.id}</p>
                       <p className="text-sm text-muted-foreground">{order.customer.name} • {order.customer.email}</p>
                       <p className="text-sm text-muted-foreground">{order.customer.phone}</p>
+                      <div className="mt-3">
+                        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Ordered Products</p>
+                        <ul className="mt-1 space-y-1">
+                          {order.items.map((item) => (
+                            <li key={`${order.id}-${item.productId}-${item.grams}`} className="flex items-center justify-between gap-3 text-sm text-foreground">
+                              <span>{item.productName} - {item.quantity} x {item.grams}g</span>
+                              <span className="font-medium">₹{(item.pricePerUnit * (item.grams / 100) * item.quantity).toFixed(2)}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
                     </div>
                     <div className="text-right">
                       <p className="font-semibold text-primary">₹{order.totalAmount.toFixed(2)}</p>
