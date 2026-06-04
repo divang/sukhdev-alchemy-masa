@@ -13,6 +13,12 @@ import type { RuntimeMode } from "@/lib/runtime-mode"
 import { createProductByAdmin, loadCatalogFromSupabase, type AdminProductInput, updateProductByAdmin } from "@/lib/catalog"
 import { isSupabaseConfigured } from "@/lib/supabase"
 import {
+  fetchAdminNotifications,
+  markAdminNotificationEmailSent,
+  markAdminNotificationWhatsappSent,
+  type AdminNotification,
+} from "@/lib/admin-notifications"
+import {
   fetchPromoCodeChannelState,
   fetchActivePromoCodesForAdmin,
   promotePromoCodeDevToProdByAdmin,
@@ -65,6 +71,8 @@ type AdminPanelProps = {
 }
 
 export function AdminPanel({ orders = [], runtimeMode = "prod" }: AdminPanelProps) {
+  const adminWhatsappNumber = (import.meta.env.VITE_ADMIN_WHATSAPP_NUMBER as string | undefined)?.replace(/\D/g, "") || "917889480171"
+  const adminAlertEmail = (import.meta.env.VITE_ADMIN_ALERT_EMAIL as string | undefined)?.trim() || "divang.s@gmail.com"
   const [products, setProducts] = useKV<Product[]>("products", [])
   const [categories, setCategories] = useKV<Category[]>("categories", [])
   const [editableProducts, setEditableProducts] = useState<EditableProduct[]>([])
@@ -107,6 +115,7 @@ export function AdminPanel({ orders = [], runtimeMode = "prod" }: AdminPanelProp
   const [upiAccounts, setUpiAccounts] = useState<AdminPaymentUpiAccount[]>([])
   const [switchingUpiId, setSwitchingUpiId] = useState<string | null>(null)
   const [togglingUpiId, setTogglingUpiId] = useState<string | null>(null)
+  const [notifications, setNotifications] = useState<AdminNotification[]>([])
 
   const categoryOptions = useMemo(() => {
     if (categories && categories.length > 0) {
@@ -151,6 +160,20 @@ export function AdminPanel({ orders = [], runtimeMode = "prod" }: AdminPanelProp
 
     refreshCatalogForAdmin()
   }, [setCategories, setProducts])
+
+  useEffect(() => {
+    async function refreshAdminNotifications() {
+      const result = await fetchAdminNotifications(20)
+      if (result.error) {
+        console.warn("[admin] notifications load skipped", result.error)
+        return
+      }
+
+      setNotifications(result.notifications)
+    }
+
+    refreshAdminNotifications()
+  }, [])
 
   useEffect(() => {
     async function refreshPromoChannelState() {
@@ -292,6 +315,73 @@ export function AdminPanel({ orders = [], runtimeMode = "prod" }: AdminPanelProp
 
   const updateEditablePromo = (promoId: string, key: keyof EditablePromoCode, value: string | boolean) => {
     setEditablePromoCodes((current) => current.map((promo) => (promo.id === promoId ? { ...promo, [key]: value } : promo)))
+  }
+
+  const buildWhatsappLink = (text: string) => {
+    return `https://wa.me/${adminWhatsappNumber}?text=${encodeURIComponent(text)}`
+  }
+
+  const buildEmailLink = (subject: string, body: string) => {
+    return `mailto:${encodeURIComponent(adminAlertEmail)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
+  }
+
+  const buildNotificationMessageText = (notification: AdminNotification) => {
+    const payload = notification.payload ?? {}
+
+    if (notification.eventType === "new_user") {
+      return [
+        "New user signup alert",
+        `Name: ${String(payload.fullName ?? "Unknown")}`,
+        `Email: ${String(payload.email ?? "Unknown")}`,
+        `Phone: ${String(payload.phone ?? "Unknown")}`,
+        `Created At: ${new Date(notification.createdAt).toLocaleString()}`,
+      ].join("\n")
+    }
+
+    const items = Array.isArray(payload.items) ? payload.items : []
+    const lines = items.map((item) => {
+      const productName = String((item as { productName?: unknown }).productName ?? "Item")
+      const quantity = Number((item as { quantity?: unknown }).quantity ?? 0)
+      const grams = Number((item as { grams?: unknown }).grams ?? 0)
+      return `- ${productName}: ${quantity} x ${grams}g`
+    })
+
+    return [
+      "New order alert",
+      `Order ID: ${String(payload.orderId ?? "Unknown")}`,
+      `Customer: ${String(payload.customerName ?? "Unknown")}`,
+      `Email: ${String(payload.customerEmail ?? "Unknown")}`,
+      `Phone: ${String(payload.customerPhone ?? "Unknown")}`,
+      `Total: Rs${String(payload.totalAmount ?? "0")}`,
+      "Items:",
+      ...(lines.length > 0 ? lines : ["- No items found"]),
+      `Created At: ${new Date(notification.createdAt).toLocaleString()}`,
+    ].join("\n")
+  }
+
+  const handleSendNotificationWhatsapp = async (notification: AdminNotification) => {
+    const text = buildNotificationMessageText(notification)
+    window.open(buildWhatsappLink(text), "_blank", "noopener,noreferrer")
+    const result = await markAdminNotificationWhatsappSent(notification.id)
+    if (!result.success && result.error) {
+      toast.error(result.error)
+      return
+    }
+
+    setNotifications((current) => current.map((entry) => entry.id === notification.id ? { ...entry, whatsappSentAt: new Date().toISOString() } : entry))
+  }
+
+  const handleSendNotificationEmail = async (notification: AdminNotification) => {
+    const subject = notification.eventType === "new_user" ? "New user signup" : "New order placed"
+    const body = buildNotificationMessageText(notification)
+    window.open(buildEmailLink(subject, body), "_blank", "noopener,noreferrer")
+    const result = await markAdminNotificationEmailSent(notification.id)
+    if (!result.success && result.error) {
+      toast.error(result.error)
+      return
+    }
+
+    setNotifications((current) => current.map((entry) => entry.id === notification.id ? { ...entry, emailSentAt: new Date().toISOString() } : entry))
   }
 
   const handleSetPromoChannelDevEnabled = async (enabled: boolean) => {
@@ -534,6 +624,69 @@ export function AdminPanel({ orders = [], runtimeMode = "prod" }: AdminPanelProp
 
   return (
     <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>Admin Notifications</CardTitle>
+          <CardDescription>New user signups and new orders appear here with quick WhatsApp and email actions.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {notifications.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No notifications yet.</p>
+          ) : (
+            <div className="space-y-3">
+              {notifications.map((notification) => {
+                const payload = notification.payload ?? {}
+                const orderItems = notification.eventType === "new_order" && Array.isArray(payload.items)
+                  ? payload.items as Array<{ productName?: string; quantity?: number; grams?: number }>
+                  : []
+
+                return (
+                  <div key={notification.id} className="rounded-lg border p-4 space-y-3">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <p className="font-semibold">{notification.title}</p>
+                        <p className="text-sm text-muted-foreground">{notification.message}</p>
+                      </div>
+                      <div className="text-right">
+                        <Badge variant={notification.eventType === "new_order" ? "default" : "secondary"}>
+                          {notification.eventType === "new_order" ? "New Order" : "New User"}
+                        </Badge>
+                        <p className="mt-1 text-xs text-muted-foreground">{new Date(notification.createdAt).toLocaleString()}</p>
+                      </div>
+                    </div>
+
+                    {notification.eventType === "new_order" && orderItems.length > 0 && (
+                      <div className="rounded-md bg-muted/40 p-3">
+                        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Products Purchased</p>
+                        <ul className="mt-2 space-y-1">
+                          {orderItems.map((item, index) => (
+                            <li key={`${notification.id}-item-${index}`} className="text-sm">
+                              {item.productName ?? "Item"} - {item.quantity ?? 0} x {item.grams ?? 0}g
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Button size="sm" variant="outline" onClick={() => handleSendNotificationWhatsapp(notification)}>
+                        Send WhatsApp
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => handleSendNotificationEmail(notification)}>
+                        Send Email
+                      </Button>
+                      <span className="text-xs text-muted-foreground">
+                        WhatsApp: {notification.whatsappSentAt ? "Sent" : "Not Sent"} | Email: {notification.emailSentAt ? "Sent" : "Not Sent"}
+                      </span>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader>
           <CardTitle>Payment UPI Switch</CardTitle>

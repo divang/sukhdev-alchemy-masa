@@ -45,6 +45,11 @@ Execution order agreed for production hardening:
   - SQL migration: `supabase/sql/013_feature_channel_states.sql`
   - Admin controls: Promo Channel Controls card in `src/components/AdminPanel.tsx`
   - Checkout enforcement by channel in `src/components/CheckoutView.tsx`
+- Added admin notifications for operational events:
+  - SQL migration: `supabase/sql/014_admin_notifications.sql`
+  - Auto notification records on new profile and new order inserts
+  - Admin panel actions to send WhatsApp/email with user/order details
+- Checkout promo UI is now disabled by default; enable with env `VITE_ENABLE_CHECKOUT_PROMO=true` when needed.
 
 ### Phase 3 Target
 - Implement verified payment with Razorpay through server-side functions:
@@ -125,6 +130,7 @@ Apply in this order:
 11. supabase/sql/011_feature_flags_social_experiment.sql
 12. supabase/sql/012_payment_upi_accounts.sql
 13. supabase/sql/013_feature_channel_states.sql
+14. supabase/sql/014_admin_notifications.sql
 
 ## Environment Configuration
 
@@ -133,6 +139,7 @@ Apply in this order:
 - VITE_SUPABASE_ANON_KEY
 - VITE_AUTH_REDIRECT_URL
 - Optional: VITE_DEV_MODE_ADMIN_EMAIL (default in code is `divang.s@gmail.com`)
+- Optional: VITE_ENABLE_CHECKOUT_PROMO (default disabled)
 - Optional: VITE_ALLOW_CLIENT_ORDER_UPDATES (keep false for production unless explicitly required)
 
 ### GitHub Actions Secrets (Pages deploy)

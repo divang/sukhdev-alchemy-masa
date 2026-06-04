@@ -28,6 +28,7 @@ type CheckoutViewProps = {
 }
 
 export function CheckoutView({ cartItems, products, accountProfile, runtimeMode = "prod", onBack, onOrderComplete }: CheckoutViewProps) {
+  const isPromoUiEnabled = import.meta.env.VITE_ENABLE_CHECKOUT_PROMO === "true"
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -75,12 +76,17 @@ export function CheckoutView({ cartItems, products, accountProfile, runtimeMode 
   const getProduct = (productId: string) => products.find(p => p.id === productId)
   const cartSubtotal = calculateCartSubtotal(cartItems, products)
   const shippingAmount = calculateShippingAmountByPincode(formData.pincode, cartSubtotal)
-  const promoDiscountAmount = appliedPromo
+  const promoDiscountAmount = isPromoUiEnabled && appliedPromo
     ? calculatePromoDiscountAmount(appliedPromo, cartSubtotal, shippingAmount)
     : 0
   const cartTotal = Math.max(0, cartSubtotal + shippingAmount - promoDiscountAmount)
 
   const handleApplyPromo = async () => {
+    if (!isPromoUiEnabled) {
+      toast.info("Promo codes are currently disabled.")
+      return
+    }
+
     if (!promoInput.trim()) {
       toast.error("Please enter a promo code.")
       return
@@ -288,43 +294,49 @@ export function CheckoutView({ cartItems, products, accountProfile, runtimeMode 
                   Shipping zone: {formData.pincode.length >= 2 ? getShippingZoneLabel(formData.pincode) : "Enter pincode to confirm zone"}
                 </p>
 
-                <div className="space-y-2 rounded-lg border border-dashed p-3">
-                  <Label htmlFor="promo-code" className="text-xs uppercase tracking-wide text-muted-foreground">Promo Code</Label>
-                  <div className="flex gap-2">
-                    <Input
-                      id="promo-code"
-                      value={promoInput}
-                      onChange={(event) => setPromoInput(event.target.value.toUpperCase())}
+                {isPromoUiEnabled ? (
+                  <div className="space-y-2 rounded-lg border border-dashed p-3">
+                    <Label htmlFor="promo-code" className="text-xs uppercase tracking-wide text-muted-foreground">Promo Code</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        id="promo-code"
+                        value={promoInput}
+                        onChange={(event) => setPromoInput(event.target.value.toUpperCase())}
                         placeholder="SDAJUNE26"
-                      className="h-9"
-                      disabled={!promoEnabledInMode}
-                    />
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      className="h-9"
-                      onClick={handleApplyPromo}
-                      disabled={isApplyingPromo || !promoEnabledInMode}
-                    >
-                      {isApplyingPromo ? "Applying..." : "Apply"}
-                    </Button>
-                  </div>
-                  {promoEnabledInMode ? (
-                    <p className="text-xs text-muted-foreground">
-                      Example promo code: SDAJUNE26
-                    </p>
-                  ) : (
-                    <p className="text-xs text-amber-700">
-                      Promo codes are disabled in {runtimeMode === "dev" ? "dev" : "prod"} mode.
-                    </p>
-                  )}
-                  {appliedPromo && (
-                    <div className="flex items-center justify-between text-xs text-green-700">
-                      <span>{appliedPromo.code} applied ({appliedPromo.discountScope} discount)</span>
-                      <button type="button" className="underline" onClick={handleRemovePromo}>Remove {appliedPromo.code}</button>
+                        className="h-9"
+                        disabled={!promoEnabledInMode}
+                      />
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        className="h-9"
+                        onClick={handleApplyPromo}
+                        disabled={isApplyingPromo || !promoEnabledInMode}
+                      >
+                        {isApplyingPromo ? "Applying..." : "Apply"}
+                      </Button>
                     </div>
-                  )}
-                </div>
+                    {promoEnabledInMode ? (
+                      <p className="text-xs text-muted-foreground">
+                        Example promo code: SDAJUNE26
+                      </p>
+                    ) : (
+                      <p className="text-xs text-amber-700">
+                        Promo codes are disabled in {runtimeMode === "dev" ? "dev" : "prod"} mode.
+                      </p>
+                    )}
+                    {appliedPromo && (
+                      <div className="flex items-center justify-between text-xs text-green-700">
+                        <span>{appliedPromo.code} applied ({appliedPromo.discountScope} discount)</span>
+                        <button type="button" className="underline" onClick={handleRemovePromo}>Remove {appliedPromo.code}</button>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="rounded-lg border border-dashed p-3 text-xs text-muted-foreground">
+                    Promo code entry is currently disabled.
+                  </div>
+                )}
 
                 {promoDiscountAmount > 0 && (
                   <div className="flex justify-between items-center text-sm text-green-700">

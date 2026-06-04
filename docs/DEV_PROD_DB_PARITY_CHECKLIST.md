@@ -26,6 +26,7 @@ Apply migrations in order for both environments:
 11. `supabase/sql/011_feature_flags_social_experiment.sql`
 12. `supabase/sql/012_payment_upi_accounts.sql`
 13. `supabase/sql/013_feature_channel_states.sql`
+14. `supabase/sql/014_admin_notifications.sql`
 
 Important:
 - Keep object names identical.
