@@ -69,6 +69,39 @@ function authDebug(message: string, details?: Record<string, unknown>) {
   console.log(`[auth ${ts}] ${message}`)
 }
 
+async function logAuthStage(
+  stage: string,
+  status: "info" | "success" | "failure",
+  details?: {
+    email?: string
+    userId?: string
+    errorMessage?: string
+    metadata?: Record<string, unknown>
+  }
+) {
+  if (!supabase || !isSupabaseConfigured) {
+    return
+  }
+
+  try {
+    await supabase.rpc("log_auth_audit", {
+      p_kind: "client",
+      p_stage: stage,
+      p_status: status,
+      p_email: details?.email,
+      p_user_id: details?.userId,
+      p_metadata: details?.metadata ?? {},
+      p_error_message: details?.errorMessage,
+    })
+  } catch (rpcError) {
+    authDebug("logAuthStage skipped/failure", {
+      stage,
+      status,
+      rpcError: rpcError instanceof Error ? rpcError.message : String(rpcError),
+    })
+  }
+}
+
 function networkDiagnostics(): Record<string, unknown> {
   if (typeof navigator === "undefined") {
     return { network: "unavailable" }
@@ -171,6 +204,11 @@ async function saveProfile(profile: UserProfile): Promise<string | undefined> {
     role: profile.role,
     ...networkDiagnostics(),
   })
+  await logAuthStage("profile_upsert_started", "info", {
+    email: profile.email,
+    userId: profile.id,
+    metadata: { role: profile.role },
+  })
 
   const { error } = await supabase.from("profiles").upsert(
     {
@@ -194,10 +232,23 @@ async function saveProfile(profile: UserProfile): Promise<string | undefined> {
       rcaCategory: classifySupabaseError(error.message),
       durationMs: Date.now() - saveStart,
     })
+    await logAuthStage("profile_upsert_failed", "failure", {
+      email: profile.email,
+      userId: profile.id,
+      errorMessage: error.message,
+      metadata: {
+        errorCode: (error as { code?: string }).code,
+        errorHint: (error as { hint?: string }).hint,
+      },
+    })
     return error.message
   }
 
   authDebug("saveProfile succeeded", { userId: profile.id, durationMs: Date.now() - saveStart })
+  await logAuthStage("profile_upsert_succeeded", "success", {
+    email: profile.email,
+    userId: profile.id,
+  })
   return undefined
 }
 
@@ -357,6 +408,12 @@ export async function signUpCustomer(input: SignUpInput): Promise<AuthResult> {
     email: maskEmail(input.email),
     redirectTo: getEmailRedirectTo() ?? "none",
   })
+  await logAuthStage("signup_started", "info", {
+    email: input.email,
+    metadata: {
+      redirectTo: getEmailRedirectTo() ?? "none",
+    },
+  })
 
   let data: Awaited<ReturnType<typeof supabase.auth.signUp>>["data"] | undefined
   let error: Awaited<ReturnType<typeof supabase.auth.signUp>>["error"] | undefined
@@ -389,6 +446,10 @@ export async function signUpCustomer(input: SignUpInput): Promise<AuthResult> {
       email: maskEmail(input.email),
       error: mappedError,
     })
+    await logAuthStage("signup_failed_unexpected", "failure", {
+      email: input.email,
+      errorMessage: mappedError,
+    })
     return { user: null, profile: null, error: mappedError }
   }
 
@@ -397,6 +458,13 @@ export async function signUpCustomer(input: SignUpInput): Promise<AuthResult> {
     authDebug("signUpCustomer failed", {
       email: maskEmail(input.email),
       error: mappedError,
+    })
+    await logAuthStage("signup_failed", "failure", {
+      email: input.email,
+      errorMessage: mappedError,
+      metadata: {
+        originalError: error.message,
+      },
     })
     return { user: null, profile: null, error: mappedError }
   }
@@ -415,6 +483,12 @@ export async function signUpCustomer(input: SignUpInput): Promise<AuthResult> {
       email: maskEmail(input.email),
       sessionReturned: Boolean(data.session),
     })
+    await logAuthStage("signup_missing_user_payload", "failure", {
+      email: input.email,
+      metadata: {
+        sessionReturned: Boolean(data.session),
+      },
+    })
     return {
       user: null,
       profile: null,
@@ -426,6 +500,10 @@ export async function signUpCustomer(input: SignUpInput): Promise<AuthResult> {
     authDebug("signUpCustomer requires email confirmation", {
       userId: user.id,
       email: maskEmail(user.email ?? input.email),
+    })
+    await logAuthStage("signup_requires_email_confirmation", "success", {
+      email: user.email ?? input.email,
+      userId: user.id,
     })
     return {
       user,
@@ -466,12 +544,21 @@ export async function signUpCustomer(input: SignUpInput): Promise<AuthResult> {
       userId: user.id,
       error: saveError,
     })
+    await logAuthStage("signup_profile_sync_failed", "failure", {
+      email: user.email ?? input.email,
+      userId: user.id,
+      errorMessage: saveError,
+    })
     return { user, profile, error: `Account created but profile sync failed: ${saveError}` }
   }
 
   authDebug("signUpCustomer succeeded with active session", {
     userId: user.id,
     email: maskEmail(user.email ?? input.email),
+  })
+  await logAuthStage("signup_completed", "success", {
+    email: user.email ?? input.email,
+    userId: user.id,
   })
 
   return { user, profile }

@@ -138,6 +138,7 @@ The app now supports two authenticated experiences on the frontend:
 After running [supabase/sql/001_orders_secure_launch.sql](supabase/sql/001_orders_secure_launch.sql), also run:
 
 1. [supabase/sql/002_auth_accounts_and_order_ownership.sql](supabase/sql/002_auth_accounts_and_order_ownership.sql)
+2. [supabase/sql/018_auth_audit_logging_and_profile_trigger.sql](supabase/sql/018_auth_audit_logging_and_profile_trigger.sql)
 
 This adds:
 
@@ -145,6 +146,39 @@ This adds:
 - `orders.user_id`
 - customer-only order reads via RLS
 - admin-only full order visibility via role checks
+- `public.auth_audit_logs` for auth/signup stage tracing
+- trigger-based profile auto-provisioning from `auth.users`
+
+### 2.1 Debug signup/profile failures by stage
+
+If a user receives a confirmation email but you do not see a profile row, run:
+
+```sql
+-- 1) Check if Auth user exists
+select id, email, created_at, email_confirmed_at
+from auth.users
+where email = 'user@example.com';
+
+-- 2) Check profile row
+select id, email, role, created_at, updated_at
+from public.profiles
+where email = 'user@example.com';
+
+-- 3) Check full auth audit timeline
+select created_at, kind, stage, status, email, user_id, error_message, metadata
+from public.auth_audit_logs
+where email = 'user@example.com'
+order by created_at desc
+limit 200;
+```
+
+Key stages to look for in `public.auth_audit_logs`:
+
+- `kind='client'` and `stage='signup_started'`
+- `kind='client'` and `stage='signup_requires_email_confirmation'` (signup succeeded, waiting for verification)
+- `kind='db_trigger'` and `stage='auth_user_created'` (row inserted into `auth.users`)
+- `kind='db_trigger'` and `stage='profile_upsert_from_auth_user'` with `status='success'` or `status='failure'`
+- `kind='client'` and `stage='profile_upsert_failed'` (frontend profile upsert failed after session flow)
 
 ### 2. Enable Supabase Auth
 
