@@ -15,6 +15,7 @@ import { TestimonialsSection } from "@/components/TestimonialsSection"
 import { ContactUsSection } from "@/components/ContactUsSection"
 import { AdminPanel } from "@/components/AdminPanel"
 import { AuthView } from "@/components/AuthView"
+import { AccountDetailsView } from "@/components/AccountDetailsView"
 import type { Category, Product, CartItem, Order, UserProfile } from "@/lib/types"
 import { toast } from "sonner"
 import { useInitialData } from "@/hooks/use-initial-data"
@@ -41,7 +42,7 @@ import { isPaymentGatewayEnabled, startRazorpayCheckout } from "@/lib/payment-ga
 import { getRequestedRuntimeModeFromSearch, resolveRuntimeMode } from "@/lib/runtime-mode"
 import { triggerOrderCreatedNotification } from "@/lib/order-notifications"
 
-type View = "store" | "account" | "checkout" | "payment" | "tracking" | "admin"
+type View = "store" | "account" | "checkout" | "payment" | "tracking" | "admin" | "account-details"
 
 function mergeOrders(primary: Order[], secondary: Order[]) {
   const deduped = new Map<string, Order>()
@@ -461,7 +462,7 @@ function App() {
 
   const handleOpenAccount = () => {
     if (profile) {
-      setCurrentView(profile.role === "admin" ? "admin" : "tracking")
+      setCurrentView("account-details")
       return
     }
 
@@ -665,6 +666,21 @@ function App() {
         mode={authMode}
         onBack={handleBackToStore}
         onAuthenticated={handleAuthenticated}
+      />
+    )
+  }
+
+  if (currentView === "account-details") {
+    if (!profile) {
+      setCurrentView("store")
+      return null
+    }
+
+    return (
+      <AccountDetailsView
+        profile={profile}
+        onBack={handleBackToStore}
+        onSignOut={handleSignOut}
       />
     )
   }
