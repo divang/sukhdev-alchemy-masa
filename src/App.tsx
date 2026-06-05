@@ -740,8 +740,29 @@ function App() {
                 <p className="text-xs text-muted-foreground uppercase tracking-wide">Order ID</p>
                 <p className="text-sm font-mono font-semibold break-all">{currentOrder.id}</p>
               </div>
-              <div className="flex justify-between items-center">
-                <span className="text-base font-medium">Amount</span>
+
+              {/* Order Breakdown */}
+              <div className="space-y-2 pt-2 border-t border-border/50">
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-muted-foreground">Subtotal</span>
+                  <span>₹{(currentOrder.subtotalAmount ?? 0).toFixed(2)}</span>
+                </div>
+                {(currentOrder.shippingAmount ?? 0) > 0 && (
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-muted-foreground">Shipping</span>
+                    <span>₹{(currentOrder.shippingAmount ?? 0).toFixed(2)}</span>
+                  </div>
+                )}
+                {(currentOrder.discountAmount ?? 0) > 0 && (
+                  <div className="flex justify-between items-center text-sm text-green-600">
+                    <span>Discount {currentOrder.promoCode ? `(${currentOrder.promoCode})` : ""}</span>
+                    <span>-₹{(currentOrder.discountAmount ?? 0).toFixed(2)}</span>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex justify-between items-center pt-2 border-t border-border/50">
+                <span className="text-base font-medium">Total Amount</span>
                 <span className="text-2xl font-bold text-primary">₹{currentOrder.totalAmount.toFixed(2)}</span>
               </div>
             </div>

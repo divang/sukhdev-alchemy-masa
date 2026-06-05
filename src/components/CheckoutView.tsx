@@ -94,8 +94,8 @@ export function CheckoutView({ cartItems, products, accountProfile, runtimeMode 
 
     setIsApplyingPromo(true)
     const result = await validatePromoCode(promoInput, cartSubtotal, shippingAmount, runtimeMode, {
-      email: accountProfile?.email,
-      phone: accountProfile?.phone,
+      email: formData.email || accountProfile?.email,
+      phone: formData.phone || accountProfile?.phone,
     })
     setIsApplyingPromo(false)
 
@@ -125,8 +125,8 @@ export function CheckoutView({ cartItems, products, accountProfile, runtimeMode 
 
     if (isPromoUiEnabled && appliedPromo?.code) {
       const consumeResult = await consumePromoCodeUsage(appliedPromo.code, {
-        email: accountProfile?.email,
-        phone: accountProfile?.phone,
+        email: formData.email || accountProfile?.email,
+        phone: formData.phone || accountProfile?.phone,
       })
       if (!consumeResult.success) {
         setAppliedPromo(null)
