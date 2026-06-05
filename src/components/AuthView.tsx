@@ -9,7 +9,18 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { toast } from "sonner"
 import type { UserProfile } from "@/lib/types"
 import { BRAND_LOGO_PATH } from "@/lib/brand"
-import { resendSignupConfirmation, signInAdmin, signInCustomer, signUpCustomer } from "@/lib/auth"
+import {
+  hasRecoveryParamsInUrl,
+  requestPasswordReset,
+  resendSignupConfirmation,
+  sendPhoneOtp,
+  signInAdmin,
+  signInCustomer,
+  signInWithGoogle,
+  signUpCustomer,
+  updateCurrentUserPassword,
+  verifyPhoneOtp,
+} from "@/lib/auth"
 
 type AuthViewProps = {
   mode: "customer" | "admin"
@@ -35,8 +46,20 @@ async function withTimeout<T>(promise: Promise<T>, ms: number, message: string):
 export function AuthView({ mode, onBack, onAuthenticated }: AuthViewProps) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isResending, setIsResending] = useState(false)
+  const [isSendingOtp, setIsSendingOtp] = useState(false)
+  const [isVerifyingOtp, setIsVerifyingOtp] = useState(false)
+  const [isRequestingReset, setIsRequestingReset] = useState(false)
+  const [isUpdatingPassword, setIsUpdatingPassword] = useState(false)
   const [authNotice, setAuthNotice] = useState<string | null>(null)
+  const [usePasswordSignIn, setUsePasswordSignIn] = useState(false)
+  const [isRecoveryMode] = useState(() => hasRecoveryParamsInUrl())
   const [signInData, setSignInData] = useState({ email: "", password: "" })
+  const [phoneOtpData, setPhoneOtpData] = useState({ phone: "", otp: "", otpSent: false })
+  const [resetPasswordData, setResetPasswordData] = useState({
+    email: "",
+    newPassword: "",
+    confirmPassword: "",
+  })
   const [signUpData, setSignUpData] = useState({
     fullName: "",
     phone: "",
@@ -200,6 +223,91 @@ export function AuthView({ mode, onBack, onAuthenticated }: AuthViewProps) {
     toast.success("Confirmation email sent. If you retry, wait at least 60 seconds between attempts.")
   }
 
+  const handleSendPhoneOtp = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setIsSendingOtp(true)
+    const error = await sendPhoneOtp({ phone: phoneOtpData.phone })
+    setIsSendingOtp(false)
+
+    if (error) {
+      toast.error(error)
+      return
+    }
+
+    setPhoneOtpData((current) => ({ ...current, otpSent: true }))
+    toast.success("OTP sent to your phone number.")
+  }
+
+  const handleVerifyPhoneOtp = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setIsVerifyingOtp(true)
+    const result = await verifyPhoneOtp({ phone: phoneOtpData.phone, otp: phoneOtpData.otp })
+    setIsVerifyingOtp(false)
+
+    if (result.error || !result.profile) {
+      toast.error(result.error ?? "Unable to verify OTP.")
+      return
+    }
+
+    toast.success("Signed in with phone OTP.")
+    onAuthenticated(result.profile)
+  }
+
+  const handleGoogleSignIn = async () => {
+    const error = await signInWithGoogle()
+    if (error) {
+      toast.error(error)
+      return
+    }
+
+    toast.info("Redirecting to Google sign-in...")
+  }
+
+  const handleRequestPasswordReset = async () => {
+    const email = signInData.email.trim() || resetPasswordData.email.trim()
+    if (!email) {
+      toast.error("Enter your email first.")
+      return
+    }
+
+    setIsRequestingReset(true)
+    const error = await requestPasswordReset(email)
+    setIsRequestingReset(false)
+
+    if (error) {
+      toast.error(error)
+      return
+    }
+
+    toast.success("Password reset email sent. Open the link in your email and set a new password.")
+  }
+
+  const handleUpdatePassword = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    if (resetPasswordData.newPassword.length < 8) {
+      toast.error("Password must be at least 8 characters long.")
+      return
+    }
+
+    if (resetPasswordData.newPassword !== resetPasswordData.confirmPassword) {
+      toast.error("Passwords do not match.")
+      return
+    }
+
+    setIsUpdatingPassword(true)
+    const error = await updateCurrentUserPassword(resetPasswordData.newPassword)
+    setIsUpdatingPassword(false)
+
+    if (error) {
+      toast.error(error)
+      return
+    }
+
+    toast.success("Password updated. You can now sign in normally.")
+    setResetPasswordData((current) => ({ ...current, newPassword: "", confirmPassword: "" }))
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b bg-card sticky top-0 z-10">
@@ -264,47 +372,132 @@ export function AuthView({ mode, onBack, onAuthenticated }: AuthViewProps) {
                 </Button>
               </form>
             ) : (
-              <Tabs defaultValue="sign-in" className="w-full">
+              <Tabs defaultValue={isRecoveryMode ? "reset-password" : "sign-in"} className="w-full">
                 <TabsList className="grid w-full grid-cols-2">
                   <TabsTrigger value="sign-in">Sign In</TabsTrigger>
                   <TabsTrigger value="create-account">Create Account</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="sign-in" className="mt-6">
-                  <form className="space-y-4" onSubmit={handleSignIn}>
-                    <div>
-                      <Label htmlFor="sign-in-email">Email</Label>
-                      <Input
-                        id="sign-in-email"
-                        type="email"
-                        value={signInData.email}
-                        onChange={(e) => setSignInData((current) => ({ ...current, email: e.target.value }))}
-                        placeholder="your@email.com"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="sign-in-password">Password</Label>
-                      <Input
-                        id="sign-in-password"
-                        type="password"
-                        value={signInData.password}
-                        onChange={(e) => setSignInData((current) => ({ ...current, password: e.target.value }))}
-                        placeholder="Enter your password"
-                      />
-                    </div>
-                    <Button className="w-full" type="submit" disabled={isSubmitting}>
-                      {isSubmitting ? "Signing in..." : "Sign In"}
+                  <div className="space-y-4">
+                    <form className="space-y-3" onSubmit={phoneOtpData.otpSent ? handleVerifyPhoneOtp : handleSendPhoneOtp}>
+                      <div>
+                        <Label htmlFor="phone-otp-number">Phone Number</Label>
+                        <Input
+                          id="phone-otp-number"
+                          value={phoneOtpData.phone}
+                          onChange={(e) => setPhoneOtpData((current) => ({ ...current, phone: e.target.value }))}
+                          placeholder="+91XXXXXXXXXX"
+                        />
+                      </div>
+
+                      {phoneOtpData.otpSent && (
+                        <div>
+                          <Label htmlFor="phone-otp-code">OTP</Label>
+                          <Input
+                            id="phone-otp-code"
+                            value={phoneOtpData.otp}
+                            onChange={(e) => setPhoneOtpData((current) => ({ ...current, otp: e.target.value }))}
+                            placeholder="Enter 6-digit OTP"
+                          />
+                        </div>
+                      )}
+
+                      <Button className="w-full" type="submit" disabled={isSendingOtp || isVerifyingOtp}>
+                        {phoneOtpData.otpSent
+                          ? (isVerifyingOtp ? "Verifying OTP..." : "Verify OTP")
+                          : (isSendingOtp ? "Sending OTP..." : "Continue with Phone OTP")}
+                      </Button>
+                    </form>
+
+                    <Button className="w-full" type="button" variant="outline" onClick={handleGoogleSignIn}>
+                      Continue with Google
                     </Button>
+
                     <Button
                       className="w-full"
                       type="button"
-                      variant="outline"
-                      disabled={isSubmitting || isResending}
-                      onClick={handleResendConfirmation}
+                      variant="ghost"
+                      onClick={() => setUsePasswordSignIn((current) => !current)}
                     >
-                      {isResending ? "Resending..." : "Resend Confirmation Email"}
+                      {usePasswordSignIn ? "Hide email/password" : "Use email/password instead"}
                     </Button>
-                  </form>
+
+                    {usePasswordSignIn && (
+                      <form className="space-y-4 rounded-lg border p-3" onSubmit={handleSignIn}>
+                        <div>
+                          <Label htmlFor="sign-in-email">Email</Label>
+                          <Input
+                            id="sign-in-email"
+                            type="email"
+                            value={signInData.email}
+                            onChange={(e) => setSignInData((current) => ({ ...current, email: e.target.value }))}
+                            placeholder="your@email.com"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="sign-in-password">Password</Label>
+                          <Input
+                            id="sign-in-password"
+                            type="password"
+                            value={signInData.password}
+                            onChange={(e) => setSignInData((current) => ({ ...current, password: e.target.value }))}
+                            placeholder="Enter your password"
+                          />
+                        </div>
+                        <Button className="w-full" type="submit" disabled={isSubmitting}>
+                          {isSubmitting ? "Signing in..." : "Sign In"}
+                        </Button>
+                        <Button
+                          className="w-full"
+                          type="button"
+                          variant="outline"
+                          disabled={isSubmitting || isResending}
+                          onClick={handleResendConfirmation}
+                        >
+                          {isResending ? "Resending..." : "Resend Confirmation Email"}
+                        </Button>
+                        <Button
+                          className="w-full"
+                          type="button"
+                          variant="outline"
+                          disabled={isRequestingReset}
+                          onClick={handleRequestPasswordReset}
+                        >
+                          {isRequestingReset ? "Sending reset email..." : "Forgot Password"}
+                        </Button>
+                      </form>
+                    )}
+
+                    {isRecoveryMode && (
+                      <form className="space-y-3 rounded-lg border border-amber-300 bg-amber-50 p-3" onSubmit={handleUpdatePassword}>
+                        <p className="text-sm font-medium text-amber-900">Set your new password</p>
+                        <div>
+                          <Label htmlFor="new-password">New Password</Label>
+                          <Input
+                            id="new-password"
+                            type="password"
+                            value={resetPasswordData.newPassword}
+                            onChange={(e) => setResetPasswordData((current) => ({ ...current, newPassword: e.target.value }))}
+                            placeholder="Minimum 8 characters"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="confirm-new-password">Confirm New Password</Label>
+                          <Input
+                            id="confirm-new-password"
+                            type="password"
+                            value={resetPasswordData.confirmPassword}
+                            onChange={(e) => setResetPasswordData((current) => ({ ...current, confirmPassword: e.target.value }))}
+                            placeholder="Re-enter new password"
+                          />
+                        </div>
+                        <Button className="w-full" type="submit" disabled={isUpdatingPassword}>
+                          {isUpdatingPassword ? "Updating password..." : "Update Password"}
+                        </Button>
+                      </form>
+                    )}
+                  </div>
                 </TabsContent>
 
                 <TabsContent value="create-account" className="mt-6">

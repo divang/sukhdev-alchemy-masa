@@ -1,3 +1,4 @@
+import { useState } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { StarRating } from "./StarRating"
 import { useKV } from "@/hooks/use-kv"
@@ -5,6 +6,15 @@ import type { Testimonial } from "@/lib/types"
 
 export function TestimonialsSection() {
   const [testimonials] = useKV<Testimonial[]>("testimonials", [])
+  const [expandedTestimonials, setExpandedTestimonials] = useState<string[]>([])
+
+  const toggleExpanded = (testimonialId: string) => {
+    setExpandedTestimonials((current) => (
+      current.includes(testimonialId)
+        ? current.filter((id) => id !== testimonialId)
+        : [...current, testimonialId]
+    ))
+  }
   
   if (!testimonials || testimonials.length === 0) return null
   
@@ -29,8 +39,20 @@ export function TestimonialsSection() {
                 </div>
                 
                 <p className="text-sm text-muted-foreground italic">
-                  "{testimonial.comment}"
+                  <span className={expandedTestimonials.includes(testimonial.id) ? "" : "line-clamp-4"}>
+                    "{testimonial.comment}"
+                  </span>
                 </p>
+
+                {testimonial.comment.length > 180 && (
+                  <button
+                    type="button"
+                    className="text-xs font-medium text-primary hover:underline"
+                    onClick={() => toggleExpanded(testimonial.id)}
+                  >
+                    {expandedTestimonials.includes(testimonial.id) ? "Show less" : "More"}
+                  </button>
+                )}
                 
                 <p className="text-xs text-muted-foreground">
                   {new Date(testimonial.date).toLocaleDateString()}

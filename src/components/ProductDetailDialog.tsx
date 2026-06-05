@@ -32,6 +32,7 @@ export function ProductDetailDialog({ product, currentUser, canReview, open, onO
   const [reviewRating, setReviewRating] = useState<string>("5")
   const [reviewComment, setReviewComment] = useState("")
   const [isSubmittingReview, setIsSubmittingReview] = useState(false)
+  const [expandedReviewIds, setExpandedReviewIds] = useState<string[]>([])
   
   const productReviews = (reviews || []).filter(r => r.productId === product.id)
   const imageUrl = getProductImage(product, productImages ?? {})
@@ -39,6 +40,14 @@ export function ProductDetailDialog({ product, currentUser, canReview, open, onO
   const handleAddToCart = () => {
     onAddToCart(product, getProductPackGrams(product))
     onOpenChange(false)
+  }
+
+  const toggleExpandedReview = (reviewId: string) => {
+    setExpandedReviewIds((current) => (
+      current.includes(reviewId)
+        ? current.filter((id) => id !== reviewId)
+        : [...current, reviewId]
+    ))
   }
 
   const handleSubmitReview = async () => {
@@ -235,7 +244,18 @@ export function ProductDetailDialog({ product, currentUser, canReview, open, onO
                         </div>
                         <StarRating rating={review.rating} size={14} />
                       </div>
-                      <p className="text-sm">{review.comment}</p>
+                      <p className={`text-sm ${expandedReviewIds.includes(review.id) ? "" : "line-clamp-4"}`}>
+                        {review.comment}
+                      </p>
+                      {review.comment.length > 180 && (
+                        <button
+                          type="button"
+                          className="text-xs font-medium text-primary hover:underline"
+                          onClick={() => toggleExpandedReview(review.id)}
+                        >
+                          {expandedReviewIds.includes(review.id) ? "Show less" : "More"}
+                        </button>
+                      )}
                       <p className="text-xs text-muted-foreground">{new Date(review.date).toLocaleDateString()}</p>
                       {productReviews.indexOf(review) < productReviews.length - 1 && (
                         <Separator className="mt-4" />

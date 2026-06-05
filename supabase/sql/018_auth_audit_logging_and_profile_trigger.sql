@@ -108,7 +108,7 @@ begin
       new.id,
       coalesce(new.email, ''),
       coalesce(new.raw_user_meta_data ->> 'full_name', ''),
-      coalesce(new.raw_user_meta_data ->> 'phone', ''),
+      coalesce(new.phone, new.raw_user_meta_data ->> 'phone', ''),
       v_role,
       coalesce((new.raw_user_meta_data ->> 'review_opt_in')::boolean, true),
       coalesce((new.raw_user_meta_data ->> 'marketing_opt_in')::boolean, true)
@@ -171,7 +171,7 @@ begin
     u.id,
     coalesce(u.email, ''),
     coalesce(u.raw_user_meta_data ->> 'full_name', ''),
-    coalesce(u.raw_user_meta_data ->> 'phone', ''),
+    coalesce(u.phone, u.raw_user_meta_data ->> 'phone', ''),
     case when coalesce(u.raw_user_meta_data ->> 'role', 'customer') = 'admin' then 'admin' else 'customer' end,
     coalesce((u.raw_user_meta_data ->> 'review_opt_in')::boolean, true),
     coalesce((u.raw_user_meta_data ->> 'marketing_opt_in')::boolean, true)

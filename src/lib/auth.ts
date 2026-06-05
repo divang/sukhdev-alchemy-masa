@@ -27,6 +27,15 @@ type SignInInput = {
   password: string
 }
 
+type PhoneOtpInput = {
+  phone: string
+}
+
+type VerifyPhoneOtpInput = {
+  phone: string
+  otp: string
+}
+
 async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, timeoutMessage: string): Promise<T> {
   let timeoutId: ReturnType<typeof setTimeout> | undefined
   const timeoutPromise = new Promise<never>((_, reject) => {
@@ -156,10 +165,28 @@ function mapAuthErrorMessage(message: string) {
 
 const PRODUCTION_ORIGIN = "https://sukhdevialchemy.com"
 
+function isAllowedAuthRedirect(urlValue: string) {
+  try {
+    const parsed = new URL(urlValue)
+    const hostname = parsed.hostname.toLowerCase()
+    return hostname === "sukhdevialchemy.com" || hostname === "www.sukhdevialchemy.com"
+  } catch {
+    return false
+  }
+}
+
 function getEmailRedirectTo() {
   const configured = import.meta.env.VITE_AUTH_REDIRECT_URL as string | undefined
   if (configured && configured.trim()) {
-    return configured.trim()
+    const trimmed = configured.trim()
+    if (isAllowedAuthRedirect(trimmed)) {
+      return trimmed
+    }
+
+    authDebug("Ignoring non-production VITE_AUTH_REDIRECT_URL; using production origin", {
+      configured: trimmed,
+      fallback: `${PRODUCTION_ORIGIN}/`,
+    })
   }
 
   // Never derive the redirect from window.location — in dev/preview environments
@@ -173,7 +200,7 @@ function buildProfileFromMetadata(user: User): UserProfile {
     id: user.id,
     email: user.email ?? "",
     fullName: typeof user.user_metadata.full_name === "string" ? user.user_metadata.full_name : "",
-    phone: typeof user.user_metadata.phone === "string" ? user.user_metadata.phone : "",
+    phone: typeof user.user_metadata.phone === "string" ? user.user_metadata.phone : (user.phone ?? ""),
     role: user.user_metadata.role === "admin" ? "admin" : "customer",
     reviewOptIn: user.user_metadata.review_opt_in === true,
     marketingOptIn: user.user_metadata.marketing_opt_in === true,
@@ -185,11 +212,24 @@ function mapProfileRow(row: Record<string, unknown>, fallbackUser?: User): UserP
     id: String(row.id ?? fallbackUser?.id ?? ""),
     email: String(row.email ?? fallbackUser?.email ?? ""),
     fullName: String(row.full_name ?? fallbackUser?.user_metadata.full_name ?? ""),
-    phone: String(row.phone ?? fallbackUser?.user_metadata.phone ?? ""),
+    phone: String(row.phone ?? fallbackUser?.user_metadata.phone ?? fallbackUser?.phone ?? ""),
     role: row.role === "admin" ? "admin" : "customer",
     reviewOptIn: Boolean(row.review_opt_in ?? fallbackUser?.user_metadata.review_opt_in),
     marketingOptIn: Boolean(row.marketing_opt_in ?? fallbackUser?.user_metadata.marketing_opt_in),
   }
+}
+
+function normalizePhone(rawPhone: string) {
+  const compact = rawPhone.trim().replace(/\s+/g, "")
+  if (!compact) {
+    return ""
+  }
+
+  if (compact.startsWith("+")) {
+    return compact
+  }
+
+  return `+91${compact}`
 }
 
 async function saveProfile(profile: UserProfile): Promise<string | undefined> {
@@ -766,6 +806,166 @@ export async function signInAdmin(input: SignInInput): Promise<AuthResult> {
   }
 
   return result
+}
+
+export async function sendPhoneOtp(input: PhoneOtpInput): Promise<string | undefined> {
+  if (!supabase || !isSupabaseConfigured) {
+    return "Supabase auth is not configured."
+  }
+
+  const normalizedPhone = normalizePhone(input.phone)
+  if (!normalizedPhone) {
+    return "Enter a valid phone number."
+  }
+
+  authDebug("sendPhoneOtp started", { phone: normalizedPhone })
+  await logAuthStage("phone_otp_send_started", "info", {
+    metadata: { phone: normalizedPhone },
+  })
+
+  const { error } = await supabase.auth.signInWithOtp({
+    phone: normalizedPhone,
+    options: {
+      shouldCreateUser: true,
+      data: {
+        role: "customer",
+        phone: normalizedPhone,
+      },
+    },
+  })
+
+  if (error) {
+    const mapped = mapAuthErrorMessage(error.message)
+    await logAuthStage("phone_otp_send_failed", "failure", {
+      errorMessage: mapped,
+      metadata: { phone: normalizedPhone, originalError: error.message },
+    })
+    return mapped
+  }
+
+  await logAuthStage("phone_otp_sent", "success", {
+    metadata: { phone: normalizedPhone },
+  })
+  return undefined
+}
+
+export async function verifyPhoneOtp(input: VerifyPhoneOtpInput): Promise<AuthResult> {
+  if (!supabase || !isSupabaseConfigured) {
+    return { user: null, profile: null, error: "Supabase auth is not configured." }
+  }
+
+  const normalizedPhone = normalizePhone(input.phone)
+  if (!normalizedPhone) {
+    return { user: null, profile: null, error: "Enter a valid phone number." }
+  }
+
+  authDebug("verifyPhoneOtp started", { phone: normalizedPhone })
+  const { data, error } = await supabase.auth.verifyOtp({
+    phone: normalizedPhone,
+    token: input.otp.trim(),
+    type: "sms",
+  })
+
+  if (error) {
+    const mapped = mapAuthErrorMessage(error.message)
+    await logAuthStage("phone_otp_verify_failed", "failure", {
+      errorMessage: mapped,
+      metadata: { phone: normalizedPhone, originalError: error.message },
+    })
+    return { user: null, profile: null, error: mapped }
+  }
+
+  const user = data.user
+  if (!user) {
+    return { user: null, profile: null, error: "OTP verified but no active user found." }
+  }
+
+  let profile: UserProfile | null = null
+  try {
+    profile = await withTimeout(fetchProfile(user), 10000, "Phone OTP profile fetch timed out")
+  } catch {
+    profile = buildProfileFromMetadata(user)
+  }
+
+  await logAuthStage("phone_otp_verify_success", "success", {
+    userId: user.id,
+    metadata: { phone: normalizedPhone },
+  })
+
+  return {
+    user,
+    profile: profile ?? buildProfileFromMetadata(user),
+  }
+}
+
+export async function signInWithGoogle(): Promise<string | undefined> {
+  if (!supabase || !isSupabaseConfigured) {
+    return "Supabase auth is not configured."
+  }
+
+  const redirectTo = getEmailRedirectTo()
+  const { error } = await supabase.auth.signInWithOAuth({
+    provider: "google",
+    options: {
+      redirectTo,
+    },
+  })
+
+  if (error) {
+    return mapAuthErrorMessage(error.message)
+  }
+
+  return undefined
+}
+
+export async function requestPasswordReset(email: string): Promise<string | undefined> {
+  if (!supabase || !isSupabaseConfigured) {
+    return "Supabase auth is not configured."
+  }
+
+  const trimmedEmail = email.trim()
+  if (!trimmedEmail) {
+    return "Please enter your email first."
+  }
+
+  const { error } = await supabase.auth.resetPasswordForEmail(trimmedEmail, {
+    redirectTo: getEmailRedirectTo(),
+  })
+
+  if (error) {
+    return mapAuthErrorMessage(error.message)
+  }
+
+  return undefined
+}
+
+export function hasRecoveryParamsInUrl() {
+  if (typeof window === "undefined") {
+    return false
+  }
+
+  const hash = window.location.hash
+  return hash.includes("type=recovery") && hash.includes("access_token=")
+}
+
+export async function updateCurrentUserPassword(newPassword: string): Promise<string | undefined> {
+  if (!supabase || !isSupabaseConfigured) {
+    return "Supabase auth is not configured."
+  }
+
+  if (newPassword.trim().length < 8) {
+    return "Password must be at least 8 characters long."
+  }
+
+  const { error } = await supabase.auth.updateUser({
+    password: newPassword,
+  })
+
+  if (error) {
+    return mapAuthErrorMessage(error.message)
+  }
+
+  return undefined
 }
 
 export async function signOutUser() {
