@@ -38,8 +38,8 @@ type PromoCodeRow = {
   valid_until: string | null
   usage_limit: number | null
   usage_count: number
-  assigned_email: string | null
-  assigned_phone: string | null
+  assigned_email?: string | null
+  assigned_phone?: string | null
   created_at: string
   updated_at: string
 }
@@ -63,6 +63,13 @@ export type PromoCodeChannelState = {
 }
 
 const PROMO_CHANNEL_KEY = "promo_codes"
+const PROMO_SELECT_BASE = "id, code, description, discount_scope, discount_type, discount_value, max_discount_amount, min_order_amount, is_active, valid_from, valid_until, usage_limit, usage_count, created_at, updated_at"
+const PROMO_SELECT_WITH_ASSIGNMENTS = `${PROMO_SELECT_BASE}, assigned_email, assigned_phone`
+
+function isMissingAssignedColumnsError(message: string | undefined) {
+  const normalizedMessage = String(message ?? "").toLowerCase()
+  return normalizedMessage.includes("assigned_email") && normalizedMessage.includes("does not exist")
+}
 
 const defaultPromoChannelState: PromoCodeChannelState = {
   key: PROMO_CHANNEL_KEY,
@@ -316,11 +323,24 @@ export async function fetchActivePromoCodesForAdmin(): Promise<{ promoCodes: Pro
 
   const { data, error } = await supabase
     .from("promo_codes")
-    .select("id, code, description, discount_scope, discount_type, discount_value, max_discount_amount, min_order_amount, is_active, valid_from, valid_until, usage_limit, usage_count, assigned_email, assigned_phone, created_at, updated_at")
+    .select(PROMO_SELECT_WITH_ASSIGNMENTS)
     .order("created_at", { ascending: false })
 
-  if (error) {
+  if (error && !isMissingAssignedColumnsError(error.message)) {
     return { promoCodes: [], error: error.message }
+  }
+
+  if (error && isMissingAssignedColumnsError(error.message)) {
+    const fallback = await supabase
+      .from("promo_codes")
+      .select(PROMO_SELECT_BASE)
+      .order("created_at", { ascending: false })
+
+    if (fallback.error) {
+      return { promoCodes: [], error: fallback.error.message }
+    }
+
+    return { promoCodes: ((fallback.data as PromoCodeRow[] | null) ?? []).map(mapPromoCodeRow) }
   }
 
   return { promoCodes: ((data as PromoCodeRow[] | null) ?? []).map(mapPromoCodeRow) }
@@ -378,8 +398,38 @@ export async function upsertPromoCodeByAdmin(input: UpsertPromoCodeInput): Promi
   const { data, error } = await supabase
     .from("promo_codes")
     .upsert(payload, { onConflict: "id" })
-    .select("id, code, description, discount_scope, discount_type, discount_value, max_discount_amount, min_order_amount, is_active, valid_from, valid_until, usage_limit, usage_count, assigned_email, assigned_phone, created_at, updated_at")
+    .select(PROMO_SELECT_WITH_ASSIGNMENTS)
     .single()
+
+  if (error && isMissingAssignedColumnsError(error.message)) {
+    const legacyPayload = {
+      id,
+      code: normalizedCode,
+      description: input.description?.trim() || null,
+      discount_scope: input.discountScope,
+      discount_type: input.discountType,
+      discount_value: input.discountValue,
+      max_discount_amount: input.maxDiscountAmount ?? null,
+      min_order_amount: input.minOrderAmount ?? null,
+      valid_from: input.validFrom ?? null,
+      valid_until: input.validUntil ?? null,
+      usage_limit: input.usageLimit ?? null,
+      is_active: input.isActive,
+      updated_at: new Date().toISOString(),
+    }
+
+    const fallback = await supabase
+      .from("promo_codes")
+      .upsert(legacyPayload, { onConflict: "id" })
+      .select(PROMO_SELECT_BASE)
+      .single()
+
+    if (fallback.error || !fallback.data) {
+      return { error: fallback.error?.message ?? "Failed to save promo code." }
+    }
+
+    return { promoCode: mapPromoCodeRow(fallback.data as PromoCodeRow) }
+  }
 
   if (error || !data) {
     return { error: error?.message ?? "Failed to save promo code." }
@@ -456,13 +506,56 @@ export async function validatePromoCode(
 
   const { data, error } = await supabase
     .from("promo_codes")
-    .select("id, code, description, discount_scope, discount_type, discount_value, max_discount_amount, min_order_amount, is_active, valid_from, valid_until, usage_limit, usage_count, assigned_email, assigned_phone, created_at, updated_at")
+    .select(PROMO_SELECT_WITH_ASSIGNMENTS)
     .eq("code", code)
     .eq("is_active", true)
     .maybeSingle()
 
-  if (error) {
+  if (error && !isMissingAssignedColumnsError(error.message)) {
     return { error: error.message }
+  }
+
+  if (error && isMissingAssignedColumnsError(error.message)) {
+    const fallback = await supabase
+      .from("promo_codes")
+      .select(PROMO_SELECT_BASE)
+      .eq("code", code)
+      .eq("is_active", true)
+      .maybeSingle()
+
+    if (fallback.error) {
+      return { error: fallback.error.message }
+    }
+
+    if (!fallback.data) {
+      return { error: "Invalid or inactive promo code." }
+    }
+
+    const promo = mapPromoCodeRow(fallback.data as PromoCodeRow)
+    const now = Date.now()
+
+    if (promo.validFrom && now < new Date(promo.validFrom).getTime()) {
+      return { error: "This promo code is not active yet." }
+    }
+
+    if (promo.validUntil && now > new Date(promo.validUntil).getTime()) {
+      return { error: "This promo code has expired." }
+    }
+
+    if (promo.usageLimit != null && promo.usageCount >= promo.usageLimit) {
+      return { error: "This promo code has reached its usage limit." }
+    }
+
+    if (promo.minOrderAmount != null && subtotal < promo.minOrderAmount) {
+      return { error: `Promo code is valid on orders above Rs${promo.minOrderAmount}.` }
+    }
+
+    const discountAmount = calculatePromoDiscountAmount(promo, subtotal, shipping)
+    if (discountAmount <= 0) {
+      return { error: "Promo code does not apply to this cart." }
+    }
+
+    return { promo, discountAmount }
   }
 
   if (!data) {

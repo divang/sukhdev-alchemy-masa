@@ -294,6 +294,9 @@ Apply in this order:
 12. supabase/sql/012_payment_upi_accounts.sql
 13. supabase/sql/013_feature_channel_states.sql
 14. supabase/sql/014_admin_notifications.sql
+15. supabase/sql/015_consume_promo_code_usage.sql
+16. supabase/sql/016_promo_code_assignment_and_bound_redeem.sql
+17. supabase/sql/017_promo_code_assignment_columns_backfill.sql
 
 ## Environment Configuration
 

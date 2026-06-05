@@ -1,11 +1,32 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 import { corsHeaders, jsonResponse } from "../_shared/cors.ts"
+import { sendOrderNotifications } from "../_shared/order-notifications.ts"
 
 type VerifyPaymentPayload = {
   appOrderId?: string
   razorpay_order_id?: string
   razorpay_payment_id?: string
   razorpay_signature?: string
+}
+
+type OrderRow = {
+  id: string
+  customer_name: string
+  customer_email: string
+  customer_phone: string
+  customer_address: string
+  customer_city: string
+  customer_pincode: string
+  items: Array<{
+    productName?: string
+    quantity?: number
+    grams?: number
+    pricePerUnit?: number
+  }> | null
+  total_amount: number
+  payment_status: string
+  status: string
+  created_at: string
 }
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL")
@@ -165,6 +186,45 @@ Deno.serve(async (req) => {
       })
       .eq("id", appOrderId)
       .eq("user_id", auth.user!.id)
+
+    const { data: orderRow, error: orderFetchError } = await serviceClient
+      .from("orders")
+      .select("id, customer_name, customer_email, customer_phone, customer_address, customer_city, customer_pincode, items, total_amount, payment_status, status, created_at")
+      .eq("id", appOrderId)
+      .eq("user_id", auth.user!.id)
+      .maybeSingle()
+
+    if (!orderFetchError && orderRow) {
+      await sendOrderNotifications({
+        eventType: "payment_verified",
+        order: {
+          id: orderRow.id,
+          customer: {
+            name: orderRow.customer_name,
+            email: orderRow.customer_email,
+            phone: orderRow.customer_phone,
+            address: orderRow.customer_address,
+            city: orderRow.customer_city,
+            pincode: orderRow.customer_pincode,
+          },
+          items: ((orderRow as OrderRow).items ?? []).map((item) => ({
+            productName: String(item.productName ?? "Item"),
+            quantity: Number(item.quantity ?? 0),
+            grams: Number(item.grams ?? 0),
+            pricePerUnit: Number(item.pricePerUnit ?? 0),
+          })),
+          totalAmount: Number(orderRow.total_amount ?? 0),
+          paymentStatus: "paid",
+          status: "processing",
+          createdAt: orderRow.created_at,
+        },
+        paymentDetails: {
+          razorpayOrderId,
+          razorpayPaymentId,
+          gatewayStatus,
+        },
+      })
+    }
   }
 
   return jsonResponse({

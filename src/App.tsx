@@ -39,6 +39,7 @@ import { BRAND_LOGO_PATH } from "@/lib/brand"
 import { CATALOG_SEED_CATEGORIES, CATALOG_SEED_PRODUCTS } from "@/lib/catalog-seed"
 import { isPaymentGatewayEnabled, startRazorpayCheckout } from "@/lib/payment-gateway"
 import { getRequestedRuntimeModeFromSearch, resolveRuntimeMode } from "@/lib/runtime-mode"
+import { triggerOrderCreatedNotification } from "@/lib/order-notifications"
 
 type View = "store" | "account" | "checkout" | "payment" | "tracking" | "admin"
 
@@ -550,6 +551,13 @@ function App() {
       }
     } else {
       toast.success(`Order saved to ${result.provider}!`)
+
+      if (result.provider === "supabase") {
+        const notifyResult = await triggerOrderCreatedNotification(nextOrder)
+        if (!notifyResult.ok) {
+          console.warn("Order notification dispatch failed", notifyResult.error)
+        }
+      }
     }
   }
 
