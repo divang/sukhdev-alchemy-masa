@@ -18,7 +18,7 @@ import { AuthView } from "@/components/AuthView"
 import type { Category, Product, CartItem, Order, UserProfile } from "@/lib/types"
 import { toast } from "sonner"
 import { useInitialData } from "@/hooks/use-initial-data"
-import { getCurrentAuthState, signOutUser, subscribeToAuthStateChanges } from "@/lib/auth"
+import { finalizeOAuthRedirect, getCurrentAuthState, signOutUser, subscribeToAuthStateChanges } from "@/lib/auth"
 import {
   fetchCartForCurrentUser,
   removeCartItemForCurrentUser,
@@ -197,16 +197,31 @@ function App() {
   useEffect(() => {
     let isActive = true
 
-    console.log("[app-auth] getCurrentAuthState requested")
-    getCurrentAuthState().then((state) => {
-      if (!isActive) return
+    async function initializeAuthState() {
+      const oauthError = await finalizeOAuthRedirect()
+      if (!isActive) {
+        return
+      }
+
+      if (oauthError) {
+        toast.error(oauthError)
+      }
+
+      console.log("[app-auth] getCurrentAuthState requested")
+      const state = await getCurrentAuthState()
+      if (!isActive) {
+        return
+      }
+
       console.log("[app-auth] getCurrentAuthState resolved", {
         hasUser: Boolean(state.user),
         hasProfile: Boolean(state.profile),
         role: state.profile?.role ?? null,
       })
       setProfile(state.profile)
-    })
+    }
+
+    void initializeAuthState()
 
     const subscription = subscribeToAuthStateChanges((state) => {
       if (!isActive) return

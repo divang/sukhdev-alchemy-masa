@@ -1,9 +1,9 @@
 # Continuation Context
 
-Last updated: 2026-06-04 UTC
+Last updated: 2026-06-05 UTC
 Branch: main
-Latest pushed commit: 1fb8dff
-Previous major feature commit: d6ef491
+Latest pushed commit: da1056d
+Previous major feature commit: 816dc5d
 
 ## Why This File Exists
 Use this as the single recovery document when chat/session history is unavailable.
@@ -226,6 +226,15 @@ order by tablename, policyname;
 - Enforced in both:
   - client logic
   - DB policy/function (`has_purchased_product`)
+- Long reviews now show 3-4 lines first with `More` / `Show less` for better readability.
+
+### Auth UX (Latest)
+- Customer sign-in now supports Phone OTP flow.
+- Google sign-in option is available (requires provider configuration in Supabase Auth).
+- Email/password remains available as fallback.
+- Forgot password and password reset update flow are implemented.
+- Signup/profile provisioning now has DB audit logging + auth trigger profile auto-upsert.
+- Email redirect hardening: non-production redirect values are ignored; production origin is used as fallback.
 
 ### Checkout + Shipping
 - Shipping is now pincode-based:
@@ -275,8 +284,11 @@ After replacing images:
 - src/components/ProductDetailDialog.tsx
 - src/components/ProductCard.tsx
 - src/components/ContactUsSection.tsx
+- src/components/AuthView.tsx
+- src/components/TestimonialsSection.tsx
 - supabase/sql/004_catalog_seed_data.sql
 - supabase/sql/006_cart_items_and_review_purchase_gate.sql
+- supabase/sql/018_auth_audit_logging_and_profile_trigger.sql
 
 ## Supabase SQL Migration Order (Current)
 Apply in this order:
@@ -297,6 +309,7 @@ Apply in this order:
 15. supabase/sql/015_consume_promo_code_usage.sql
 16. supabase/sql/016_promo_code_assignment_and_bound_redeem.sql
 17. supabase/sql/017_promo_code_assignment_columns_backfill.sql
+18. supabase/sql/018_auth_audit_logging_and_profile_trigger.sql
 
 ## Environment Configuration
 
@@ -334,6 +347,9 @@ Apply in this order:
 - Added explicit auth request timeouts.
 - Added clearer timeout/rate-limit user-facing messages.
 - Added debug instrumentation around sign-in/sign-up/profile fetch flow.
+- Added auth audit logging table + trigger profile provisioning from `auth.users`.
+- Added specific message for Google provider-not-enabled errors.
+- Added phone OTP and forgot/reset password user flows.
 
 ### Likely remaining external cause
 - Supabase Auth rate limits and email provider constraints during pre-launch spikes.
@@ -376,9 +392,9 @@ where email = 'you@example.com';
 6. Verify deploy secrets and push to `main` for Pages deploy.
 
 ## Deployment / Git Status Notes
-- Latest pushed commit: `1fb8dff`.
-- At time of last session, `package-lock.json` had a local modification not intentionally included in feature pushes.
-- If release reproducibility is needed, inspect and decide whether to commit that lockfile change separately.
+- Latest pushed commit: `da1056d`.
+- Current working tree has an uncommitted change in `src/lib/auth.ts` (Google provider error mapping improvement).
+- If release reproducibility is needed, inspect and commit or discard local-only changes intentionally.
 
 ## Useful Verification Queries
 

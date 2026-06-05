@@ -156,6 +156,14 @@ function mapAuthErrorMessage(message: string) {
     return "Too many auth requests from this device or IP. Please wait a minute and retry."
   }
 
+  if (normalized.includes("provider") && normalized.includes("not enabled")) {
+    return "Google sign-in is not enabled yet. Please enable the Google provider in Supabase Authentication -> Providers, then retry."
+  }
+
+  if (normalized.includes("unsupported provider")) {
+    return "Google sign-in is currently unavailable for this project. Enable Google under Supabase Authentication -> Providers."
+  }
+
   if (normalized.includes("timed out") || normalized.includes("timeout")) {
     return "Auth request timed out. Please retry. If this keeps happening, check Supabase region/network latency."
   }
@@ -915,6 +923,34 @@ export async function signInWithGoogle(): Promise<string | undefined> {
     return mapAuthErrorMessage(error.message)
   }
 
+  return undefined
+}
+
+export async function finalizeOAuthRedirect(): Promise<string | undefined> {
+  if (!supabase || !isSupabaseConfigured || typeof window === "undefined") {
+    return undefined
+  }
+
+  const url = new URL(window.location.href)
+  const code = url.searchParams.get("code")
+  const error = url.searchParams.get("error")
+  const errorDescription = url.searchParams.get("error_description")
+
+  if (error) {
+    return mapAuthErrorMessage(errorDescription || error)
+  }
+
+  if (!code) {
+    return undefined
+  }
+
+  const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code)
+  if (exchangeError) {
+    return mapAuthErrorMessage(exchangeError.message)
+  }
+
+  // Clean OAuth query params after successful exchange.
+  window.history.replaceState({}, document.title, `${url.origin}${url.pathname}${url.hash}`)
   return undefined
 }
 
