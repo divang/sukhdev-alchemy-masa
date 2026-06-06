@@ -55,18 +55,9 @@ type EditablePromoCode = {
   id: string
   code: string
   description: string
-  discountScope: PromoScope
   discountType: PromoDiscountType
   discountValue: string
-  maxDiscountAmount: string
-  minOrderAmount: string
-  usageLimit: string
-  validFrom: string
-  validUntil: string
-  assignedEmail: string
-  assignedPhone: string
   isActive: boolean
-  usageCount: number
 }
 
 type AdminPanelProps = {
@@ -106,18 +97,9 @@ export function AdminPanel({ orders = [], runtimeMode = "prod" }: AdminPanelProp
     id: "",
     code: "",
     description: "",
-    discountScope: "total",
     discountType: "percent",
     discountValue: "10",
-    maxDiscountAmount: "",
-    minOrderAmount: "0",
-    usageLimit: "1",
-    validFrom: "",
-    validUntil: "",
-    assignedEmail: "",
-    assignedPhone: "",
     isActive: true,
-    usageCount: 0,
   })
   const [upiAccounts, setUpiAccounts] = useState<AdminPaymentUpiAccount[]>([])
   const [switchingUpiId, setSwitchingUpiId] = useState<string | null>(null)
@@ -208,18 +190,9 @@ export function AdminPanel({ orders = [], runtimeMode = "prod" }: AdminPanelProp
           id: promo.id,
           code: promo.code,
           description: promo.description ?? "",
-          discountScope: promo.discountScope,
           discountType: promo.discountType,
           discountValue: String(promo.discountValue),
-          maxDiscountAmount: promo.maxDiscountAmount != null ? String(promo.maxDiscountAmount) : "",
-          minOrderAmount: promo.minOrderAmount != null ? String(promo.minOrderAmount) : "",
-          usageLimit: promo.usageLimit != null ? String(promo.usageLimit) : "",
-          validFrom: promo.validFrom ? promo.validFrom.slice(0, 10) : "",
-          validUntil: promo.validUntil ? promo.validUntil.slice(0, 10) : "",
-          assignedEmail: promo.assignedEmail ?? "",
-          assignedPhone: promo.assignedPhone ?? "",
           isActive: promo.isActive,
-          usageCount: promo.usageCount,
         }))
       )
     }
@@ -282,41 +255,9 @@ export function AdminPanel({ orders = [], runtimeMode = "prod" }: AdminPanelProp
       return undefined
     }
 
-    const maxDiscountAmount = input.maxDiscountAmount.trim() ? Number(input.maxDiscountAmount) : undefined
-    const minOrderAmount = input.minOrderAmount.trim() ? Number(input.minOrderAmount) : undefined
-    const usageLimit = input.usageLimit.trim() ? Number(input.usageLimit) : undefined
-
-    if (maxDiscountAmount != null && (!Number.isFinite(maxDiscountAmount) || maxDiscountAmount < 0)) {
-      toast.error("Max discount must be a valid non-negative number.")
-      return undefined
-    }
-
-    if (minOrderAmount != null && (!Number.isFinite(minOrderAmount) || minOrderAmount < 0)) {
-      toast.error("Minimum order must be a valid non-negative number.")
-      return undefined
-    }
-
-    if (usageLimit != null && (!Number.isFinite(usageLimit) || usageLimit < 1)) {
-      toast.error("Usage limit must be at least 1.")
-      return undefined
-    }
-
     const code = input.code.trim().toUpperCase()
     if (!code) {
       toast.error("Promo code is required.")
-      return undefined
-    }
-
-    const assignedEmail = input.assignedEmail.trim().toLowerCase()
-    const assignedPhone = input.assignedPhone.replace(/\D/g, "")
-
-    if (assignedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(assignedEmail)) {
-      toast.error("Assigned email must be a valid email address.")
-      return undefined
-    }
-
-    if (assignedPhone && assignedPhone.length < 10) {
-      toast.error("Assigned phone must have at least 10 digits.")
       return undefined
     }
 
@@ -324,16 +265,9 @@ export function AdminPanel({ orders = [], runtimeMode = "prod" }: AdminPanelProp
       id: input.id || undefined,
       code,
       description: input.description.trim() || undefined,
-      discountScope: input.discountScope,
+      discountScope: "total" as PromoScope,
       discountType: input.discountType,
       discountValue,
-      maxDiscountAmount,
-      minOrderAmount,
-      usageLimit,
-      validFrom: input.validFrom ? `${input.validFrom}T00:00:00.000Z` : undefined,
-      validUntil: input.validUntil ? `${input.validUntil}T23:59:59.999Z` : undefined,
-      assignedEmail: assignedEmail || undefined,
-      assignedPhone: assignedPhone || undefined,
       isActive: input.isActive,
     }
   }
@@ -504,18 +438,9 @@ export function AdminPanel({ orders = [], runtimeMode = "prod" }: AdminPanelProp
         id: result.promoCode.id,
         code: result.promoCode.code,
         description: result.promoCode.description ?? "",
-        discountScope: result.promoCode.discountScope,
         discountType: result.promoCode.discountType,
         discountValue: String(result.promoCode.discountValue),
-        maxDiscountAmount: result.promoCode.maxDiscountAmount != null ? String(result.promoCode.maxDiscountAmount) : "",
-        minOrderAmount: result.promoCode.minOrderAmount != null ? String(result.promoCode.minOrderAmount) : "",
-        usageLimit: result.promoCode.usageLimit != null ? String(result.promoCode.usageLimit) : "",
-        validFrom: result.promoCode.validFrom ? result.promoCode.validFrom.slice(0, 10) : "",
-        validUntil: result.promoCode.validUntil ? result.promoCode.validUntil.slice(0, 10) : "",
-        assignedEmail: result.promoCode.assignedEmail ?? "",
-        assignedPhone: result.promoCode.assignedPhone ?? "",
         isActive: result.promoCode.isActive,
-        usageCount: result.promoCode.usageCount,
       },
       ...current,
     ])
@@ -524,44 +449,25 @@ export function AdminPanel({ orders = [], runtimeMode = "prod" }: AdminPanelProp
       id: "",
       code: "",
       description: "",
-      discountScope: "shipping",
-      discountType: "fixed",
-      discountValue: "",
-      maxDiscountAmount: "",
-      minOrderAmount: "",
-      usageLimit: "",
-      validFrom: "",
-      validUntil: "",
-      assignedEmail: "",
-      assignedPhone: "",
+      discountType: "percent",
+      discountValue: "10",
       isActive: true,
-      usageCount: 0,
     })
 
     toast.success(`Promo code ${result.promoCode.code} created.`)
   }
 
   const handleGenerateOneTimePromoToken = () => {
-    const now = new Date()
-    const validFrom = now.toISOString().slice(0, 10)
-    const validUntilDate = new Date(now)
-    validUntilDate.setDate(validUntilDate.getDate() + 7)
-    const validUntil = validUntilDate.toISOString().slice(0, 10)
-
     setNewPromoCode((current) => ({
       ...current,
       code: generatePromoCodeToken("SDA", 8),
-      description: current.description.trim() || "Single-use promo token",
+      description: current.description.trim() || "Open promo code",
       discountType: "percent",
-      discountScope: current.discountScope || "total",
       discountValue: current.discountValue.trim() || "10",
-      usageLimit: "1",
-      validFrom: current.validFrom || validFrom,
-      validUntil: current.validUntil || validUntil,
       isActive: true,
     }))
 
-    toast.success("Single-use token generated. Review and click Create Promo Code.")
+    toast.success("Promo token generated. Review and click Create Promo Code.")
   }
 
   const handleSaveProduct = async (productId: string) => {
@@ -844,12 +750,12 @@ export function AdminPanel({ orders = [], runtimeMode = "prod" }: AdminPanelProp
       <Card>
         <CardHeader>
           <CardTitle>Promo Code Management</CardTitle>
-          <CardDescription>Create and update discount codes for checkout. Example: SDAJUNE26 can be configured for shipping discounts.</CardDescription>
+          <CardDescription>Create simple amount or percentage promo codes and manage enable or disable status.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="rounded-lg border p-4 space-y-4">
             <p className="text-sm font-medium">Create Promo Code</p>
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
               <div>
                 <Label>Code</Label>
                 <Input value={newPromoCode.code} onChange={(event) => setNewPromoCode((c) => ({ ...c, code: event.target.value.toUpperCase() }))} placeholder="SDAJUNE26" />
@@ -863,56 +769,11 @@ export function AdminPanel({ orders = [], runtimeMode = "prod" }: AdminPanelProp
                 <Input type="number" value={newPromoCode.discountValue} onChange={(event) => setNewPromoCode((c) => ({ ...c, discountValue: event.target.value }))} placeholder="100" />
               </div>
               <div>
-                <Label>Scope</Label>
-                <select className="h-9 w-full rounded-md border bg-background px-3 text-sm" value={newPromoCode.discountScope} onChange={(event) => setNewPromoCode((c) => ({ ...c, discountScope: event.target.value as PromoScope }))}>
-                  <option value="shipping">Shipping</option>
-                  <option value="subtotal">Subtotal</option>
-                  <option value="total">Total</option>
-                </select>
-              </div>
-              <div>
                 <Label>Type</Label>
                 <select className="h-9 w-full rounded-md border bg-background px-3 text-sm" value={newPromoCode.discountType} onChange={(event) => setNewPromoCode((c) => ({ ...c, discountType: event.target.value as PromoDiscountType }))}>
                   <option value="fixed">Fixed Amount</option>
                   <option value="percent">Percentage</option>
                 </select>
-              </div>
-              <div>
-                <Label>Max Discount (optional)</Label>
-                <Input type="number" value={newPromoCode.maxDiscountAmount} onChange={(event) => setNewPromoCode((c) => ({ ...c, maxDiscountAmount: event.target.value }))} placeholder="120" />
-              </div>
-              <div>
-                <Label>Min Order (optional)</Label>
-                <Input type="number" value={newPromoCode.minOrderAmount} onChange={(event) => setNewPromoCode((c) => ({ ...c, minOrderAmount: event.target.value }))} placeholder="500" />
-              </div>
-              <div>
-                <Label>Usage Limit (optional)</Label>
-                <Input type="number" value={newPromoCode.usageLimit} onChange={(event) => setNewPromoCode((c) => ({ ...c, usageLimit: event.target.value }))} placeholder="1" />
-              </div>
-              <div>
-                <Label>Valid From (optional)</Label>
-                <Input type="date" value={newPromoCode.validFrom} onChange={(event) => setNewPromoCode((c) => ({ ...c, validFrom: event.target.value }))} />
-              </div>
-              <div>
-                <Label>Valid Until (optional)</Label>
-                <Input type="date" value={newPromoCode.validUntil} onChange={(event) => setNewPromoCode((c) => ({ ...c, validUntil: event.target.value }))} />
-              </div>
-              <div>
-                <Label>Assigned Email (optional)</Label>
-                <Input
-                  type="email"
-                  value={newPromoCode.assignedEmail}
-                  onChange={(event) => setNewPromoCode((c) => ({ ...c, assignedEmail: event.target.value }))}
-                  placeholder="customer@example.com"
-                />
-              </div>
-              <div>
-                <Label>Assigned Phone (optional)</Label>
-                <Input
-                  value={newPromoCode.assignedPhone}
-                  onChange={(event) => setNewPromoCode((c) => ({ ...c, assignedPhone: event.target.value.replace(/\D/g, "").slice(0, 15) }))}
-                  placeholder="9876543210"
-                />
               </div>
             </div>
             <div className="flex items-center gap-3">
@@ -928,21 +789,16 @@ export function AdminPanel({ orders = [], runtimeMode = "prod" }: AdminPanelProp
           </div>
 
           <div className="space-y-4">
+            <p className="text-sm font-medium">Available Promo Codes</p>
             {editablePromoCodes.length === 0 && (
               <p className="text-sm text-muted-foreground">No promo codes found yet. Create one above.</p>
             )}
             {editablePromoCodes.map((promo) => {
               const isSavingPromo = savingPromoId === promo.id
-              const usageLabel = promo.usageLimit
-                ? `${promo.usageCount}/${promo.usageLimit}`
-                : `${promo.usageCount}`
 
               return (
                 <div key={promo.id} className="rounded-lg border p-4 space-y-4">
-                  <div className="text-xs text-muted-foreground">
-                    Usage: {usageLabel}
-                  </div>
-                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                     <div>
                       <Label>Code</Label>
                       <Input value={promo.code} onChange={(event) => updateEditablePromo(promo.id, "code", event.target.value.toUpperCase())} />
@@ -956,62 +812,17 @@ export function AdminPanel({ orders = [], runtimeMode = "prod" }: AdminPanelProp
                       <Input type="number" value={promo.discountValue} onChange={(event) => updateEditablePromo(promo.id, "discountValue", event.target.value)} />
                     </div>
                     <div>
-                      <Label>Scope</Label>
-                      <select className="h-9 w-full rounded-md border bg-background px-3 text-sm" value={promo.discountScope} onChange={(event) => updateEditablePromo(promo.id, "discountScope", event.target.value as PromoScope)}>
-                        <option value="shipping">Shipping</option>
-                        <option value="subtotal">Subtotal</option>
-                        <option value="total">Total</option>
-                      </select>
-                    </div>
-                    <div>
                       <Label>Type</Label>
                       <select className="h-9 w-full rounded-md border bg-background px-3 text-sm" value={promo.discountType} onChange={(event) => updateEditablePromo(promo.id, "discountType", event.target.value as PromoDiscountType)}>
                         <option value="fixed">Fixed Amount</option>
                         <option value="percent">Percentage</option>
                       </select>
                     </div>
-                    <div>
-                      <Label>Max Discount</Label>
-                      <Input type="number" value={promo.maxDiscountAmount} onChange={(event) => updateEditablePromo(promo.id, "maxDiscountAmount", event.target.value)} />
-                    </div>
-                    <div>
-                      <Label>Min Order</Label>
-                      <Input type="number" value={promo.minOrderAmount} onChange={(event) => updateEditablePromo(promo.id, "minOrderAmount", event.target.value)} />
-                    </div>
-                    <div>
-                      <Label>Usage Limit</Label>
-                      <Input type="number" value={promo.usageLimit} onChange={(event) => updateEditablePromo(promo.id, "usageLimit", event.target.value)} />
-                    </div>
-                    <div>
-                      <Label>Valid From</Label>
-                      <Input type="date" value={promo.validFrom} onChange={(event) => updateEditablePromo(promo.id, "validFrom", event.target.value)} />
-                    </div>
-                    <div>
-                      <Label>Valid Until</Label>
-                      <Input type="date" value={promo.validUntil} onChange={(event) => updateEditablePromo(promo.id, "validUntil", event.target.value)} />
-                    </div>
-                    <div>
-                      <Label>Assigned Email</Label>
-                      <Input
-                        type="email"
-                        value={promo.assignedEmail}
-                        onChange={(event) => updateEditablePromo(promo.id, "assignedEmail", event.target.value)}
-                        placeholder="customer@example.com"
-                      />
-                    </div>
-                    <div>
-                      <Label>Assigned Phone</Label>
-                      <Input
-                        value={promo.assignedPhone}
-                        onChange={(event) => updateEditablePromo(promo.id, "assignedPhone", event.target.value.replace(/\D/g, "").slice(0, 15))}
-                        placeholder="9876543210"
-                      />
-                    </div>
                   </div>
 
                   <div className="flex flex-wrap items-center gap-3">
                     <Switch checked={promo.isActive} onCheckedChange={(checked) => updateEditablePromo(promo.id, "isActive", checked)} />
-                    <span className="text-sm">Active</span>
+                    <span className="text-sm">Enabled</span>
                     <Button size="sm" onClick={() => handleSavePromoCode(promo.id)} disabled={isSavingPromo}>{isSavingPromo ? "Saving..." : "Save Promo"}</Button>
                   </div>
                 </div>

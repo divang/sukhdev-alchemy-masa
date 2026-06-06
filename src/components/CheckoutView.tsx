@@ -15,7 +15,7 @@ import {
   getProductPackLabel,
   getShippingZoneLabel,
 } from "@/lib/pricing"
-import { calculatePromoDiscountAmount, consumePromoCodeUsage, fetchPromoCodeChannelState, type PromoCode, validatePromoCode } from "@/lib/promo-codes"
+import { calculatePromoDiscountAmount, fetchPromoCodeChannelState, type PromoCode, validatePromoCode } from "@/lib/promo-codes"
 import type { RuntimeMode } from "@/lib/runtime-mode"
 
 type CheckoutViewProps = {
@@ -123,18 +123,6 @@ export function CheckoutView({ cartItems, products, accountProfile, runtimeMode 
       return
     }
 
-    if (isPromoUiEnabled && appliedPromo?.code) {
-      const consumeResult = await consumePromoCodeUsage(appliedPromo.code, {
-        email: formData.email || accountProfile?.email,
-        phone: formData.phone || accountProfile?.phone,
-      })
-      if (!consumeResult.success) {
-        setAppliedPromo(null)
-        toast.error(consumeResult.error ?? "Promo code has already been used. Please request a new one.")
-        return
-      }
-    }
-    
     const order: Order = {
       id: `ORD-${Date.now()}`,
       items: cartItems.map(item => {
@@ -346,6 +334,7 @@ export function CheckoutView({ cartItems, products, accountProfile, runtimeMode 
                         <button type="button" className="underline" onClick={handleRemovePromo}>Remove {appliedPromo.code}</button>
                       </div>
                     )}
+                    <p className="text-xs text-muted-foreground">Only one promo code can be applied per order.</p>
                   </div>
                 ) : (
                   <div className="rounded-lg border border-dashed p-3 text-xs text-muted-foreground">
