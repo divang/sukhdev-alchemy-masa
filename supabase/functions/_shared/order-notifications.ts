@@ -187,10 +187,68 @@ async function sendEmail(
   return reports
 }
 
+type WhatsappApiError = {
+  code?: number
+  message?: string
+}
+
+function parseWhatsappApiError(payload: string): WhatsappApiError {
+  try {
+    const parsed = JSON.parse(payload) as { error?: { code?: unknown; message?: unknown } }
+    return {
+      code: typeof parsed.error?.code === "number" ? parsed.error.code : undefined,
+      message: typeof parsed.error?.message === "string" ? parsed.error.message : undefined,
+    }
+  } catch {
+    return {}
+  }
+}
+
+function shouldRetryWithTemplate(error: WhatsappApiError) {
+  const message = String(error.message ?? "").toLowerCase()
+  if (!message) {
+    return false
+  }
+
+  return (
+    message.includes("outside") && message.includes("window")
+  ) || message.includes("template")
+}
+
+async function sendWhatsappTemplateMessage(params: {
+  token: string
+  phoneNumberId: string
+  apiVersion: string
+  phone: string
+  templateName: string
+  templateLanguage: string
+}) {
+  return fetch(`https://graph.facebook.com/${params.apiVersion}/${params.phoneNumberId}/messages`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${params.token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      messaging_product: "whatsapp",
+      to: params.phone,
+      type: "template",
+      template: {
+        name: params.templateName,
+        language: {
+          code: params.templateLanguage,
+        },
+      },
+    }),
+  })
+}
+
 async function sendWhatsappMessage(phone: string, text: string): Promise<NotificationDispatchReport> {
   const token = Deno.env.get("WHATSAPP_ACCESS_TOKEN")
   const phoneNumberId = Deno.env.get("WHATSAPP_PHONE_NUMBER_ID")
   const apiVersion = Deno.env.get("WHATSAPP_API_VERSION") || "v22.0"
+  const templateName = Deno.env.get("WHATSAPP_TEMPLATE_NAME") || "hello_world"
+  const templateLanguage = Deno.env.get("WHATSAPP_TEMPLATE_LANGUAGE") || "en_US"
 
   if (!token || !phoneNumberId) {
     return {
@@ -220,6 +278,31 @@ async function sendWhatsappMessage(phone: string, text: string): Promise<Notific
 
   if (!response.ok) {
     const payload = await response.text()
+    const parsedError = parseWhatsappApiError(payload)
+
+    if (shouldRetryWithTemplate(parsedError)) {
+      const templateResponse = await sendWhatsappTemplateMessage({
+        token,
+        phoneNumberId,
+        apiVersion,
+        phone,
+        templateName,
+        templateLanguage,
+      })
+
+      if (templateResponse.ok) {
+        return { provider: "whatsapp", recipient: phone, ok: true }
+      }
+
+      const templatePayload = await templateResponse.text()
+      return {
+        provider: "whatsapp",
+        recipient: phone,
+        ok: false,
+        error: `WhatsApp text+template send failed. text=${payload} template=${templatePayload}`,
+      }
+    }
+
     return {
       provider: "whatsapp",
       recipient: phone,

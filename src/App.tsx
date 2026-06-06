@@ -577,6 +577,7 @@ function App() {
         const notifyResult = await triggerOrderCreatedNotification(nextOrder)
         if (!notifyResult.ok) {
           console.warn("Order notification dispatch failed", notifyResult.error)
+          toast.error(`Order notification failed: ${notifyResult.error ?? "Unknown error"}`)
         }
       }
     }
@@ -617,6 +618,7 @@ function App() {
       })
       if (!notifyResult.ok) {
         console.warn("Payment notification dispatch failed", notifyResult.error)
+        toast.error(`Payment notification failed: ${notifyResult.error ?? "Unknown error"}`)
       }
     }
   }
