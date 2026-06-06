@@ -1,6 +1,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 import { corsHeaders, jsonResponse } from "../_shared/cors.ts"
 import { sendOrderNotifications } from "../_shared/order-notifications.ts"
+import { createShipmentForPaidOrder } from "../_shared/shipping.ts"
 
 type VerifyPaymentPayload = {
   appOrderId?: string
@@ -195,29 +196,31 @@ Deno.serve(async (req) => {
       .maybeSingle()
 
     if (!orderFetchError && orderRow) {
+      const mappedOrder = {
+        id: orderRow.id,
+        customer: {
+          name: orderRow.customer_name,
+          email: orderRow.customer_email,
+          phone: orderRow.customer_phone,
+          address: orderRow.customer_address,
+          city: orderRow.customer_city,
+          pincode: orderRow.customer_pincode,
+        },
+        items: ((orderRow as OrderRow).items ?? []).map((item) => ({
+          productName: String(item.productName ?? "Item"),
+          quantity: Number(item.quantity ?? 0),
+          grams: Number(item.grams ?? 0),
+          pricePerUnit: Number(item.pricePerUnit ?? 0),
+        })),
+        totalAmount: Number(orderRow.total_amount ?? 0),
+        paymentStatus: "paid",
+        status: "processing",
+        createdAt: orderRow.created_at,
+      }
+
       const notificationResult = await sendOrderNotifications({
         eventType: "payment_verified",
-        order: {
-          id: orderRow.id,
-          customer: {
-            name: orderRow.customer_name,
-            email: orderRow.customer_email,
-            phone: orderRow.customer_phone,
-            address: orderRow.customer_address,
-            city: orderRow.customer_city,
-            pincode: orderRow.customer_pincode,
-          },
-          items: ((orderRow as OrderRow).items ?? []).map((item) => ({
-            productName: String(item.productName ?? "Item"),
-            quantity: Number(item.quantity ?? 0),
-            grams: Number(item.grams ?? 0),
-            pricePerUnit: Number(item.pricePerUnit ?? 0),
-          })),
-          totalAmount: Number(orderRow.total_amount ?? 0),
-          paymentStatus: "paid",
-          status: "processing",
-          createdAt: orderRow.created_at,
-        },
+        order: mappedOrder,
         paymentDetails: {
           razorpayOrderId,
           razorpayPaymentId,
@@ -241,6 +244,23 @@ Deno.serve(async (req) => {
             .map((entry) => ({ provider: entry.provider, recipient: entry.recipient, error: entry.error })),
         })
       }
+
+      const shipmentResult = await createShipmentForPaidOrder(serviceClient, {
+        id: mappedOrder.id,
+        customer: mappedOrder.customer,
+        items: mappedOrder.items,
+        totalAmount: mappedOrder.totalAmount,
+      })
+
+      console.log("[verify-payment] shipment-attempt-result", {
+        appOrderId,
+        attempted: shipmentResult.attempted,
+        created: shipmentResult.created,
+        provider: shipmentResult.provider ?? null,
+        reason: shipmentResult.reason ?? null,
+        shipmentId: shipmentResult.shipmentId ?? null,
+        awbCode: shipmentResult.awbCode ?? null,
+      })
     }
   }
 

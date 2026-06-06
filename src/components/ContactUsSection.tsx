@@ -9,7 +9,7 @@ const CONTACT_LINKS = [
   },
   {
     name: "Facebook",
-    href: "https://www.facebook.com/people/Sukhdevi-Alchemy/61590206949388/",
+    href: "https://www.facebook.com/sukhdevialchemy",
     icon: FacebookLogo,
     handle: "Sukhdevi Alchemy",
   },

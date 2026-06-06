@@ -260,7 +260,7 @@ order by tablename, policyname;
 ### Contact Us
 Professional contact section is live with:
 - Instagram: https://www.instagram.com/sukhdevialchemy/
-- Facebook: https://www.facebook.com/people/Sukhdevi-Alchemy/61590206949388/
+- Facebook: https://www.facebook.com/sukhdevialchemy
 - YouTube: https://www.youtube.com/@sukhdevialchemy
 - WhatsApp: +91 78894 80171 (wa.me link)
 

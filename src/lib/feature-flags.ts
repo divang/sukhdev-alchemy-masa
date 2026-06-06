@@ -5,6 +5,7 @@ export type FeatureFlags = {
   enableSocialIcons: boolean
   enableRestaurantToHomeReels: boolean
   enableChefSampleCta: boolean
+  enableShiprocketIntegration: boolean
 }
 
 type FeatureFlagRow = {
@@ -17,6 +18,7 @@ const keyMap: Record<string, keyof FeatureFlags> = {
   enable_social_icons: "enableSocialIcons",
   enable_restaurant_to_home_reels: "enableRestaurantToHomeReels",
   enable_chef_sample_cta: "enableChefSampleCta",
+  enable_shiprocket_integration: "enableShiprocketIntegration",
 }
 
 export const defaultFeatureFlags: FeatureFlags = {
@@ -24,6 +26,29 @@ export const defaultFeatureFlags: FeatureFlags = {
   enableSocialIcons: false,
   enableRestaurantToHomeReels: false,
   enableChefSampleCta: false,
+  enableShiprocketIntegration: false,
+}
+
+export async function setFeatureFlagEnabledByAdmin(key: string, enabled: boolean): Promise<{ success: boolean; error?: string }> {
+  if (!supabase || !isSupabaseConfigured) {
+    return { success: false, error: "Supabase is not configured." }
+  }
+
+  const { error } = await supabase
+    .from("feature_flags")
+    .upsert(
+      {
+        key,
+        enabled,
+      },
+      { onConflict: "key" }
+    )
+
+  if (error) {
+    return { success: false, error: error.message }
+  }
+
+  return { success: true }
 }
 
 export async function fetchFeatureFlags(): Promise<{ flags: FeatureFlags; error?: string }> {

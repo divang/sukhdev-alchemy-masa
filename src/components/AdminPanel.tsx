@@ -30,12 +30,19 @@ import {
   type PromoScope,
   upsertPromoCodeByAdmin,
 } from "@/lib/promo-codes"
+import { fetchFeatureFlags, setFeatureFlagEnabledByAdmin, type FeatureFlags } from "@/lib/feature-flags"
 import {
   fetchPaymentUpiAccountsForAdmin,
   setPaymentUpiAccountEnabled,
   setPrimaryPaymentUpiAccount,
   type AdminPaymentUpiAccount,
 } from "@/lib/payment-upi"
+import {
+  fetchDeliveryPartnerAccountsForAdmin,
+  setDeliveryPartnerEnabled,
+  setPrimaryDeliveryPartnerAccount,
+  type AdminDeliveryPartnerAccount,
+} from "@/lib/delivery-partners"
 
 type EditableProduct = {
   id: string
@@ -104,6 +111,11 @@ export function AdminPanel({ orders = [], runtimeMode = "prod" }: AdminPanelProp
   const [upiAccounts, setUpiAccounts] = useState<AdminPaymentUpiAccount[]>([])
   const [switchingUpiId, setSwitchingUpiId] = useState<string | null>(null)
   const [togglingUpiId, setTogglingUpiId] = useState<string | null>(null)
+  const [deliveryPartners, setDeliveryPartners] = useState<AdminDeliveryPartnerAccount[]>([])
+  const [switchingDeliveryPartnerId, setSwitchingDeliveryPartnerId] = useState<string | null>(null)
+  const [togglingDeliveryPartnerId, setTogglingDeliveryPartnerId] = useState<string | null>(null)
+  const [featureFlagsState, setFeatureFlagsState] = useState<FeatureFlags | null>(null)
+  const [isSavingShiprocketFlag, setIsSavingShiprocketFlag] = useState(false)
   const [notifications, setNotifications] = useState<AdminNotification[]>([])
 
   const categoryOptions = useMemo(() => {
@@ -212,6 +224,33 @@ export function AdminPanel({ orders = [], runtimeMode = "prod" }: AdminPanelProp
     }
 
     refreshUpiAccountsForAdmin()
+  }, [])
+
+  useEffect(() => {
+    async function refreshDeliveryPartnersForAdmin() {
+      const result = await fetchDeliveryPartnerAccountsForAdmin()
+      if (result.error) {
+        console.warn("[admin] delivery partner load skipped", result.error)
+        return
+      }
+
+      setDeliveryPartners(result.accounts)
+    }
+
+    refreshDeliveryPartnersForAdmin()
+  }, [])
+
+  useEffect(() => {
+    async function refreshFeatureFlagsForAdmin() {
+      const result = await fetchFeatureFlags()
+      if (result.error) {
+        console.warn("[admin] feature flags load skipped", result.error)
+      }
+
+      setFeatureFlagsState(result.flags)
+    }
+
+    refreshFeatureFlagsForAdmin()
   }, [])
 
   const updateEditableProduct = (productId: string, key: keyof EditableProduct, value: string | boolean) => {
@@ -545,6 +584,76 @@ export function AdminPanel({ orders = [], runtimeMode = "prod" }: AdminPanelProp
     toast.success(`UPI account ${enabled ? "enabled" : "disabled"}.`)
   }
 
+  const handleSetPrimaryDeliveryPartner = async (accountId: string) => {
+    setSwitchingDeliveryPartnerId(accountId)
+    const result = await setPrimaryDeliveryPartnerAccount(accountId)
+    setSwitchingDeliveryPartnerId(null)
+
+    if (!result.success) {
+      toast.error(result.error ?? "Failed to switch primary delivery partner.")
+      return
+    }
+
+    const refreshed = await fetchDeliveryPartnerAccountsForAdmin()
+    if (refreshed.error) {
+      toast.error(refreshed.error)
+      return
+    }
+
+    setDeliveryPartners(refreshed.accounts)
+    toast.success("Primary delivery partner updated.")
+  }
+
+  const handleToggleDeliveryPartnerEnabled = async (accountId: string, enabled: boolean) => {
+    const currentlyEnabledCount = deliveryPartners.filter((account) => account.enabled).length
+    if (!enabled && currentlyEnabledCount <= 1) {
+      toast.error("At least one delivery partner must remain enabled.")
+      return
+    }
+
+    setTogglingDeliveryPartnerId(accountId)
+    const result = await setDeliveryPartnerEnabled(accountId, enabled)
+    setTogglingDeliveryPartnerId(null)
+
+    if (!result.success) {
+      toast.error(result.error ?? "Failed to update delivery partner status.")
+      return
+    }
+
+    const refreshed = await fetchDeliveryPartnerAccountsForAdmin()
+    if (refreshed.error) {
+      toast.error(refreshed.error)
+      return
+    }
+
+    setDeliveryPartners(refreshed.accounts)
+    toast.success(`Delivery partner ${enabled ? "enabled" : "disabled"}.`)
+  }
+
+  const handleSetShiprocketFeatureEnabled = async (enabled: boolean) => {
+    setIsSavingShiprocketFlag(true)
+    const result = await setFeatureFlagEnabledByAdmin("enable_shiprocket_integration", enabled)
+    setIsSavingShiprocketFlag(false)
+
+    if (!result.success) {
+      toast.error(result.error ?? "Failed to update Shiprocket feature flag.")
+      return
+    }
+
+    setFeatureFlagsState((current) => ({
+      ...(current ?? {
+        enableSocialExperimentSection: false,
+        enableSocialIcons: false,
+        enableRestaurantToHomeReels: false,
+        enableChefSampleCta: false,
+        enableShiprocketIntegration: false,
+      }),
+      enableShiprocketIntegration: enabled,
+    }))
+
+    toast.success(`Shiprocket integration ${enabled ? "enabled" : "disabled"} for paid-order shipment flow.`)
+  }
+
   const handleCreateProduct = async () => {
     if (!isSupabaseConfigured) {
       toast.error("Supabase auth is not configured.")
@@ -694,6 +803,82 @@ export function AdminPanel({ orders = [], runtimeMode = "prod" }: AdminPanelProp
               })}
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Delivery Partner Switch</CardTitle>
+          <CardDescription>Switch the active courier provider without changing the rest of the order flow.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {deliveryPartners.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No delivery partners found yet. Run SQL migration 020 first.</p>
+          ) : (
+            <div className="space-y-3">
+              {deliveryPartners.map((partner, index) => {
+                const isPrimary = partner.enabled && index === 0
+                const isSwitching = switchingDeliveryPartnerId === partner.id
+
+                return (
+                  <div key={partner.id} className="rounded-lg border p-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium">{partner.displayName}</p>
+                        <Badge variant="outline" className="uppercase">{partner.providerKey}</Badge>
+                        {isPrimary && <Badge>Primary</Badge>}
+                        {!partner.enabled && <Badge variant="outline">Disabled</Badge>}
+                      </div>
+                      <p className="text-sm text-muted-foreground">Ready to plug in partner-specific pickup, AWB, and tracking APIs.</p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          checked={partner.enabled}
+                          onCheckedChange={(checked) => handleToggleDeliveryPartnerEnabled(partner.id, checked)}
+                          disabled={togglingDeliveryPartnerId === partner.id}
+                        />
+                        <span className="text-sm">Enabled</span>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant={isPrimary ? "secondary" : "default"}
+                        onClick={() => handleSetPrimaryDeliveryPartner(partner.id)}
+                        disabled={isPrimary || isSwitching || !partner.enabled}
+                      >
+                        {isPrimary ? "Current Primary" : isSwitching ? "Switching..." : "Make Primary"}
+                      </Button>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Shipping Feature Flag</CardTitle>
+          <CardDescription>Keep this OFF in production until Shiprocket E2E is validated.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="rounded-lg border p-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="font-medium">Enable Shiprocket Integration</p>
+              <p className="text-sm text-muted-foreground">
+                When enabled, paid orders will attempt shipment creation for the active partner if it is Shiprocket.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Switch
+                checked={Boolean(featureFlagsState?.enableShiprocketIntegration)}
+                onCheckedChange={handleSetShiprocketFeatureEnabled}
+                disabled={isSavingShiprocketFlag}
+              />
+              <span className="text-sm">{featureFlagsState?.enableShiprocketIntegration ? "ON" : "OFF"}</span>
+            </div>
+          </div>
         </CardContent>
       </Card>
 
