@@ -40,7 +40,7 @@ import { BRAND_LOGO_PATH } from "@/lib/brand"
 import { CATALOG_SEED_CATEGORIES, CATALOG_SEED_PRODUCTS } from "@/lib/catalog-seed"
 import { isPaymentGatewayEnabled, startRazorpayCheckout } from "@/lib/payment-gateway"
 import { getRequestedRuntimeModeFromSearch, resolveRuntimeMode } from "@/lib/runtime-mode"
-import { triggerOrderCreatedNotification } from "@/lib/order-notifications"
+import { triggerOrderCreatedNotification, triggerOrderNotification } from "@/lib/order-notifications"
 
 type View = "store" | "account" | "checkout" | "payment" | "tracking" | "admin" | "account-details"
 
@@ -609,6 +609,15 @@ function App() {
       }
     } else {
       toast.success("Payment status updated!")
+
+      // Trigger WhatsApp / email notification for payment confirmation (UPI manual flow).
+      const notifyResult = await triggerOrderNotification({
+        eventType: "payment_verified",
+        appOrderId: updatedOrder.id,
+      })
+      if (!notifyResult.ok) {
+        console.warn("Payment notification dispatch failed", notifyResult.error)
+      }
     }
   }
 

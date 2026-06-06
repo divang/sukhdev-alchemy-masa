@@ -454,8 +454,6 @@ export async function consumePromoCodeUsage(
   const { data, error } = await supabase
     .rpc("consume_promo_code_usage", {
       p_code: code,
-      p_customer_email: customer?.email?.trim().toLowerCase() || null,
-      p_customer_phone: customer?.phone?.replace(/\D/g, "") || null,
     })
     .maybeSingle()
 
@@ -575,17 +573,6 @@ export async function validatePromoCode(
 
   if (promo.usageLimit != null && promo.usageCount >= promo.usageLimit) {
     return { error: "This promo code has reached its usage limit." }
-  }
-
-  const normalizedCustomerEmail = customer?.email?.trim().toLowerCase()
-  const normalizedCustomerPhone = customer?.phone?.replace(/\D/g, "")
-
-  if (promo.assignedEmail && normalizedCustomerEmail !== promo.assignedEmail.toLowerCase()) {
-    return { error: "This promo code is assigned to a different email." }
-  }
-
-  if (promo.assignedPhone && normalizedCustomerPhone !== promo.assignedPhone.replace(/\D/g, "")) {
-    return { error: "This promo code is assigned to a different phone number." }
   }
 
   if (promo.minOrderAmount != null && subtotal < promo.minOrderAmount) {
