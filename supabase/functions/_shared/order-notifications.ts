@@ -38,6 +38,30 @@ type NotificationDispatchReport = {
   error?: string
 }
 
+function maskEmail(value: string) {
+  const normalized = String(value ?? "").trim().toLowerCase()
+  const atIndex = normalized.indexOf("@")
+  if (atIndex <= 1) {
+    return "***"
+  }
+
+  const name = normalized.slice(0, atIndex)
+  const domain = normalized.slice(atIndex + 1)
+  return `${name[0]}***@${domain}`
+}
+
+function maskPhone(value: string) {
+  const digits = String(value ?? "").replace(/\D/g, "")
+  if (digits.length <= 4) {
+    return "***"
+  }
+  return `${digits.slice(0, 2)}******${digits.slice(-2)}`
+}
+
+function truncateForLog(value: string, maxLength = 220) {
+  return value.length > maxLength ? `${value.slice(0, maxLength)}...` : value
+}
+
 const DEFAULT_ADMIN_EMAILS = [
   "divang.s@gmail.com",
   "poonam.om.107@gmail.com",
@@ -145,7 +169,20 @@ async function sendEmail(
   const apiKey = Deno.env.get("RESEND_API_KEY")
   const fromEmail = Deno.env.get("ORDER_NOTIFICATION_FROM_EMAIL")
 
+  console.log("[order-notifications] email-dispatch-start", {
+    recipients: recipients.map(maskEmail),
+    hasApiKey: Boolean(apiKey),
+    fromEmail: fromEmail ? maskEmail(fromEmail) : null,
+    subject,
+  })
+
   if (!apiKey || !fromEmail || recipients.length === 0) {
+    console.warn("[order-notifications] email-provider-not-configured", {
+      hasApiKey: Boolean(apiKey),
+      hasFromEmail: Boolean(fromEmail),
+      recipientCount: recipients.length,
+    })
+
     return recipients.map((recipient) => ({
       provider: "email",
       recipient,
@@ -156,6 +193,11 @@ async function sendEmail(
 
   const reports: NotificationDispatchReport[] = []
   for (const recipient of recipients) {
+    console.log("[order-notifications] email-send-attempt", {
+      recipient: maskEmail(recipient),
+      subject,
+    })
+
     const response = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: {
@@ -172,6 +214,12 @@ async function sendEmail(
 
     if (!response.ok) {
       const payload = await response.text()
+      console.error("[order-notifications] email-send-failed", {
+        recipient: maskEmail(recipient),
+        status: response.status,
+        payload: truncateForLog(payload),
+      })
+
       reports.push({
         provider: "email",
         recipient,
@@ -180,6 +228,10 @@ async function sendEmail(
       })
       continue
     }
+
+    console.log("[order-notifications] email-send-success", {
+      recipient: maskEmail(recipient),
+    })
 
     reports.push({ provider: "email", recipient, ok: true })
   }
@@ -250,7 +302,22 @@ async function sendWhatsappMessage(phone: string, text: string): Promise<Notific
   const templateName = Deno.env.get("WHATSAPP_TEMPLATE_NAME") || "hello_world"
   const templateLanguage = Deno.env.get("WHATSAPP_TEMPLATE_LANGUAGE") || "en_US"
 
+  console.log("[order-notifications] whatsapp-send-start", {
+    recipient: maskPhone(phone),
+    hasToken: Boolean(token),
+    hasPhoneNumberId: Boolean(phoneNumberId),
+    apiVersion,
+    templateName,
+    templateLanguage,
+  })
+
   if (!token || !phoneNumberId) {
+    console.warn("[order-notifications] whatsapp-provider-not-configured", {
+      hasToken: Boolean(token),
+      hasPhoneNumberId: Boolean(phoneNumberId),
+      recipient: maskPhone(phone),
+    })
+
     return {
       provider: "whatsapp",
       recipient: phone,
@@ -280,7 +347,20 @@ async function sendWhatsappMessage(phone: string, text: string): Promise<Notific
     const payload = await response.text()
     const parsedError = parseWhatsappApiError(payload)
 
+    console.warn("[order-notifications] whatsapp-text-failed", {
+      recipient: maskPhone(phone),
+      status: response.status,
+      errorCode: parsedError.code ?? null,
+      errorMessage: truncateForLog(parsedError.message ?? payload),
+    })
+
     if (shouldRetryWithTemplate(parsedError)) {
+      console.log("[order-notifications] whatsapp-template-retry", {
+        recipient: maskPhone(phone),
+        templateName,
+        templateLanguage,
+      })
+
       const templateResponse = await sendWhatsappTemplateMessage({
         token,
         phoneNumberId,
@@ -291,10 +371,19 @@ async function sendWhatsappMessage(phone: string, text: string): Promise<Notific
       })
 
       if (templateResponse.ok) {
+        console.log("[order-notifications] whatsapp-template-success", {
+          recipient: maskPhone(phone),
+        })
         return { provider: "whatsapp", recipient: phone, ok: true }
       }
 
       const templatePayload = await templateResponse.text()
+      console.error("[order-notifications] whatsapp-template-failed", {
+        recipient: maskPhone(phone),
+        status: templateResponse.status,
+        payload: truncateForLog(templatePayload),
+      })
+
       return {
         provider: "whatsapp",
         recipient: phone,
@@ -310,6 +399,10 @@ async function sendWhatsappMessage(phone: string, text: string): Promise<Notific
       error: payload || `WhatsApp API failed (${response.status})`,
     }
   }
+
+  console.log("[order-notifications] whatsapp-text-success", {
+    recipient: maskPhone(phone),
+  })
 
   return { provider: "whatsapp", recipient: phone, ok: true }
 }
@@ -341,6 +434,18 @@ export async function sendOrderNotifications(input: {
   const whatsappRecipientsForUser = customerPhone ? [customerPhone] : []
   const whatsappRecipientsForAdmin = adminPhones
 
+  console.log("[order-notifications] dispatch-plan", {
+    eventType,
+    orderId: order.id,
+    amount: order.totalAmount,
+    paymentStatus: order.paymentStatus,
+    userEmailRecipients: emailRecipientsForUser.map(maskEmail),
+    adminEmailRecipients: emailRecipientsForAdmin.map(maskEmail),
+    userWhatsappRecipients: whatsappRecipientsForUser.map(maskPhone),
+    adminWhatsappRecipients: whatsappRecipientsForAdmin.map(maskPhone),
+    hasPaymentDetails: Boolean(paymentDetails),
+  })
+
   const summaryText = buildTextSummary(eventType, order, paymentDetails)
   const userSubject = eventType === "payment_verified"
     ? `Payment confirmed for order ${order.id}`
@@ -366,6 +471,19 @@ export async function sendOrderNotifications(input: {
 
   const sent = reports.filter((entry) => entry.ok)
   const failed = reports.filter((entry) => !entry.ok)
+
+  console.log("[order-notifications] dispatch-result", {
+    orderId: order.id,
+    eventType,
+    attempted: reports.length,
+    sent: sent.length,
+    failed: failed.length,
+    failedReports: failed.map((entry) => ({
+      provider: entry.provider,
+      recipient: entry.provider === "email" ? maskEmail(entry.recipient) : maskPhone(entry.recipient),
+      error: truncateForLog(String(entry.error ?? "unknown error")),
+    })),
+  })
 
   return {
     ok: failed.length === 0,

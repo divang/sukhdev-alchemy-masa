@@ -29,6 +29,14 @@ type NotifyPayload = {
   paymentDetails?: OrderPaymentDetails
 }
 
+function maskUserId(value: string) {
+  const normalized = String(value ?? "")
+  if (normalized.length < 10) {
+    return "***"
+  }
+  return `${normalized.slice(0, 6)}...${normalized.slice(-4)}`
+}
+
 const supabaseUrl = Deno.env.get("SUPABASE_URL")
 const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")
 const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")
@@ -92,6 +100,12 @@ function mapOrderRow(row: OrderRow) {
 }
 
 Deno.serve(async (req) => {
+  const requestUrl = new URL(req.url)
+  console.log("[order-notifications] request-received", {
+    method: req.method,
+    pathname: requestUrl.pathname,
+  })
+
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders })
   }
@@ -102,12 +116,25 @@ Deno.serve(async (req) => {
 
   const auth = await getAuthenticatedUser(req)
   if (auth.error) {
+    console.warn("[order-notifications] auth-failed", {
+      error: auth.error,
+    })
     return jsonResponse({ error: auth.error }, 401)
   }
+
+  console.log("[order-notifications] auth-success", {
+    userId: maskUserId(auth.user!.id),
+  })
 
   const payload = (await req.json().catch(() => ({}))) as NotifyPayload
   const appOrderId = String(payload.appOrderId ?? "").trim()
   const eventType = payload.eventType ?? "order_created"
+
+  console.log("[order-notifications] payload", {
+    eventType,
+    appOrderId,
+    hasPaymentDetails: Boolean(payload.paymentDetails),
+  })
 
   if (!appOrderId) {
     return jsonResponse({ error: "appOrderId is required." }, 400)
@@ -123,17 +150,42 @@ Deno.serve(async (req) => {
     .maybeSingle()
 
   if (orderError) {
+    console.error("[order-notifications] order-fetch-failed", {
+      appOrderId,
+      userId: maskUserId(auth.user!.id),
+      error: orderError.message,
+    })
     return jsonResponse({ error: orderError.message }, 500)
   }
 
   if (!orderRow) {
+    console.warn("[order-notifications] order-not-found", {
+      appOrderId,
+      userId: maskUserId(auth.user!.id),
+    })
     return jsonResponse({ error: "Order not found for current user." }, 404)
   }
+
+  console.log("[order-notifications] order-found", {
+    appOrderId,
+    userId: maskUserId(auth.user!.id),
+    paymentStatus: (orderRow as OrderRow).payment_status,
+    status: (orderRow as OrderRow).status,
+  })
 
   const result = await sendOrderNotifications({
     eventType,
     order: mapOrderRow(orderRow as OrderRow),
     paymentDetails: payload.paymentDetails,
+  })
+
+  console.log("[order-notifications] response-summary", {
+    appOrderId,
+    eventType,
+    ok: result.ok,
+    attempted: result.attempted,
+    sent: result.sent,
+    failed: result.failed,
   })
 
   return jsonResponse(result, result.ok ? 200 : 207)
