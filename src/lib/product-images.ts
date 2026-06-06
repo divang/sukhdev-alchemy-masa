@@ -10,6 +10,24 @@ const defaultImages: Record<string, string> = {
   'chhole-masala-premium': 'images/products/chhole-masala-premium.png',
 }
 
+function isRuntimeLocalhost() {
+  if (typeof window === 'undefined') {
+    return false
+  }
+
+  const host = window.location.hostname
+  return host === 'localhost' || host === '127.0.0.1'
+}
+
+function isLocalhostAssetUrl(value: string) {
+  try {
+    const parsed = new URL(value)
+    return parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1'
+  } catch {
+    return false
+  }
+}
+
 function normalizeImageUrl(imagePath?: string): string {
   if (!imagePath) {
     return ''
@@ -27,8 +45,13 @@ function normalizeImageUrl(imagePath?: string): string {
 }
 
 export function getProductImage(product: Pick<Product, 'id' | 'image'>, uploadedImages?: Record<string, string>): string {
-  if (uploadedImages && uploadedImages[product.id]) {
-    return uploadedImages[product.id]
+  const uploadedImage = uploadedImages?.[product.id]
+  if (uploadedImage) {
+    // Browser-local admin overrides sometimes persist localhost image URLs.
+    // Ignore those in production/public domains to prevent broken image fetches.
+    if (!(isLocalhostAssetUrl(uploadedImage) && !isRuntimeLocalhost())) {
+      return uploadedImage
+    }
   }
 
   return normalizeImageUrl(product.image) || normalizeImageUrl(defaultImages[product.id])
