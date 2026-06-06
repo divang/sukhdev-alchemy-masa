@@ -60,15 +60,15 @@ function getCartItemKey(item: CartItem) {
   return `${item.productId}:${item.grams}`
 }
 
-function mergeCartItems(primary: CartItem[], secondary: CartItem[]) {
+function canonicalizeCartItems(cartItems: CartItem[]) {
   const merged = new Map<string, CartItem>()
 
-  for (const item of [...primary, ...secondary]) {
+  for (const item of cartItems) {
     const key = getCartItemKey(item)
     const existing = merged.get(key)
 
     if (existing) {
-      merged.set(key, { ...existing, quantity: existing.quantity + item.quantity })
+      merged.set(key, { ...existing, quantity: Math.max(existing.quantity, item.quantity) })
       continue
     }
 
@@ -76,6 +76,11 @@ function mergeCartItems(primary: CartItem[], secondary: CartItem[]) {
   }
 
   return [...merged.values()]
+}
+
+// Merge local + persisted cart snapshots without inflating quantity on refresh.
+function mergeCartSnapshots(localCart: CartItem[], persistedCart: CartItem[]) {
+  return canonicalizeCartItems([...persistedCart, ...localCart])
 }
 
 function normalizeCartItems(cartItems: CartItem[], products: Product[]) {
@@ -91,7 +96,7 @@ function normalizeCartItems(cartItems: CartItem[], products: Product[]) {
     }
   })
 
-  return mergeCartItems(normalized, [])
+  return canonicalizeCartItems(normalized)
 }
 
 function App() {
@@ -354,7 +359,7 @@ function App() {
         return
       }
 
-      const mergedCart = normalizeCartItems(mergeCartItems(cartItems || [], result.cartItems), products || [])
+      const mergedCart = normalizeCartItems(mergeCartSnapshots(cartItems || [], result.cartItems), products || [])
       setCartItems(mergedCart)
 
       const persistResult = await replaceCartForCurrentUser(mergedCart)
@@ -432,13 +437,13 @@ function App() {
     toast.success(`${product.name} added to cart!`)
   }
 
-  const handleUpdateQuantity = (productId: string, quantity: number) => {
+  const handleUpdateQuantity = (productId: string, grams: number, quantity: number) => {
     if (quantity < 1) return
 
     let nextItem: CartItem | null = null
     setCartItems((current = []) =>
       current.map((item) =>
-        item.productId === productId
+        item.productId === productId && item.grams === grams
           ? ((nextItem = { ...item, quantity }), { ...item, quantity })
           : item
       )
@@ -449,9 +454,9 @@ function App() {
     }
   }
 
-  const handleRemoveItem = (productId: string) => {
-    const targetItem = (cartItems || []).find((item) => item.productId === productId)
-    setCartItems((current = []) => current.filter((item) => item.productId !== productId))
+  const handleRemoveItem = (productId: string, grams: number) => {
+    const targetItem = (cartItems || []).find((item) => item.productId === productId && item.grams === grams)
+    setCartItems((current = []) => current.filter((item) => !(item.productId === productId && item.grams === grams)))
 
     if (targetItem) {
       void persistCartRemoval(targetItem.productId, targetItem.grams)

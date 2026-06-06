@@ -12,8 +12,8 @@ type CartDrawerProps = {
   onOpenChange: (open: boolean) => void
   cartItems: CartItem[]
   products: Product[]
-  onUpdateQuantity: (productId: string, quantity: number) => void
-  onRemoveItem: (productId: string) => void
+  onUpdateQuantity: (productId: string, grams: number, quantity: number) => void
+  onRemoveItem: (productId: string, grams: number) => void
   onCheckout: () => void
 }
 
@@ -72,7 +72,7 @@ export function CartDrawer({
                           variant="ghost"
                           size="sm"
                           className="h-6 w-6 p-0 -mt-1"
-                          onClick={() => onRemoveItem(item.productId)}
+                          onClick={() => onRemoveItem(item.productId, item.grams)}
                         >
                           <X size={14} />
                         </Button>
@@ -87,7 +87,7 @@ export function CartDrawer({
                               variant="outline"
                               size="sm"
                               className="h-7 w-7 p-0"
-                              onClick={() => onUpdateQuantity(item.productId, Math.max(1, item.quantity - 1))}
+                              onClick={() => onUpdateQuantity(item.productId, item.grams, Math.max(1, item.quantity - 1))}
                             >
                               <Minus size={12} />
                             </Button>
@@ -96,7 +96,7 @@ export function CartDrawer({
                               variant="outline"
                               size="sm"
                               className="h-7 w-7 p-0"
-                              onClick={() => onUpdateQuantity(item.productId, item.quantity + 1)}
+                              onClick={() => onUpdateQuantity(item.productId, item.grams, item.quantity + 1)}
                             >
                               <Plus size={12} />
                             </Button>

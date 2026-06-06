@@ -5,6 +5,7 @@ type CartRow = {
   product_id: string
   quantity: number
   grams: number
+  updated_at?: string
 }
 
 type CartLoadResult = {
@@ -15,6 +16,38 @@ type CartLoadResult = {
 type CartPersistenceResult = {
   persisted: boolean
   error?: string
+}
+
+function getCartItemKey(productId: string, grams: number) {
+  return `${productId}:${grams}`
+}
+
+function dedupeCartRows(rows: CartRow[] | null | undefined): CartItem[] {
+  const merged = new Map<string, CartItem>()
+
+  for (const row of rows ?? []) {
+    const productId = row.product_id
+    const grams = Number(row.grams)
+    const quantity = Number(row.quantity)
+    const key = getCartItemKey(productId, grams)
+    const existing = merged.get(key)
+
+    if (existing) {
+      merged.set(key, {
+        ...existing,
+        quantity: Math.max(existing.quantity, quantity),
+      })
+      continue
+    }
+
+    merged.set(key, {
+      productId,
+      quantity,
+      grams,
+    })
+  }
+
+  return [...merged.values()]
 }
 
 function assertClient() {
@@ -55,7 +88,7 @@ export async function fetchCartForCurrentUser(): Promise<CartLoadResult> {
 
   const { data, error } = await client
     .from("cart_items")
-    .select("product_id, quantity, grams")
+    .select("product_id, quantity, grams, updated_at")
     .eq("user_id", userId)
     .order("updated_at", { ascending: false })
 
@@ -64,11 +97,7 @@ export async function fetchCartForCurrentUser(): Promise<CartLoadResult> {
   }
 
   return {
-    cartItems: ((data as CartRow[] | null) ?? []).map((row) => ({
-      productId: row.product_id,
-      quantity: Number(row.quantity),
-      grams: Number(row.grams),
-    })),
+    cartItems: dedupeCartRows(data as CartRow[] | null),
   }
 }
 
