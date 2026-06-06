@@ -195,7 +195,7 @@ Deno.serve(async (req) => {
       .maybeSingle()
 
     if (!orderFetchError && orderRow) {
-      await sendOrderNotifications({
+      const notificationResult = await sendOrderNotifications({
         eventType: "payment_verified",
         order: {
           id: orderRow.id,
@@ -224,6 +224,23 @@ Deno.serve(async (req) => {
           gatewayStatus,
         },
       })
+
+      console.log("[verify-payment] payment_verified-notification-result", {
+        appOrderId,
+        ok: notificationResult.ok,
+        attempted: notificationResult.attempted,
+        sent: notificationResult.sent,
+        failed: notificationResult.failed,
+      })
+
+      if (!notificationResult.ok) {
+        console.warn("[verify-payment] payment_verified-notification-failed", {
+          appOrderId,
+          failedReports: notificationResult.reports
+            .filter((entry) => !entry.ok)
+            .map((entry) => ({ provider: entry.provider, recipient: entry.recipient, error: entry.error })),
+        })
+      }
     }
   }
 

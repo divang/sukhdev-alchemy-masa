@@ -1,6 +1,7 @@
 import type { Order } from "@/lib/types"
 import { isSupabaseConfigured, supabase } from "@/lib/supabase"
 import { isGoogleSheetsConfigured, postToGoogleSheets } from "@/lib/google-sheets"
+import { validateIndianShippingAddress } from "@/lib/validation"
 
 const allowClientOrderUpdates = import.meta.env.VITE_ALLOW_CLIENT_ORDER_UPDATES === "true"
 
@@ -62,6 +63,21 @@ function mapOrderRow(row: OrderRow): Order {
 }
 
 export async function persistOrderToSupabase(order: Order): Promise<PersistenceResult> {
+  const shippingValidationError = validateIndianShippingAddress({
+    address: order.customer.address,
+    city: order.customer.city,
+    pincode: order.customer.pincode,
+    country: order.customer.country ?? "India",
+  })
+
+  if (shippingValidationError) {
+    return {
+      persisted: false,
+      reason: "error",
+      error: shippingValidationError,
+    }
+  }
+
   if (isGoogleSheetsConfigured) {
     try {
       await postToGoogleSheets({ action: "create_order", order })

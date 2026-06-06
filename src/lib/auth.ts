@@ -1,6 +1,7 @@
 import type { Session, User } from "@supabase/supabase-js"
 import type { UserProfile } from "@/lib/types"
 import { isSupabaseConfigured, supabase } from "@/lib/supabase"
+import { validateStrongPassword } from "@/lib/validation"
 
 type AuthState = {
   user: User | null
@@ -450,6 +451,11 @@ export async function signUpCustomer(input: SignUpInput): Promise<AuthResult> {
   if (!supabase || !isSupabaseConfigured) {
     console.error("[auth] signUpCustomer blocked: Supabase auth is not configured.")
     return { user: null, profile: null, error: "Supabase auth is not configured." }
+  }
+
+  const passwordValidationError = validateStrongPassword(input.password)
+  if (passwordValidationError) {
+    return { user: null, profile: null, error: passwordValidationError }
   }
 
   authDebug("signUpCustomer started", {
@@ -989,8 +995,9 @@ export async function updateCurrentUserPassword(newPassword: string): Promise<st
     return "Supabase auth is not configured."
   }
 
-  if (newPassword.trim().length < 8) {
-    return "Password must be at least 8 characters long."
+  const passwordValidationError = validateStrongPassword(newPassword)
+  if (passwordValidationError) {
+    return passwordValidationError
   }
 
   const { error } = await supabase.auth.updateUser({

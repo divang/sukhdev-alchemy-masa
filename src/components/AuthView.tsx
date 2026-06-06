@@ -21,6 +21,7 @@ import {
   updateCurrentUserPassword,
   verifyPhoneOtp,
 } from "@/lib/auth"
+import { getPasswordPolicyMessage, validateStrongPassword } from "@/lib/validation"
 
 type AuthViewProps = {
   mode: "customer" | "admin"
@@ -127,8 +128,9 @@ export function AuthView({ mode, onBack, onAuthenticated }: AuthViewProps) {
     e.preventDefault()
     console.log("[auth-ui] handleSignUp submitted", { email: signUpData.email })
 
-    if (signUpData.password.length < 8) {
-      toast.error("Password must be at least 8 characters long.")
+    const passwordValidationError = validateStrongPassword(signUpData.password)
+    if (passwordValidationError) {
+      toast.error(passwordValidationError)
       return
     }
 
@@ -285,8 +287,9 @@ export function AuthView({ mode, onBack, onAuthenticated }: AuthViewProps) {
   const handleUpdatePassword = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (resetPasswordData.newPassword.length < 8) {
-      toast.error("Password must be at least 8 characters long.")
+    const passwordValidationError = validateStrongPassword(resetPasswordData.newPassword)
+    if (passwordValidationError) {
+      toast.error(passwordValidationError)
       return
     }
 
@@ -479,8 +482,9 @@ export function AuthView({ mode, onBack, onAuthenticated }: AuthViewProps) {
                             type="password"
                             value={resetPasswordData.newPassword}
                             onChange={(e) => setResetPasswordData((current) => ({ ...current, newPassword: e.target.value }))}
-                            placeholder="Minimum 8 characters"
+                            placeholder="12+ chars, mixed case, number, symbol"
                           />
+                          <p className="mt-1 text-xs text-muted-foreground">{getPasswordPolicyMessage()}</p>
                         </div>
                         <div>
                           <Label htmlFor="confirm-new-password">Confirm New Password</Label>
@@ -540,8 +544,9 @@ export function AuthView({ mode, onBack, onAuthenticated }: AuthViewProps) {
                           type="password"
                           value={signUpData.password}
                           onChange={(e) => setSignUpData((current) => ({ ...current, password: e.target.value }))}
-                          placeholder="Minimum 8 characters"
+                          placeholder="12+ chars, mixed case, number, symbol"
                         />
+                        <p className="mt-1 text-xs text-muted-foreground">{getPasswordPolicyMessage()}</p>
                       </div>
                       <div>
                         <Label htmlFor="confirm-password">Confirm Password</Label>

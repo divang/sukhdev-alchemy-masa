@@ -76,11 +76,33 @@ export async function triggerOrderNotification(options: TriggerOrderNotification
     }
   }
 
-  const json = await response.json().catch(() => ({}))
+  const json = await response.json().catch(() => ({})) as {
+    ok?: boolean
+    failed?: number
+    reports?: Array<{ provider?: string; recipient?: string; ok?: boolean; error?: string }>
+    error?: unknown
+  }
+
   if (!response.ok) {
     return {
       ok: false,
-      error: String((json as { error?: unknown }).error ?? `Notification API failed (${response.status})`),
+      error: String(json.error ?? `Notification API failed (${response.status})`),
+    }
+  }
+
+  if (json.ok === false) {
+    const failedReports = (json.reports ?? []).filter((report) => report.ok === false)
+    const firstFailure = failedReports[0]
+    const failedLabel = firstFailure
+      ? `${String(firstFailure.provider ?? "provider")} to ${String(firstFailure.recipient ?? "recipient")}`
+      : "notification delivery"
+
+    return {
+      ok: false,
+      error: firstFailure?.error
+        ? `${failedLabel} failed: ${firstFailure.error}`
+        : `Notification dispatch failed for ${json.failed ?? failedReports.length} recipient(s).`,
+      data: json,
     }
   }
 

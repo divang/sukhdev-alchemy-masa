@@ -56,6 +56,7 @@ export type Order = {
     address: string
     city: string
     pincode: string
+    country?: string
   }
   subtotalAmount?: number
   shippingAmount?: number

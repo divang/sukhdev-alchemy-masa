@@ -17,6 +17,7 @@ import {
 } from "@/lib/pricing"
 import { calculatePromoDiscountAmount, fetchPromoCodeChannelState, type PromoCode, validatePromoCode } from "@/lib/promo-codes"
 import type { RuntimeMode } from "@/lib/runtime-mode"
+import { validateIndianShippingAddress } from "@/lib/validation"
 
 type CheckoutViewProps = {
   cartItems: CartItem[]
@@ -35,7 +36,8 @@ export function CheckoutView({ cartItems, products, accountProfile, runtimeMode 
     phone: "",
     address: "",
     city: "",
-    pincode: ""
+    pincode: "",
+    country: "India"
   })
   const [promoInput, setPromoInput] = useState("")
   const [appliedPromo, setAppliedPromo] = useState<PromoCode | null>(null)
@@ -118,8 +120,19 @@ export function CheckoutView({ cartItems, products, accountProfile, runtimeMode 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
-    if (!formData.name || !formData.email || !formData.phone || !formData.address || !formData.city || !formData.pincode) {
+    if (!formData.name || !formData.email || !formData.phone || !formData.address || !formData.city || !formData.pincode || !formData.country) {
       toast.error("Please fill in all fields")
+      return
+    }
+
+    const shippingValidationError = validateIndianShippingAddress({
+      address: formData.address,
+      city: formData.city,
+      pincode: formData.pincode,
+      country: formData.country,
+    })
+    if (shippingValidationError) {
+      toast.error(shippingValidationError)
       return
     }
 
@@ -220,18 +233,19 @@ export function CheckoutView({ cartItems, products, accountProfile, runtimeMode 
                       id="address"
                       value={formData.address}
                       onChange={(e) => setFormData(f => ({ ...f, address: e.target.value }))}
-                      placeholder="House no., Street, Landmark"
+                      placeholder="House/Flat no., Street, Locality"
                       rows={3}
                     />
+                    <p className="mt-1 text-xs text-muted-foreground">Include house/flat number and street/locality.</p>
                   </div>
                   
-                  <div className="grid md:grid-cols-2 gap-4">
+                  <div className="grid md:grid-cols-3 gap-4">
                     <div>
                       <Label htmlFor="city">City *</Label>
                       <Input
                         id="city"
                         value={formData.city}
-                        onChange={(e) => setFormData(f => ({ ...f, city: e.target.value }))}
+                        onChange={(e) => setFormData(f => ({ ...f, city: e.target.value.replace(/[^A-Za-z\s.'-]/g, "") }))}
                         placeholder="City"
                       />
                     </div>
@@ -245,6 +259,17 @@ export function CheckoutView({ cartItems, products, accountProfile, runtimeMode 
                         inputMode="numeric"
                         maxLength={6}
                       />
+                    </div>
+                    <div>
+                      <Label htmlFor="country">Country *</Label>
+                      <Input
+                        id="country"
+                        value={formData.country}
+                        readOnly
+                        autoComplete="country-name"
+                        className="bg-muted"
+                      />
+                      <p className="mt-1 text-xs text-muted-foreground">We currently deliver only within India.</p>
                     </div>
                   </div>
 

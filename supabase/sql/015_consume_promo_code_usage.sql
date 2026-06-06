@@ -49,13 +49,13 @@ begin
     return;
   end if;
 
-  update public.promo_codes
+  update public.promo_codes as pc
   set
-    usage_count = usage_count + 1,
+    usage_count = pc.usage_count + 1,
     updated_at = now()
-  where id = v_promo.id
-    and (usage_limit is null or usage_count < usage_limit)
-  returning promo_codes.usage_count, promo_codes.usage_limit
+  where pc.id = v_promo.id
+    and (pc.usage_limit is null or pc.usage_count < pc.usage_limit)
+  returning pc.usage_count, pc.usage_limit
   into v_usage_count, v_usage_limit;
 
   if not found then

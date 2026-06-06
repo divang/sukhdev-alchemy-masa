@@ -2,8 +2,9 @@
 
 Last updated: 2026-06-05 UTC
 Branch: main
-Latest pushed commit: da1056d
-Previous major feature commit: 816dc5d
+Latest pushed commit: 2a67184
+Latest local commit: 68add95
+Previous major feature commit: da1056d
 
 ## Why This File Exists
 Use this as the single recovery document when chat/session history is unavailable.
@@ -230,17 +231,21 @@ order by tablename, policyname;
 
 ### Auth UX (Latest)
 - Customer sign-in now supports Phone OTP flow.
+- Phone provider has been enabled in Supabase Auth; SMS delivery still depends on the configured provider credentials and successful real-device testing.
 - Google sign-in option is available (requires provider configuration in Supabase Auth).
 - Email/password remains available as fallback.
 - Forgot password and password reset update flow are implemented.
 - Signup/profile provisioning now has DB audit logging + auth trigger profile auto-upsert.
 - Email redirect hardening: non-production redirect values are ignored; production origin is used as fallback.
+- Signed-in customers now have a dedicated account details screen showing profile data, role, preferences, and sign-out action.
 
 ### Checkout + Shipping
 - Shipping is now pincode-based:
   - Karnataka pincodes (56/57/58/59): ₹60
   - Rest of India: ₹120
 - Shipping is computed in checkout using entered pincode.
+- Payment screen now shows a full amount breakdown: subtotal, shipping, promo discount, and final payable total.
+- Promo validation/consumption now uses the checkout form email/phone values so person-bound promo codes are checked consistently at apply-time and place-order time.
 
 ### Mobile UX Improvements
 - Header actions compacted for small screens.
@@ -276,9 +281,11 @@ After replacing images:
 - src/lib/cart-persistence.ts
 - src/lib/catalog.ts
 - src/lib/auth.ts
+- src/lib/promo-codes.ts
 - src/lib/runtime-mode.ts
 - src/hooks/use-initial-data.ts
 - src/App.tsx
+- src/components/AccountDetailsView.tsx
 - src/components/CartDrawer.tsx
 - src/components/CheckoutView.tsx
 - src/components/ProductDetailDialog.tsx
@@ -358,7 +365,8 @@ Apply in this order:
 1. Supabase Dashboard -> Authentication -> Rate Limits.
 2. Supabase logs for 429/too-many-requests patterns.
 3. SMTP sender health in Resend (domain verified, sender stable).
-4. Decide pre-launch sign-up strategy (controlled ramp vs open flood).
+4. Validate phone OTP delivery end-to-end on a real handset after SMS provider credentials are saved.
+5. Decide pre-launch sign-up strategy (controlled ramp vs open flood).
 
 Note: exact per-hour/per-day quota values depend on Supabase plan/project settings and are not hardcoded in this repo.
 
@@ -379,22 +387,28 @@ where email = 'you@example.com';
 ## Quick Recovery Checklist (If Starting Fresh)
 1. Clone repo and checkout `main`.
 2. Configure `.env` with Supabase values.
-3. Ensure all 001-006 SQL files are applied.
+3. Ensure all SQL migrations up to `018_auth_audit_logging_and_profile_trigger.sql` are applied in order.
 4. Run `npm install` then `npm run build`.
 5. Smoke test:
    - Home loads catalog.
    - Product detail opens on mobile without clipping.
    - Add to cart works.
    - Checkout shipping changes by pincode.
+  - Promo code discount appears in both checkout and payment screens.
    - Sign-up/sign-in works and surfaces errors quickly.
+  - Phone OTP sends and verifies on a real device.
+  - Account button opens the profile details screen for signed-in users.
    - Review allowed only for paid purchased items.
    - Contact links open correctly.
 6. Verify deploy secrets and push to `main` for Pages deploy.
 
 ## Deployment / Git Status Notes
-- Latest pushed commit: `da1056d`.
-- Current working tree has an uncommitted change in `src/lib/auth.ts` (Google provider error mapping improvement).
-- If release reproducibility is needed, inspect and commit or discard local-only changes intentionally.
+- Latest pushed commit on `origin/main`: `2a67184`.
+- Latest local commits not yet pushed:
+  - `81a9a0b` - account details screen for signed-in users
+  - `68add95` - promo discount breakdown on payment screen + promo validation consistency
+- Working tree was clean at last check.
+- If release reproducibility is needed, push or intentionally hold the two local commits above before further changes.
 
 ## Useful Verification Queries
 
