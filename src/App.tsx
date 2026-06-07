@@ -33,7 +33,7 @@ import {
   updateSupabaseOrderPayment,
 } from "@/lib/order-persistence"
 import { isSupabaseConfigured } from "@/lib/supabase"
-import { getProductPackGrams, hasPurchasedProduct } from "@/lib/pricing"
+import { getProductPackGrams, hasPurchasedProduct, MAX_PRODUCT_GRAMS_PER_CART } from "@/lib/pricing"
 import { defaultFeatureFlags, fetchFeatureFlags } from "@/lib/feature-flags"
 import { fallbackUpiConfig, fetchActiveUpiConfig } from "@/lib/payment-upi"
 import { BRAND_LOGO_PATH } from "@/lib/brand"
@@ -99,10 +99,16 @@ function normalizeCartItems(cartItems: CartItem[], products: Product[]) {
   return canonicalizeCartItems(normalized)
 }
 
+function getTotalGramsForProduct(cartItems: CartItem[], productId: string) {
+  return cartItems
+    .filter((item) => item.productId === productId)
+    .reduce((sum, item) => sum + (item.grams * item.quantity), 0)
+}
+
 function App() {
   useInitialData()
 
-  const [categories, setCategories] = useKV<Category[]>("categories", CATALOG_SEED_CATEGORIES)
+  const [categories] = useKV<Category[]>("categories", CATALOG_SEED_CATEGORIES)
   const [products] = useKV<Product[]>("products", CATALOG_SEED_PRODUCTS)
   const [cartItems, setCartItems] = useKV<CartItem[]>("cart", [])
   const [orders, setOrders] = useKV<Order[]>("orders", [])
@@ -181,24 +187,6 @@ function App() {
     window.addEventListener("hashchange", handleHash)
     return () => window.removeEventListener("hashchange", handleHash)
   }, [profile])
-
-  useEffect(() => {
-    if (categories && categories.length > 0) {
-      const rawSpicesCategory = categories.find(
-        (cat) => cat.slug === "raw-organic-spices" || cat.name === "Raw Organic Spices"
-      )
-
-      if (rawSpicesCategory && rawSpicesCategory.enabled) {
-        setCategories((current = []) =>
-          current.map((cat) =>
-            cat.slug === "raw-organic-spices" || cat.name === "Raw Organic Spices"
-              ? { ...cat, enabled: false }
-              : cat
-          )
-        )
-      }
-    }
-  }, [categories, setCategories])
 
   useEffect(() => {
     let isActive = true
@@ -413,9 +401,16 @@ function App() {
 
   const handleAddToCart = (product: Product, grams: number = getProductPackGrams(product)) => {
     let nextItem: CartItem | null = null
+    let limitExceeded = false
 
     setCartItems((current = []) => {
       const normalized = normalizeCartItems(current, products || [])
+      const productTotalGrams = getTotalGramsForProduct(normalized, product.id)
+      if (productTotalGrams + grams > MAX_PRODUCT_GRAMS_PER_CART) {
+        limitExceeded = true
+        return normalized
+      }
+
       const existingItem = normalized.find((item) => item.productId === product.id && item.grams === grams)
       if (existingItem) {
         nextItem = { ...existingItem, quantity: existingItem.quantity + 1 }
@@ -434,11 +429,28 @@ function App() {
       void persistCartItem(nextItem)
     }
 
+    if (limitExceeded) {
+      toast.error(`Maximum ${MAX_PRODUCT_GRAMS_PER_CART}g allowed per product in cart.`)
+      return
+    }
+
     toast.success(`${product.name} added to cart!`)
   }
 
   const handleUpdateQuantity = (productId: string, grams: number, quantity: number) => {
     if (quantity < 1) return
+
+    const current = cartItems || []
+    const otherItemsTotalGrams = current
+      .filter((item) => !(item.productId === productId && item.grams === grams))
+      .filter((item) => item.productId === productId)
+      .reduce((sum, item) => sum + (item.grams * item.quantity), 0)
+
+    const requestedTotalGrams = otherItemsTotalGrams + (grams * quantity)
+    if (requestedTotalGrams > MAX_PRODUCT_GRAMS_PER_CART) {
+      toast.error(`Maximum ${MAX_PRODUCT_GRAMS_PER_CART}g allowed per product in cart.`)
+      return
+    }
 
     let nextItem: CartItem | null = null
     setCartItems((current = []) =>

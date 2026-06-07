@@ -11,9 +11,10 @@ import { toast } from "sonner"
 import {
   calculateCartItemTotal,
   calculateCartSubtotal,
+  getCartItemPackLabel,
   calculateShippingAmountByPincode,
-  getProductPackLabel,
   getShippingZoneLabel,
+  resolveProductPackPrice,
 } from "@/lib/pricing"
 import { calculatePromoDiscountAmount, fetchPromoCodeChannelState, type PromoCode, validatePromoCode } from "@/lib/promo-codes"
 import type { RuntimeMode } from "@/lib/runtime-mode"
@@ -145,7 +146,7 @@ export function CheckoutView({ cartItems, products, accountProfile, runtimeMode 
           productName: product.name,
           quantity: item.quantity,
           grams: item.grams,
-          pricePerUnit: product.price
+          pricePerUnit: resolveProductPackPrice(product, item.grams)
         }
       }),
       customer: formData,
@@ -300,7 +301,7 @@ export function CheckoutView({ cartItems, products, accountProfile, runtimeMode 
                       <div className="flex-1">
                         <p className="font-medium">{product.name}</p>
                         <p className="text-muted-foreground text-xs">
-                          {getProductPackLabel(product)} × {item.quantity}
+                          {getCartItemPackLabel(product, item.grams)} × {item.quantity}
                         </p>
                       </div>
                       <p className="font-semibold">₹{calculateCartItemTotal(item, product).toFixed(2)}</p>

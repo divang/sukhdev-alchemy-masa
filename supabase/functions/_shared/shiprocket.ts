@@ -28,6 +28,16 @@ type ShiprocketShipmentResult = {
   rawResponse?: unknown
 }
 
+type ShiprocketTrackingResult = {
+  ok: boolean
+  shipmentId?: string
+  awbCode?: string
+  trackingUrl?: string
+  externalStatus?: string
+  error?: string
+  rawResponse?: unknown
+}
+
 type ShiprocketTokenCache = {
   token: string
   expiresAtMs: number
@@ -93,6 +103,30 @@ function calculateTotalWeightKg(order: ShiprocketOrderPayload) {
 function getShiprocketBaseUrl() {
   const configured = Deno.env.get("SHIPROCKET_API_BASE_URL")
   return (configured && configured.trim()) || "https://apiv2.shiprocket.in/v1/external"
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    return value as Record<string, unknown>
+  }
+  return {}
+}
+
+function asArray(value: unknown): unknown[] {
+  return Array.isArray(value) ? value : []
+}
+
+function readString(value: unknown): string | undefined {
+  if (typeof value === "string") {
+    const trimmed = value.trim()
+    return trimmed || undefined
+  }
+
+  if (typeof value === "number") {
+    return String(value)
+  }
+
+  return undefined
 }
 
 async function getShiprocketAuthToken(): Promise<{ token?: string; error?: string }> {
@@ -223,6 +257,79 @@ export async function createShiprocketShipment(order: ShiprocketOrderPayload): P
     shipmentId: payload.shipment_id != null ? String(payload.shipment_id) : undefined,
     awbCode: payload.awb_code,
     trackingUrl: payload.tracking_url,
+    rawResponse: payload,
+  }
+}
+
+function parseTrackingPayload(payload: unknown): {
+  shipmentId?: string
+  awbCode?: string
+  trackingUrl?: string
+  externalStatus?: string
+} {
+  const root = asRecord(payload)
+  const trackingData = asRecord(root.tracking_data)
+  const shipmentTrack = asRecord(asArray(trackingData.shipment_track)[0])
+
+  const shipmentId = readString(root.shipment_id) || readString(trackingData.shipment_id)
+  const awbCode = readString(shipmentTrack.awb_code)
+    || readString(trackingData.awb_code)
+    || readString(root.awb_code)
+
+  const trackingUrl = readString(shipmentTrack.tracking_url)
+    || readString(shipmentTrack.track_url)
+    || readString(trackingData.tracking_url)
+    || readString(trackingData.track_url)
+    || readString(root.tracking_url)
+
+  const externalStatus = readString(shipmentTrack.current_status)
+    || readString(trackingData.shipment_status)
+    || readString(root.status)
+    || readString(root.message)
+
+  return {
+    shipmentId,
+    awbCode,
+    trackingUrl: trackingUrl || (awbCode ? `https://shiprocket.co/tracking/${encodeURIComponent(awbCode)}` : undefined),
+    externalStatus,
+  }
+}
+
+export async function fetchShiprocketTrackingByShipmentId(shipmentId: string): Promise<ShiprocketTrackingResult> {
+  const resolvedShipmentId = String(shipmentId ?? "").trim()
+  if (!resolvedShipmentId) {
+    return { ok: false, error: "shipmentId is required." }
+  }
+
+  const authResult = await getShiprocketAuthToken()
+  if (!authResult.token) {
+    return { ok: false, error: authResult.error }
+  }
+
+  const response = await fetch(`${getShiprocketBaseUrl()}/courier/track/shipment/${encodeURIComponent(resolvedShipmentId)}`, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${authResult.token}`,
+    },
+  })
+
+  const payload = await response.json().catch(() => ({})) as Record<string, unknown>
+
+  if (!response.ok) {
+    return {
+      ok: false,
+      error: readString(payload.message) || `Shiprocket tracking fetch failed (${response.status}).`,
+      rawResponse: payload,
+    }
+  }
+
+  const parsed = parseTrackingPayload(payload)
+  return {
+    ok: true,
+    shipmentId: parsed.shipmentId || resolvedShipmentId,
+    awbCode: parsed.awbCode,
+    trackingUrl: parsed.trackingUrl,
+    externalStatus: parsed.externalStatus,
     rawResponse: payload,
   }
 }

@@ -389,3 +389,37 @@ export async function createProductByAdmin(input: AdminProductInput): Promise<Ad
 
   return { product: mapProductRowToProduct(data as ProductRow) }
 }
+
+type AdminCategoryResult = {
+  success: boolean
+  category?: Category
+  error?: string
+}
+
+export async function setCategoryEnabledByAdmin(categoryId: string, enabled: boolean): Promise<AdminCategoryResult> {
+  if (!supabase || !isSupabaseConfigured) {
+    return { success: false, error: "Supabase is not configured." }
+  }
+
+  const { data, error } = await supabase
+    .from("categories")
+    .update({ enabled })
+    .eq("id", categoryId)
+    .select("id, name, slug, enabled")
+    .single()
+
+  if (error || !data) {
+    return { success: false, error: error?.message ?? "Failed to update category." }
+  }
+
+  const row = data as CategoryRow
+  return {
+    success: true,
+    category: {
+      id: row.id,
+      name: row.name,
+      slug: row.slug,
+      enabled: row.enabled,
+    },
+  }
+}

@@ -3,12 +3,34 @@ import type { CartItem, Order, Product } from "@/lib/types"
 export const SHIPPING_AMOUNT = 120
 export const KARNATAKA_SHIPPING_AMOUNT = 60
 export const FREE_SHIPPING_THRESHOLD = 500
+export const MAX_PRODUCT_GRAMS_PER_CART = 500
+
+const rawPackPriceMap: Record<string, Record<number, number>> = {
+  "raw-cardamom-black": { 50: 135, 100: 265 },
+  "raw-cardamom-green": { 50: 255, 100: 510 },
+  "raw-clove": { 50: 90, 100: 175 },
+  "raw-cumin": { 50: 52, 100: 100 },
+  "raw-fennel-lucknow": { 50: 26, 100: 50 },
+  "raw-guntur-chilli": { 50: 23, 100: 45 },
+  "raw-pepper-black": { 50: 78, 100: 150 },
+  "raw-star-anise": { 50: 78, 100: 150 },
+  "raw-tej-patta": { 50: 38, 100: 75 },
+  "raw-turmeric": { 50: 33, 100: 65 },
+}
 
 export function isComboPack(product: Product) {
   return product.tags.includes("combo-pack")
 }
 
+function getRawPackPriceConfig(product: Product) {
+  return rawPackPriceMap[product.id]
+}
+
 export function getProductPackGrams(product: Product) {
+  if (getRawPackPriceConfig(product)) {
+    return 50
+  }
+
   if (typeof product.packGrams === "number" && product.packGrams > 0) {
     return product.packGrams
   }
@@ -17,11 +39,52 @@ export function getProductPackGrams(product: Product) {
 }
 
 export function getProductPackLabel(product: Product) {
+  if (getRawPackPriceConfig(product)) {
+    return "50g or 100g pack"
+  }
+
   return isComboPack(product) ? "4 x 50g packs" : `${getProductPackGrams(product)}g pack`
 }
 
+export function getProductPackOptions(product: Product) {
+  const rawConfig = getRawPackPriceConfig(product)
+  if (rawConfig) {
+    return Object.keys(rawConfig)
+      .map((grams) => Number(grams))
+      .filter((grams) => Number.isFinite(grams))
+      .sort((left, right) => left - right)
+  }
+
+  return [getProductPackGrams(product)]
+}
+
+export function resolveProductPackPrice(product: Product, grams: number) {
+  const rawConfig = getRawPackPriceConfig(product)
+  if (rawConfig && rawConfig[grams] != null) {
+    return rawConfig[grams]
+  }
+
+  return product.price
+}
+
+export function getCartItemPackLabel(product: Product, grams: number) {
+  return isComboPack(product) ? "4 x 50g packs" : `${grams}g pack`
+}
+
+export function getProductDisplayPriceLabel(product: Product) {
+  const options = getProductPackOptions(product)
+  if (options.length <= 1) {
+    return `₹${resolveProductPackPrice(product, options[0] ?? getProductPackGrams(product))}`
+  }
+
+  const prices = options.map((grams) => resolveProductPackPrice(product, grams))
+  const minPrice = Math.min(...prices)
+  const maxPrice = Math.max(...prices)
+  return `₹${minPrice} - ₹${maxPrice}`
+}
+
 export function calculateCartItemTotal(item: CartItem, product: Product) {
-  return product.price * item.quantity
+  return resolveProductPackPrice(product, item.grams) * item.quantity
 }
 
 export function calculateCartSubtotal(cartItems: CartItem[], products: Product[]) {

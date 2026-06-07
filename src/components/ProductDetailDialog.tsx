@@ -9,13 +9,13 @@ import { Textarea } from "@/components/ui/textarea"
 import { ShoppingCart, VideoCamera } from "@phosphor-icons/react"
 import { StarRating } from "./StarRating"
 import type { Product, UserProfile } from "@/lib/types"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useKV } from "@/hooks/use-kv"
 import type { Review } from "@/lib/types"
 import { getProductImage } from "@/lib/product-images"
 import { submitProductReview } from "@/lib/catalog"
 import { toast } from "sonner"
-import { getProductPackGrams, getProductPackLabel } from "@/lib/pricing"
+import { getProductPackGrams, getProductPackLabel, getProductPackOptions, resolveProductPackPrice } from "@/lib/pricing"
 
 type ProductDetailDialogProps = {
   product: Product
@@ -33,12 +33,21 @@ export function ProductDetailDialog({ product, currentUser, canReview, open, onO
   const [reviewComment, setReviewComment] = useState("")
   const [isSubmittingReview, setIsSubmittingReview] = useState(false)
   const [expandedReviewIds, setExpandedReviewIds] = useState<string[]>([])
+  const packOptions = getProductPackOptions(product)
+  const [selectedGrams, setSelectedGrams] = useState<string>(String(packOptions[0] ?? getProductPackGrams(product)))
   
   const productReviews = (reviews || []).filter(r => r.productId === product.id)
   const imageUrl = getProductImage(product, productImages ?? {})
+
+  useEffect(() => {
+    setSelectedGrams(String(packOptions[0] ?? getProductPackGrams(product)))
+  }, [product.id])
+
+  const selectedPackGrams = Number(selectedGrams) || getProductPackGrams(product)
+  const selectedPackPrice = resolveProductPackPrice(product, selectedPackGrams)
   
   const handleAddToCart = () => {
-    onAddToCart(product, getProductPackGrams(product))
+    onAddToCart(product, selectedPackGrams)
     onOpenChange(false)
   }
 
@@ -132,14 +141,33 @@ export function ProductDetailDialog({ product, currentUser, canReview, open, onO
             
             <div>
               <div className="flex items-baseline gap-2 mb-4">
-                <span className="text-3xl font-bold text-primary">₹{product.price}</span>
-                <span className="text-sm text-muted-foreground">{getProductPackLabel(product)}</span>
+                <span className="text-3xl font-bold text-primary">₹{selectedPackPrice}</span>
+                <span className="text-sm text-muted-foreground">{selectedPackGrams}g pack</span>
               </div>
               
               <div className="space-y-3">
-                <p className="text-sm text-muted-foreground">
-                  Fixed pack size: {getProductPackLabel(product)}
-                </p>
+                {packOptions.length > 1 ? (
+                  <div>
+                    <p className="text-sm text-muted-foreground mb-2">Choose pack size</p>
+                    <Select value={selectedGrams} onValueChange={setSelectedGrams}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select pack size" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {packOptions.map((grams) => (
+                          <SelectItem key={`${product.id}-${grams}`} value={String(grams)}>
+                            {grams}g - ₹{resolveProductPackPrice(product, grams)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground mt-2">Maximum 500g per product allowed in cart.</p>
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    Fixed pack size: {getProductPackLabel(product)}
+                  </p>
+                )}
                 
                 <Button 
                   className="w-full" 

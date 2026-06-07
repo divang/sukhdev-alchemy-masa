@@ -5,7 +5,7 @@ import { X, Minus, Plus, ShoppingCart } from "@phosphor-icons/react"
 import type { CartItem, Product } from "@/lib/types"
 import { useKV } from "@/hooks/use-kv"
 import { getProductImage } from "@/lib/product-images"
-import { calculateCartItemTotal, calculateCartSubtotal, getProductPackLabel } from "@/lib/pricing"
+import { calculateCartItemTotal, calculateCartSubtotal, getCartItemPackLabel } from "@/lib/pricing"
 
 type CartDrawerProps = {
   open: boolean
@@ -79,7 +79,7 @@ export function CartDrawer({
                       </div>
                       
                       <div className="mt-2 space-y-2">
-                        <p className="text-xs text-muted-foreground">{getProductPackLabel(product)}</p>
+                        <p className="text-xs text-muted-foreground">{getCartItemPackLabel(product, item.grams)}</p>
                         
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">

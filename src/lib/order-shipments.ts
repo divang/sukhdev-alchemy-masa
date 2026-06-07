@@ -210,3 +210,57 @@ export async function triggerShipmentForOrderByAdmin(orderId: string): Promise<{
     trackingUrl: json.trackingUrl,
   }
 }
+
+export async function syncShiprocketAwbForOrderByAdmin(orderId: string): Promise<{
+  success: boolean
+  synced?: boolean
+  reason?: string
+  shipmentId?: string
+  awbCode?: string
+  trackingUrl?: string
+  externalStatus?: string
+  error?: string
+}> {
+  const token = await getAuthBearerToken()
+  if (!token) {
+    return { success: false, error: "Admin session is required." }
+  }
+
+  const endpoint = resolveApiUrl("/sync-shiprocket-awb")
+  if (!endpoint) {
+    return { success: false, error: "Shiprocket sync endpoint is not configured." }
+  }
+
+  const response = await fetch(endpoint, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ appOrderId: orderId }),
+  })
+
+  const json = await response.json().catch(() => ({})) as {
+    synced?: boolean
+    reason?: string
+    shipmentId?: string
+    awbCode?: string
+    trackingUrl?: string
+    externalStatus?: string
+    error?: string
+  }
+
+  if (!response.ok) {
+    return { success: false, error: json.error ?? `Shiprocket sync API failed (${response.status})` }
+  }
+
+  return {
+    success: true,
+    synced: Boolean(json.synced),
+    reason: json.reason,
+    shipmentId: json.shipmentId,
+    awbCode: json.awbCode,
+    trackingUrl: json.trackingUrl,
+    externalStatus: json.externalStatus,
+  }
+}

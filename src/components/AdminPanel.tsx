@@ -10,7 +10,7 @@ import { Switch } from "@/components/ui/switch"
 import { toast } from "sonner"
 import type { Category, Order, Product } from "@/lib/types"
 import type { RuntimeMode } from "@/lib/runtime-mode"
-import { createProductByAdmin, loadCatalogFromSupabase, type AdminProductInput, updateProductByAdmin } from "@/lib/catalog"
+import { createProductByAdmin, loadCatalogFromSupabase, setCategoryEnabledByAdmin, type AdminProductInput, updateProductByAdmin } from "@/lib/catalog"
 import { isSupabaseConfigured } from "@/lib/supabase"
 import {
   fetchAdminNotifications,
@@ -45,6 +45,7 @@ import {
 } from "@/lib/delivery-partners"
 import {
   fetchOrderShipmentsForAdmin,
+  syncShiprocketAwbForOrderByAdmin,
   triggerShipmentForOrderByAdmin,
   type AdminOrderShipment,
 } from "@/lib/order-shipments"
@@ -121,8 +122,10 @@ export function AdminPanel({ orders = [], runtimeMode = "prod" }: AdminPanelProp
   const [togglingDeliveryPartnerId, setTogglingDeliveryPartnerId] = useState<string | null>(null)
   const [featureFlagsState, setFeatureFlagsState] = useState<FeatureFlags | null>(null)
   const [isSavingShiprocketFlag, setIsSavingShiprocketFlag] = useState(false)
+  const [isSavingRawCategory, setIsSavingRawCategory] = useState(false)
   const [shipmentLogs, setShipmentLogs] = useState<AdminOrderShipment[]>([])
   const [triggeringShipmentOrderId, setTriggeringShipmentOrderId] = useState<string | null>(null)
+  const [syncingAwbOrderId, setSyncingAwbOrderId] = useState<string | null>(null)
   const [notifications, setNotifications] = useState<AdminNotification[]>([])
 
   const categoryOptions = useMemo(() => {
@@ -696,6 +699,27 @@ export function AdminPanel({ orders = [], runtimeMode = "prod" }: AdminPanelProp
     toast.success(`Shiprocket integration ${enabled ? "enabled" : "disabled"} for paid-order shipment flow.`)
   }
 
+  const handleSetRawCategoryEnabled = async (enabled: boolean) => {
+    setIsSavingRawCategory(true)
+    const result = await setCategoryEnabledByAdmin("raw-organic-spices", enabled)
+    setIsSavingRawCategory(false)
+
+    if (!result.success || !result.category) {
+      toast.error(result.error ?? "Failed to update Raw Organic Spices category.")
+      return
+    }
+
+    setCategories((current = []) =>
+      current.map((category) =>
+        category.id === "raw-organic-spices"
+          ? { ...category, enabled: result.category?.enabled ?? enabled }
+          : category
+      )
+    )
+
+    toast.success(`Raw Organic Spices ${enabled ? "enabled" : "disabled"} in category sidebar.`)
+  }
+
   const refreshShipmentLogs = async () => {
     const result = await fetchOrderShipmentsForAdmin(25)
     if (result.error) {
@@ -721,6 +745,28 @@ export function AdminPanel({ orders = [], runtimeMode = "prod" }: AdminPanelProp
       toast.success(`Shipment created via ${result.provider ?? "provider"}${result.awbCode ? ` (AWB: ${result.awbCode})` : ""}.`)
     } else {
       toast.info(`Shipment was not created: ${result.reason ?? "check logs"}.`)
+    }
+
+    await refreshShipmentLogs()
+  }
+
+  const rawCategory = (categories || []).find((category) => category.id === "raw-organic-spices")
+
+  const handleSyncAwbForOrder = async (orderId: string) => {
+    setSyncingAwbOrderId(orderId)
+    const result = await syncShiprocketAwbForOrderByAdmin(orderId)
+    setSyncingAwbOrderId(null)
+
+    if (!result.success) {
+      toast.error(result.error ?? "Failed to sync Shiprocket AWB.")
+      await refreshShipmentLogs()
+      return
+    }
+
+    if (result.synced) {
+      toast.success(`Shiprocket updated${result.awbCode ? ` (AWB: ${result.awbCode})` : ""}.`)
+    } else {
+      toast.info(`No AWB update yet: ${result.reason ?? "carrier assignment pending"}.`)
     }
 
     await refreshShipmentLogs()
@@ -956,6 +1002,31 @@ export function AdminPanel({ orders = [], runtimeMode = "prod" }: AdminPanelProp
 
       <Card>
         <CardHeader>
+          <CardTitle>Category Visibility</CardTitle>
+          <CardDescription>Quickly show or hide Raw Organic Spices from the store left sidebar.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="rounded-lg border p-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="font-medium">Enable Raw Organic Spices</p>
+              <p className="text-sm text-muted-foreground">
+                Disabling this hides the raw category from the customer category list.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Switch
+                checked={Boolean(rawCategory?.enabled)}
+                onCheckedChange={handleSetRawCategoryEnabled}
+                disabled={isSavingRawCategory || !rawCategory}
+              />
+              <span className="text-sm">{rawCategory?.enabled ? "ON" : "OFF"}</span>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
           <CardTitle>Shipment Operations</CardTitle>
           <CardDescription>Trigger shipment for paid orders and monitor latest shipment attempts.</CardDescription>
         </CardHeader>
@@ -966,7 +1037,9 @@ export function AdminPanel({ orders = [], runtimeMode = "prod" }: AdminPanelProp
             ) : (
               orders.slice(0, 8).map((order) => {
                 const isTriggering = triggeringShipmentOrderId === order.id
+                const isSyncingAwb = syncingAwbOrderId === order.id
                 const canTrigger = order.paymentStatus === "paid"
+                const canSyncAwb = order.paymentStatus === "paid"
 
                 return (
                   <div key={`ship-trigger-${order.id}`} className="rounded-lg border p-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -974,17 +1047,31 @@ export function AdminPanel({ orders = [], runtimeMode = "prod" }: AdminPanelProp
                       <p className="font-medium">Order #{order.id}</p>
                       <p className="text-xs text-muted-foreground">Payment: {order.paymentStatus} | Status: {order.status}</p>
                     </div>
-                    <Button
-                      size="sm"
-                      onClick={() => handleTriggerShipmentForOrder(order.id)}
-                      disabled={!canTrigger || isTriggering}
-                    >
-                      {!canTrigger
-                        ? "Awaiting Payment"
-                        : isTriggering
-                          ? "Triggering..."
-                          : "Trigger Shipment"}
-                    </Button>
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        size="sm"
+                        onClick={() => handleTriggerShipmentForOrder(order.id)}
+                        disabled={!canTrigger || isTriggering}
+                      >
+                        {!canTrigger
+                          ? "Awaiting Payment"
+                          : isTriggering
+                            ? "Triggering..."
+                            : "Trigger Shipment"}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleSyncAwbForOrder(order.id)}
+                        disabled={!canSyncAwb || isSyncingAwb}
+                      >
+                        {!canSyncAwb
+                          ? "Awaiting Payment"
+                          : isSyncingAwb
+                            ? "Syncing..."
+                            : "Sync AWB"}
+                      </Button>
+                    </div>
                   </div>
                 )
               })
@@ -1192,7 +1279,7 @@ export function AdminPanel({ orders = [], runtimeMode = "prod" }: AdminPanelProp
                           {order.items.map((item) => (
                             <li key={`${order.id}-${item.productId}-${item.grams}`} className="flex items-center justify-between gap-3 text-sm text-foreground">
                               <span>{item.productName} - {item.quantity} x {item.grams}g</span>
-                              <span className="font-medium">₹{(item.pricePerUnit * (item.grams / 100) * item.quantity).toFixed(2)}</span>
+                              <span className="font-medium">₹{(item.pricePerUnit * item.quantity).toFixed(2)}</span>
                             </li>
                           ))}
                         </ul>
