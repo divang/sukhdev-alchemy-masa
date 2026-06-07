@@ -16,6 +16,65 @@ It captures what is already shipped, what infrastructure is required, and what t
 - Transactional auth email: Resend SMTP via Supabase Auth.
 - Domain/DNS: Squarespace DNS -> GitHub Pages.
 
+## Apps Plan (Web + Android + iOS)
+
+### Objective
+- Keep one core product flow and one backend data model while delivering three clients:
+  - Web app (existing production channel)
+  - Android app
+  - iOS app
+
+### Target Architecture
+- View Layer:
+  - Web UI (React)
+  - Android shell (Capacitor wrapping the same web build)
+  - iOS shell (Capacitor wrapping the same web build)
+- Business Logic Layer:
+  - Shared TypeScript modules in `src/lib` (pricing, validation, auth guards, order rules, promo rules)
+- Data/API Layer:
+  - Supabase DB + RLS
+  - Supabase Edge Functions for trusted operations (payment verify, notifications, shipping orchestration)
+
+### Safety Rules (Do Not Break Web Production)
+1. Keep web deployment pipeline unchanged.
+2. Build mobile in separate branch (`mobile-capacitor`) until stable.
+3. Use runtime platform checks for mobile-only behavior.
+4. Keep mobile-specific features behind feature flags (default OFF in prod).
+5. Never move critical payment/order state authority to client code.
+
+### Delivery Phases
+1. Phase A: Scaffold
+  - Add Capacitor config and platform projects.
+  - Verify no regression in web build and pages deploy.
+2. Phase B: Android first
+  - Create signed internal test build.
+  - Run smoke tests for auth, cart, checkout, payment callback UX, order tracking.
+3. Phase C: iOS onboarding
+  - Prepare iOS project on macOS/Xcode.
+  - Run TestFlight beta with same smoke suite.
+4. Phase D: Store hardening
+  - App icons, splash, deep-link config, privacy declarations, support URL, policy links.
+5. Phase E: Controlled release
+  - Staged rollout with monitoring and rollback playbook.
+
+### E2E Consistency Checklist Across Web/Android/iOS
+1. Sign-up/sign-in (email, Google, OTP where configured)
+2. Cart persistence and restore
+3. Checkout validation (India-only address constraints)
+4. Payment verification state transitions (`pending` -> `paid` -> `processing`)
+5. Promo validation parity
+6. Order visibility rules (customer own orders, admin all orders)
+7. Notification hooks and shipment orchestration logs
+
+### Release Accounts and Cost Notes
+- Google Play Console: one-time registration fee.
+- Apple Developer Program: annual subscription (not monthly).
+
+### Current Readiness
+- Web is production-stable.
+- Architecture already supports shared business/data layers.
+- Next step: scaffold Capacitor with strict isolation so web release lane remains unaffected.
+
 ## Backend + Payment Integration (Merged Reference)
 
 This section consolidates the implementation guidance previously split across backend and payment setup docs.

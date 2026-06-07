@@ -87,6 +87,29 @@ async function persistShipmentResult(client: SupabaseClient, input: {
   })
 }
 
+async function getExistingCreatedShipment(client: SupabaseClient, orderId: string, provider: DeliveryPartnerKey) {
+  const { data, error } = await client
+    .from("order_shipments")
+    .select("shipment_id, awb_code, tracking_url")
+    .eq("order_id", orderId)
+    .eq("provider_key", provider)
+    .eq("shipment_status", "created")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (error || !data) {
+    return null
+  }
+
+  const row = data as { shipment_id?: string | null; awb_code?: string | null; tracking_url?: string | null }
+  return {
+    shipmentId: row.shipment_id ?? undefined,
+    awbCode: row.awb_code ?? undefined,
+    trackingUrl: row.tracking_url ?? undefined,
+  }
+}
+
 export async function createShipmentForPaidOrder(client: SupabaseClient, order: PaidOrder): Promise<ShipmentAttemptResult> {
   const featureEnabled = await isFeatureEnabled(client, "enable_shiprocket_integration")
   if (!featureEnabled) {
@@ -110,6 +133,19 @@ export async function createShipmentForPaidOrder(client: SupabaseClient, order: 
       created: false,
       provider: activeProvider,
       reason: "provider_adapter_missing",
+    }
+  }
+
+  const existing = await getExistingCreatedShipment(client, order.id, "shiprocket")
+  if (existing) {
+    return {
+      attempted: false,
+      created: true,
+      provider: "shiprocket",
+      reason: "shipment_already_created",
+      shipmentId: existing.shipmentId,
+      awbCode: existing.awbCode,
+      trackingUrl: existing.trackingUrl,
     }
   }
 

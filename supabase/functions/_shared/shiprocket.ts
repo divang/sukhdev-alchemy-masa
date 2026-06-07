@@ -28,12 +28,78 @@ type ShiprocketShipmentResult = {
   rawResponse?: unknown
 }
 
+type ShiprocketTokenCache = {
+  token: string
+  expiresAtMs: number
+}
+
+const TOKEN_TTL_MS = 23 * 60 * 60 * 1000
+let tokenCache: ShiprocketTokenCache | null = null
+
+function normalizePhone(raw: string) {
+  const digits = String(raw ?? "").replace(/\D/g, "")
+  if (digits.length === 10) {
+    return digits
+  }
+
+  if (digits.length === 12 && digits.startsWith("91")) {
+    return digits.slice(2)
+  }
+
+  return digits
+}
+
+function resolveShiprocketState() {
+  return Deno.env.get("SHIPROCKET_DEFAULT_STATE")?.trim() || "Karnataka"
+}
+
+function buildShiprocketValidationError(order: ShiprocketOrderPayload): string | undefined {
+  if (!/^[1-9]\d{5}$/.test(order.customer.pincode)) {
+    return "Invalid pincode format for Shiprocket payload."
+  }
+
+  const phone = normalizePhone(order.customer.phone)
+  if (!/^\d{10}$/.test(phone)) {
+    return "Invalid phone format for Shiprocket payload. Expected 10-digit mobile number."
+  }
+
+  if (!order.items.length) {
+    return "Shiprocket payload requires at least one order item."
+  }
+
+  for (const item of order.items) {
+    if (!item.productName.trim()) {
+      return "Shiprocket payload item name is missing."
+    }
+
+    if (!Number.isFinite(item.quantity) || item.quantity <= 0) {
+      return `Invalid quantity for item ${item.productName}.`
+    }
+
+    if (!Number.isFinite(item.grams) || item.grams <= 0) {
+      return `Invalid grams value for item ${item.productName}.`
+    }
+  }
+
+  return undefined
+}
+
+function calculateTotalWeightKg(order: ShiprocketOrderPayload) {
+  const totalGrams = order.items.reduce((sum, item) => sum + (item.grams * item.quantity), 0)
+  const kg = totalGrams / 1000
+  return Math.max(0.1, Number(kg.toFixed(3)))
+}
+
 function getShiprocketBaseUrl() {
   const configured = Deno.env.get("SHIPROCKET_API_BASE_URL")
   return (configured && configured.trim()) || "https://apiv2.shiprocket.in/v1/external"
 }
 
 async function getShiprocketAuthToken(): Promise<{ token?: string; error?: string }> {
+  if (tokenCache && Date.now() < tokenCache.expiresAtMs) {
+    return { token: tokenCache.token }
+  }
+
   const email = Deno.env.get("SHIPROCKET_EMAIL")?.trim()
   const password = Deno.env.get("SHIPROCKET_PASSWORD")?.trim()
 
@@ -57,16 +123,29 @@ async function getShiprocketAuthToken(): Promise<{ token?: string; error?: strin
     }
   }
 
+  tokenCache = {
+    token: payload.token,
+    expiresAtMs: Date.now() + TOKEN_TTL_MS,
+  }
+
   return { token: payload.token }
 }
 
 export async function createShiprocketShipment(order: ShiprocketOrderPayload): Promise<ShiprocketShipmentResult> {
+  const validationError = buildShiprocketValidationError(order)
+  if (validationError) {
+    return { ok: false, error: validationError }
+  }
+
   const authResult = await getShiprocketAuthToken()
   if (!authResult.token) {
     return { ok: false, error: authResult.error }
   }
 
   const pickupLocation = Deno.env.get("SHIPROCKET_PICKUP_LOCATION")?.trim() || "Primary"
+  const normalizedPhone = normalizePhone(order.customer.phone)
+  const resolvedState = resolveShiprocketState()
+  const totalWeightKg = calculateTotalWeightKg(order)
 
   const response = await fetch(`${getShiprocketBaseUrl()}/orders/create/adhoc`, {
     method: "POST",
@@ -86,10 +165,10 @@ export async function createShiprocketShipment(order: ShiprocketOrderPayload): P
       billing_address_2: "",
       billing_city: order.customer.city,
       billing_pincode: order.customer.pincode,
-      billing_state: "Karnataka",
+      billing_state: resolvedState,
       billing_country: "India",
       billing_email: order.customer.email,
-      billing_phone: order.customer.phone,
+      billing_phone: normalizedPhone,
       shipping_is_billing: true,
       shipping_customer_name: order.customer.name,
       shipping_last_name: "",
@@ -98,9 +177,9 @@ export async function createShiprocketShipment(order: ShiprocketOrderPayload): P
       shipping_city: order.customer.city,
       shipping_pincode: order.customer.pincode,
       shipping_country: "India",
-      shipping_state: "Karnataka",
+      shipping_state: resolvedState,
       shipping_email: order.customer.email,
-      shipping_phone: order.customer.phone,
+      shipping_phone: normalizedPhone,
       order_items: order.items.map((item) => ({
         name: item.productName,
         sku: `${order.id}-${item.productName}`,
@@ -119,7 +198,7 @@ export async function createShiprocketShipment(order: ShiprocketOrderPayload): P
       length: 12,
       breadth: 10,
       height: 8,
-      weight: 0.5,
+      weight: totalWeightKg,
     }),
   })
 

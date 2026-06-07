@@ -43,6 +43,11 @@ import {
   setPrimaryDeliveryPartnerAccount,
   type AdminDeliveryPartnerAccount,
 } from "@/lib/delivery-partners"
+import {
+  fetchOrderShipmentsForAdmin,
+  triggerShipmentForOrderByAdmin,
+  type AdminOrderShipment,
+} from "@/lib/order-shipments"
 
 type EditableProduct = {
   id: string
@@ -116,6 +121,8 @@ export function AdminPanel({ orders = [], runtimeMode = "prod" }: AdminPanelProp
   const [togglingDeliveryPartnerId, setTogglingDeliveryPartnerId] = useState<string | null>(null)
   const [featureFlagsState, setFeatureFlagsState] = useState<FeatureFlags | null>(null)
   const [isSavingShiprocketFlag, setIsSavingShiprocketFlag] = useState(false)
+  const [shipmentLogs, setShipmentLogs] = useState<AdminOrderShipment[]>([])
+  const [triggeringShipmentOrderId, setTriggeringShipmentOrderId] = useState<string | null>(null)
   const [notifications, setNotifications] = useState<AdminNotification[]>([])
 
   const categoryOptions = useMemo(() => {
@@ -251,6 +258,20 @@ export function AdminPanel({ orders = [], runtimeMode = "prod" }: AdminPanelProp
     }
 
     refreshFeatureFlagsForAdmin()
+  }, [])
+
+  useEffect(() => {
+    async function refreshShipmentLogsForAdmin() {
+      const result = await fetchOrderShipmentsForAdmin(25)
+      if (result.error) {
+        console.warn("[admin] shipment logs load skipped", result.error)
+        return
+      }
+
+      setShipmentLogs(result.shipments)
+    }
+
+    refreshShipmentLogsForAdmin()
   }, [])
 
   const updateEditableProduct = (productId: string, key: keyof EditableProduct, value: string | boolean) => {
@@ -436,25 +457,33 @@ export function AdminPanel({ orders = [], runtimeMode = "prod" }: AdminPanelProp
     }
 
     setSavingPromoId(promoId)
-    const result = await upsertPromoCodeByAdmin(payload)
+    const { promoCode, error } = await upsertPromoCodeByAdmin(payload)
     setSavingPromoId(null)
 
-    if (!result.promoCode || result.error) {
-      toast.error(result.error ?? "Failed to save promo code.")
+    if (error) {
+      toast.error(error)
       return
     }
+
+    const savedPromo = promoCode
+    if (!savedPromo) {
+      toast.error("Failed to save promo code.")
+      return
+    }
+
+    const savedPromoCode = savedPromo.code
 
     setEditablePromoCodes((current) =>
       current.map((promo) =>
         promo.id === promoId
           ? {
               ...promo,
-              code: result.promoCode?.code ?? promo.code,
+              code: savedPromoCode,
             }
           : promo
       )
     )
-    toast.success(`Promo code ${result.promoCode.code} saved.`)
+    toast.success(`Promo code ${savedPromoCode} saved.`)
   }
 
   const handleCreatePromoCode = async () => {
@@ -464,22 +493,35 @@ export function AdminPanel({ orders = [], runtimeMode = "prod" }: AdminPanelProp
     }
 
     setIsCreatingPromo(true)
-    const result = await upsertPromoCodeByAdmin(payload)
+    const { promoCode, error } = await upsertPromoCodeByAdmin(payload)
     setIsCreatingPromo(false)
 
-    if (!result.promoCode || result.error) {
-      toast.error(result.error ?? "Failed to create promo code.")
+    if (error) {
+      toast.error(error)
       return
     }
 
+    const createdPromo = promoCode
+    if (!createdPromo) {
+      toast.error("Failed to create promo code.")
+      return
+    }
+
+    const createdPromoId = createdPromo.id
+    const createdPromoCode = createdPromo.code
+    const createdPromoDescription = createdPromo.description ?? ""
+    const createdPromoDiscountType = createdPromo.discountType
+    const createdPromoDiscountValue = String(createdPromo.discountValue)
+    const createdPromoActive = createdPromo.isActive
+
     setEditablePromoCodes((current) => [
       {
-        id: result.promoCode.id,
-        code: result.promoCode.code,
-        description: result.promoCode.description ?? "",
-        discountType: result.promoCode.discountType,
-        discountValue: String(result.promoCode.discountValue),
-        isActive: result.promoCode.isActive,
+        id: createdPromoId,
+        code: createdPromoCode,
+        description: createdPromoDescription,
+        discountType: createdPromoDiscountType,
+        discountValue: createdPromoDiscountValue,
+        isActive: createdPromoActive,
       },
       ...current,
     ])
@@ -493,7 +535,7 @@ export function AdminPanel({ orders = [], runtimeMode = "prod" }: AdminPanelProp
       isActive: true,
     })
 
-    toast.success(`Promo code ${result.promoCode.code} created.`)
+    toast.success(`Promo code ${createdPromoCode} created.`)
   }
 
   const handleGenerateOneTimePromoToken = () => {
@@ -652,6 +694,36 @@ export function AdminPanel({ orders = [], runtimeMode = "prod" }: AdminPanelProp
     }))
 
     toast.success(`Shiprocket integration ${enabled ? "enabled" : "disabled"} for paid-order shipment flow.`)
+  }
+
+  const refreshShipmentLogs = async () => {
+    const result = await fetchOrderShipmentsForAdmin(25)
+    if (result.error) {
+      toast.error(result.error)
+      return
+    }
+
+    setShipmentLogs(result.shipments)
+  }
+
+  const handleTriggerShipmentForOrder = async (orderId: string) => {
+    setTriggeringShipmentOrderId(orderId)
+    const result = await triggerShipmentForOrderByAdmin(orderId)
+    setTriggeringShipmentOrderId(null)
+
+    if (!result.success) {
+      toast.error(result.error ?? "Failed to trigger shipment.")
+      await refreshShipmentLogs()
+      return
+    }
+
+    if (result.created) {
+      toast.success(`Shipment created via ${result.provider ?? "provider"}${result.awbCode ? ` (AWB: ${result.awbCode})` : ""}.`)
+    } else {
+      toast.info(`Shipment was not created: ${result.reason ?? "check logs"}.`)
+    }
+
+    await refreshShipmentLogs()
   }
 
   const handleCreateProduct = async () => {
@@ -878,6 +950,84 @@ export function AdminPanel({ orders = [], runtimeMode = "prod" }: AdminPanelProp
               />
               <span className="text-sm">{featureFlagsState?.enableShiprocketIntegration ? "ON" : "OFF"}</span>
             </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Shipment Operations</CardTitle>
+          <CardDescription>Trigger shipment for paid orders and monitor latest shipment attempts.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-3">
+            {orders.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No orders loaded yet.</p>
+            ) : (
+              orders.slice(0, 8).map((order) => {
+                const isTriggering = triggeringShipmentOrderId === order.id
+                const canTrigger = order.paymentStatus === "paid"
+
+                return (
+                  <div key={`ship-trigger-${order.id}`} className="rounded-lg border p-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="font-medium">Order #{order.id}</p>
+                      <p className="text-xs text-muted-foreground">Payment: {order.paymentStatus} | Status: {order.status}</p>
+                    </div>
+                    <Button
+                      size="sm"
+                      onClick={() => handleTriggerShipmentForOrder(order.id)}
+                      disabled={!canTrigger || isTriggering}
+                    >
+                      {!canTrigger
+                        ? "Awaiting Payment"
+                        : isTriggering
+                          ? "Triggering..."
+                          : "Trigger Shipment"}
+                    </Button>
+                  </div>
+                )
+              })
+            )}
+          </div>
+
+          <div className="rounded-lg border p-3">
+            <div className="mb-3 flex items-center justify-between">
+              <p className="text-sm font-medium">Recent Shipment Logs</p>
+              <Button size="sm" variant="outline" onClick={refreshShipmentLogs}>Refresh</Button>
+            </div>
+
+            {shipmentLogs.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No shipment attempts logged yet.</p>
+            ) : (
+              <div className="space-y-2">
+                {shipmentLogs.map((shipment) => (
+                  <div key={shipment.id} className="rounded-md border p-2 text-xs">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge variant="outline">{shipment.providerKey}</Badge>
+                      <Badge variant={shipment.shipmentStatus === "created" ? "default" : shipment.shipmentStatus === "failed" ? "destructive" : "secondary"}>
+                        {shipment.shipmentStatus}
+                      </Badge>
+                      <span className="text-muted-foreground">Order #{shipment.orderId}</span>
+                    </div>
+                    <p className="mt-1 text-muted-foreground">
+                      {shipment.awbCode ? `AWB: ${shipment.awbCode} | ` : ""}
+                      {shipment.shipmentId ? `Shipment ID: ${shipment.shipmentId} | ` : ""}
+                      {new Date(shipment.createdAt).toLocaleString()}
+                    </p>
+                    {shipment.externalStatus && (
+                      <p className="mt-1 text-muted-foreground">
+                        Carrier Status: {shipment.externalStatus}
+                        {shipment.externalEventAt ? ` | Event At: ${new Date(shipment.externalEventAt).toLocaleString()}` : ""}
+                      </p>
+                    )}
+                    {shipment.errorMessage && (
+                      <p className="mt-1 text-red-700">{shipment.errorMessage}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
