@@ -1,13 +1,14 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
 import { Progress } from "@/components/ui/progress"
-import { ArrowLeft, Package, Truck, CheckCircle } from "@phosphor-icons/react"
+import { ArrowLeft, Package, Truck, CheckCircle, Link as LinkIcon } from "@phosphor-icons/react"
 import { cn } from "@/lib/utils"
 import type { Order } from "@/lib/types"
+import { fetchLatestShipmentForOrder, type LatestOrderShipment } from "@/lib/order-shipments"
 
 type OrderTrackingViewProps = {
   order: Order | null
@@ -25,6 +26,9 @@ const statusSteps = [
 
 export function OrderTrackingView({ order, orders, onBack, onSelectOrder }: OrderTrackingViewProps) {
   const [trackingId, setTrackingId] = useState("")
+  const [shipment, setShipment] = useState<LatestOrderShipment | null>(null)
+  const [isLoadingShipment, setIsLoadingShipment] = useState(false)
+  const [shipmentError, setShipmentError] = useState<string | null>(null)
   const recentOrders = orders.slice(0, 5)
 
   const handlePrintReceipt = () => {
@@ -34,6 +38,42 @@ export function OrderTrackingView({ order, orders, onBack, onSelectOrder }: Orde
   }
 
   const formatAmount = (amount?: number) => `₹${(amount ?? 0).toFixed(2)}`
+
+  useEffect(() => {
+    let isActive = true
+
+    async function loadShipment() {
+      if (!order?.id) {
+        setShipment(null)
+        setShipmentError(null)
+        return
+      }
+
+      setIsLoadingShipment(true)
+      setShipmentError(null)
+
+      const result = await fetchLatestShipmentForOrder(order.id)
+      if (!isActive) {
+        return
+      }
+
+      setIsLoadingShipment(false)
+
+      if (result.error) {
+        setShipment(null)
+        setShipmentError(result.error)
+        return
+      }
+
+      setShipment(result.shipment ?? null)
+    }
+
+    void loadShipment()
+
+    return () => {
+      isActive = false
+    }
+  }, [order?.id])
   
   const handleTrack = () => {
     if (!trackingId.trim()) return
@@ -183,6 +223,81 @@ export function OrderTrackingView({ order, orders, onBack, onSelectOrder }: Orde
                 </div>
               </div>
               
+              <Separator />
+
+              <div>
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
+                  <h3 className="font-semibold">Shipment Tracking</h3>
+                  {shipment?.trackingUrl && (
+                    <Button asChild variant="outline" size="sm">
+                      <a href={shipment.trackingUrl} target="_blank" rel="noreferrer">
+                        <LinkIcon size={16} className="mr-2" />
+                        Open Carrier Tracking
+                      </a>
+                    </Button>
+                  )}
+                </div>
+
+                <div className="rounded-lg border p-4 space-y-3 text-sm">
+                  {isLoadingShipment && (
+                    <p className="text-muted-foreground">Loading shipment details...</p>
+                  )}
+
+                  {!isLoadingShipment && !shipment && !shipmentError && (
+                    <p className="text-muted-foreground">
+                      Shipment has not been created yet. It will appear here after Razorpay payment verification and Shiprocket order booking.
+                    </p>
+                  )}
+
+                  {shipmentError && (
+                    <p className="text-red-700">Unable to load shipment details: {shipmentError}</p>
+                  )}
+
+                  {shipment && (
+                    <div className="space-y-3">
+                      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 sm:gap-4">
+                        <span className="text-muted-foreground">Courier Provider</span>
+                        <span className="font-medium capitalize">{shipment.providerKey}</span>
+                      </div>
+                      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 sm:gap-4">
+                        <span className="text-muted-foreground">Shipment Status</span>
+                        <span className="font-medium capitalize">{shipment.shipmentStatus}</span>
+                      </div>
+                      {shipment.awbCode && (
+                        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-1 sm:gap-4">
+                          <span className="text-muted-foreground">AWB</span>
+                          <span className="font-mono text-[11px] sm:text-sm break-all sm:text-right leading-5">{shipment.awbCode}</span>
+                        </div>
+                      )}
+                      {shipment.shipmentId && (
+                        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-1 sm:gap-4">
+                          <span className="text-muted-foreground">Shipment ID</span>
+                          <span className="font-mono text-[11px] sm:text-sm break-all sm:text-right leading-5">{shipment.shipmentId}</span>
+                        </div>
+                      )}
+                      {shipment.externalStatus && (
+                        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 sm:gap-4">
+                          <span className="text-muted-foreground">Latest Carrier Update</span>
+                          <span className="font-medium">{shipment.externalStatus}</span>
+                        </div>
+                      )}
+                      {shipment.externalEventAt && (
+                        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 sm:gap-4">
+                          <span className="text-muted-foreground">Update Time</span>
+                          <span className="font-medium sm:text-right">{new Date(shipment.externalEventAt).toLocaleString()}</span>
+                        </div>
+                      )}
+                      {shipment.errorMessage && (
+                        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 sm:gap-4">
+                          <span className="text-muted-foreground">Shipment Note</span>
+                          <span className="font-medium text-red-700">{shipment.errorMessage}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+
               <Separator />
 
               {order.paymentStatus === "paid" && order.paymentDetails?.gateway === "razorpay" && (

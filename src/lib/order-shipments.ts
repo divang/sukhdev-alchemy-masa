@@ -14,6 +14,19 @@ type OrderShipmentRow = {
   created_at: string
 }
 
+export type LatestOrderShipment = {
+  orderId: string
+  providerKey: string
+  shipmentStatus: "created" | "pending" | "skipped" | "failed"
+  shipmentId?: string
+  awbCode?: string
+  trackingUrl?: string
+  errorMessage?: string
+  externalStatus?: string
+  externalEventAt?: string
+  createdAt: string
+}
+
 export type AdminOrderShipment = {
   id: string
   orderId: string
@@ -91,6 +104,44 @@ export async function fetchOrderShipmentsForAdmin(limit = 30): Promise<{ shipmen
 
   return {
     shipments: ((data as OrderShipmentRow[] | null) ?? []).map(mapShipmentRow),
+  }
+}
+
+export async function fetchLatestShipmentForOrder(orderId: string): Promise<{ shipment?: LatestOrderShipment; error?: string }> {
+  if (!supabase || !isSupabaseConfigured) {
+    return { error: "Supabase is not configured." }
+  }
+
+  const { data, error } = await supabase
+    .from("order_shipments")
+    .select("order_id, provider_key, shipment_status, shipment_id, awb_code, tracking_url, error_message, external_status, external_event_at, created_at")
+    .eq("order_id", orderId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (error) {
+    return { error: error.message }
+  }
+
+  if (!data) {
+    return { shipment: undefined }
+  }
+
+  const row = data as OrderShipmentRow
+  return {
+    shipment: {
+      orderId: row.order_id,
+      providerKey: row.provider_key,
+      shipmentStatus: row.shipment_status,
+      shipmentId: row.shipment_id ?? undefined,
+      awbCode: row.awb_code ?? undefined,
+      trackingUrl: row.tracking_url ?? undefined,
+      errorMessage: row.error_message ?? undefined,
+      externalStatus: row.external_status ?? undefined,
+      externalEventAt: row.external_event_at ?? undefined,
+      createdAt: row.created_at,
+    },
   }
 }
 
