@@ -53,6 +53,7 @@ function resolveWebhookFields(payload: ShiprocketWebhookPayload) {
   const channelOrderId = readString(payload.channel_order_id)
   const shipmentId = readString(payload.shipment_id)
   const awbCode = readString(payload.awb_code || payload.awb)
+  const trackingUrl = readString(payload.tracking_url || payload.tracking_link)
   const shipmentStatus = readString(
     payload.current_status
     || payload.shipment_status
@@ -68,6 +69,7 @@ function resolveWebhookFields(payload: ShiprocketWebhookPayload) {
     channelOrderId,
     shipmentId,
     awbCode,
+    trackingUrl,
     shipmentStatus,
     externalEventAt,
   }
@@ -156,12 +158,16 @@ Deno.serve(async (req) => {
     ? "failed"
     : "pending"
 
+  // Build the tracking URL if AWB is present but tracking URL is not provided
+  const trackingUrl = fields.trackingUrl || (fields.awbCode ? `https://shiprocket.co/tracking/${encodeURIComponent(fields.awbCode)}` : null)
+
   await serviceClient.from("order_shipments").insert({
     order_id: orderId,
     provider_key: "shiprocket",
     shipment_status: shipmentStatus,
     shipment_id: fields.shipmentId || null,
     awb_code: fields.awbCode || null,
+    tracking_url: trackingUrl,
     external_status: fields.shipmentStatus || null,
     external_event_at: fields.externalEventAt,
     raw_response: payload,
@@ -184,6 +190,7 @@ Deno.serve(async (req) => {
     orderId,
     shipmentId: fields.shipmentId || null,
     awbCode: fields.awbCode || null,
+    trackingUrl: trackingUrl,
     externalStatus: fields.shipmentStatus || null,
     mappedOrderStatus: nextOrderStatus,
   })

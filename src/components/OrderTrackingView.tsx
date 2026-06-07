@@ -19,8 +19,8 @@ type OrderTrackingViewProps = {
 
 const statusSteps = [
   { key: "pending", label: "Order Placed", icon: Package },
-  { key: "processing", label: "Processing", icon: Package },
-  { key: "shipped", label: "Shipped", icon: Truck },
+  { key: "processing", label: "Assigning Courier", icon: Package },
+  { key: "shipped", label: "On the way", icon: Truck },
   { key: "delivered", label: "Delivered", icon: CheckCircle }
 ]
 
