@@ -263,12 +263,29 @@ export function OrderTrackingView({ order, orders, onBack, onSelectOrder }: Orde
                         <span className="text-muted-foreground">Shipment Status</span>
                         <span className="font-medium capitalize">{shipment.shipmentStatus}</span>
                       </div>
-                      {shipment.awbCode && (
-                        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-1 sm:gap-4">
-                          <span className="text-muted-foreground">AWB</span>
+                      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-1 sm:gap-4">
+                        <span className="text-muted-foreground">AWB</span>
+                        {shipment.awbCode ? (
                           <span className="font-mono text-[11px] sm:text-sm break-all sm:text-right leading-5">{shipment.awbCode}</span>
-                        </div>
-                      )}
+                        ) : (
+                          <span className="font-medium text-muted-foreground">Pending carrier assignment</span>
+                        )}
+                      </div>
+                      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-1 sm:gap-4">
+                        <span className="text-muted-foreground">Tracking Link</span>
+                        {shipment.trackingUrl ? (
+                          <a
+                            href={shipment.trackingUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="font-medium text-primary underline underline-offset-2 break-all sm:text-right"
+                          >
+                            {shipment.trackingUrl}
+                          </a>
+                        ) : (
+                          <span className="font-medium text-muted-foreground">Will appear once AWB is available</span>
+                        )}
+                      </div>
                       {shipment.shipmentId && (
                         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-1 sm:gap-4">
                           <span className="text-muted-foreground">Shipment ID</span>
