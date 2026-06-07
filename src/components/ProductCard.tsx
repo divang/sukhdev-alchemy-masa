@@ -18,6 +18,9 @@ type ProductCardProps = {
 export function ProductCard({ product, onViewDetails, onAddToCart }: ProductCardProps) {
   const [productImages] = useKV<Record<string, string>>("product-images", {})
   const imageUrl = getProductImage(product, productImages ?? {})
+  const imageClassName = product.category === "raw-organic-spices"
+    ? "w-full h-full object-cover object-bottom transition-transform hover:scale-105 duration-300"
+    : "w-full h-full object-cover transition-transform hover:scale-105 duration-300"
   
   return (
     <motion.div
@@ -30,7 +33,7 @@ export function ProductCard({ product, onViewDetails, onAddToCart }: ProductCard
             <img
               src={imageUrl}
               alt={product.name}
-              className="w-full h-full object-cover transition-transform hover:scale-105 duration-300"
+              className={imageClassName}
             />
           ) : (
             <div className="w-full h-full flex items-center justify-center bg-muted">
