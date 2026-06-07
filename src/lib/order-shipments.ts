@@ -44,6 +44,18 @@ export type AdminOrderShipment = {
 const rawApiBaseUrl = String(import.meta.env.VITE_API_BASE_URL ?? "").trim()
 const apiBaseUrl = rawApiBaseUrl.replace(/\/$/, "")
 
+function resolveTrackingUrl(awbCode: string | null, trackingUrl: string | null) {
+  if (trackingUrl) {
+    return trackingUrl
+  }
+
+  if (!awbCode) {
+    return undefined
+  }
+
+  return `https://shiprocket.co/tracking/${encodeURIComponent(awbCode)}`
+}
+
 function mapShipmentRow(row: OrderShipmentRow): AdminOrderShipment {
   return {
     id: row.id,
@@ -52,7 +64,7 @@ function mapShipmentRow(row: OrderShipmentRow): AdminOrderShipment {
     shipmentStatus: row.shipment_status,
     shipmentId: row.shipment_id ?? undefined,
     awbCode: row.awb_code ?? undefined,
-    trackingUrl: row.tracking_url ?? undefined,
+    trackingUrl: resolveTrackingUrl(row.awb_code, row.tracking_url),
     errorMessage: row.error_message ?? undefined,
     externalStatus: row.external_status ?? undefined,
     externalEventAt: row.external_event_at ?? undefined,
@@ -136,7 +148,7 @@ export async function fetchLatestShipmentForOrder(orderId: string): Promise<{ sh
       shipmentStatus: row.shipment_status,
       shipmentId: row.shipment_id ?? undefined,
       awbCode: row.awb_code ?? undefined,
-      trackingUrl: row.tracking_url ?? undefined,
+      trackingUrl: resolveTrackingUrl(row.awb_code, row.tracking_url),
       errorMessage: row.error_message ?? undefined,
       externalStatus: row.external_status ?? undefined,
       externalEventAt: row.external_event_at ?? undefined,
