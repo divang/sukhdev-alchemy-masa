@@ -99,7 +99,7 @@ export function ProductDetailDialog({ product, currentUser, canReview, open, onO
   
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[calc(100vw-1rem)] sm:max-w-3xl max-h-[95svh] sm:max-h-[90vh] overflow-y-auto p-4 sm:p-6 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+      <DialogContent className="max-w-[calc(100vw-1rem)] sm:max-w-3xl max-h-[95svh] sm:max-h-[90vh] overflow-x-hidden overflow-y-auto p-4 sm:p-6 pb-[calc(1rem+env(safe-area-inset-bottom))]">
         <DialogHeader>
           <DialogTitle className="text-xl sm:text-2xl pr-8">{product.name}</DialogTitle>
         </DialogHeader>
@@ -134,7 +134,7 @@ export function ProductDetailDialog({ product, currentUser, canReview, open, onO
                   {product.reviewCount} reviews
                 </span>
               </div>
-              <p className="text-muted-foreground">{product.description}</p>
+              <p className="text-muted-foreground break-words">{product.description}</p>
             </div>
             
             <Separator />
@@ -205,7 +205,7 @@ export function ProductDetailDialog({ product, currentUser, canReview, open, onO
                 {product.ingredients.map((ingredient, i) => (
                   <li key={i} className="flex items-center gap-2">
                     <span className="w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0" />
-                    <span>{ingredient}</span>
+                    <span className="break-words">{ingredient}</span>
                   </li>
                 ))}
               </ul>
@@ -272,7 +272,7 @@ export function ProductDetailDialog({ product, currentUser, canReview, open, onO
                         </div>
                         <StarRating rating={review.rating} size={14} />
                       </div>
-                      <p className={`text-sm ${expandedReviewIds.includes(review.id) ? "" : "line-clamp-4"}`}>
+                      <p className={`text-sm break-words ${expandedReviewIds.includes(review.id) ? "" : "line-clamp-4"}`}>
                         {review.comment}
                       </p>
                       {review.comment.length > 180 && (

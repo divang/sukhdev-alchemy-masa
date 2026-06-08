@@ -9,11 +9,10 @@ const FOLLOW_US_LINKS = [
 export function ContactUsSection() {
   return (
     <section className="border-t bg-card">
-      <div className="container mx-auto px-4 py-12">
-        <div className="mx-auto max-w-4xl rounded-2xl border bg-background/80 p-6 sm:p-8">
-          <div className="mb-6 sm:mb-8">
+      <div className="container mx-auto px-4 py-6 sm:py-8">
+        <div className="mx-auto max-w-4xl rounded-2xl border bg-background/80 p-4 sm:p-5">
+          <div className="mb-2">
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Contact Us</p>
-            <h2 className="mt-2 text-2xl font-bold sm:text-3xl">Talk to Sukhdevi Alchemy</h2>
             <p className="mt-2 text-sm text-muted-foreground sm:text-base">
               Reach us for product help, platform support, and delivery updates.
             </p>

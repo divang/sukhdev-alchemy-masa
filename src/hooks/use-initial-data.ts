@@ -70,7 +70,7 @@ export function useInitialData() {
             packGrams: 50,
             image: 'images/products/garam-masala-premium.png',
             rating: 4.8,
-            reviewCount: 5,
+            reviewCount: 0,
             description: 'Our flagship, rich, and highly aromatic blend crafted with rare and expensive spices like Stone Flower, Long Pepper, and Mace. No added salt or fillers.',
             ingredients: [
               'Cumin (Jeera)',
@@ -98,13 +98,13 @@ export function useInitialData() {
           },
         {
           id: 'bharwa-masala-premium',
-          name: 'Bharwa Masala',
+          name: 'Bharwa Masala Premium',
           category: 'premium-masala',
           price: 125,
           packGrams: 50,
           image: 'images/products/bharwa-masala-premium.png',
           rating: 4.7,
-          reviewCount: 4,
+          reviewCount: 0,
           description: 'A fragrant, coarsely ground blend dominated by roasted cumin and fennel. Designed specifically to bring out the best in stuffed karela, bhindi, or baingan.',
           ingredients: [
             'Cumin (Jeera)',
@@ -121,13 +121,13 @@ export function useInitialData() {
         },
         {
           id: 'chat-masala-premium',
-          name: 'Chaat Masala',
+          name: 'Chaat Masala Premium',
           category: 'premium-masala',
           price: 145,
           packGrams: 50,
           image: 'images/products/chat-masala-premium.png',
           rating: 4.9,
-          reviewCount: 3,
+          reviewCount: 0,
           description: 'A highly addictive, lip-smacking blend that balances tartness with a spicy kick. Perfect for sprinkling on fruits, salads, and street-style snacks.',
           ingredients: [
             'Cumin (Jeera)',
@@ -150,13 +150,13 @@ export function useInitialData() {
         },
         {
           id: 'chhole-masala-premium',
-          name: 'Chole Masala',
+          name: 'Chole Masala Premium',
           category: 'premium-masala',
           price: 160,
           packGrams: 50,
           image: 'images/products/chhole-masala-premium.png',
           rating: 4.8,
-          reviewCount: 6,
+          reviewCount: 0,
           description: 'A perfectly balanced, dark, and tangy blend featuring premium Bedgi chillies and Anardana for that authentic Punjabi Chole flavor.',
           ingredients: [
             'Coriander (Dhaniya)',
@@ -211,54 +211,11 @@ export function useInitialData() {
       }
 
       if (!testimonials || testimonials.length === 0) {
-        setTestimonials([
-          {
-            id: 'testimonial-aditi',
-            customerName: 'Aditi',
-            rating: 5,
-            location: 'Bengaluru, Karnataka',
-            date: '2026-01-25',
-            comment: 'Sukhdevi Alchemy has truly transformed my cooking! The quality, aroma, and freshness of their spices are unmatched. Their Chat Masala adds the perfect tangy punch to snacks and salads, while the Chhole Masala helps me create rich, authentic North Indian flavors at home. The Garam Masala brings exceptional depth and warmth to my curries, and the Bharwa Masala has made stuffed vegetables a family favorite. Every dish I prepare now carries that authentic restaurant-style taste. I highly recommend Sukhdevi Alchemy to anyone who loves flavorful, high-quality spices.',
-          },
-          {
-            id: 'testimonial-subhash',
-            customerName: 'Subhash',
-            rating: 5,
-            location: 'Lucknow, Uttar Pradesh',
-            date: '2026-01-27',
-            comment: 'As a food lover, I may not know how to cook, but I definitely know good taste when I experience it. After trying dishes prepared with Sukhdevi Alchemy spices, I was genuinely impressed by the rich flavors and authentic aroma. The Chat Masala adds a perfect burst of tangy flavor to snacks and fruits, while the Chhole Masala delivers the classic North Indian taste that makes every plate irresistible. The Garam Masala enhances the depth and richness of curries, and the Bharwa Masala brings a unique and delicious flavor to stuffed vegetable dishes. Every meal tastes more flavorful and memorable. Sukhdevi Alchemy spices have truly elevated my dining experience.',
-          },
-          {
-            id: 'testimonial-geetika',
-            customerName: 'Geetika',
-            rating: 5,
-            location: 'Delhi, NCR',
-            date: '2026-01-29',
-            comment: 'Being a working professional and managing work-from-home responsibilities, I often look for ways to prepare delicious meals without spending hours in the kitchen. Sukhdevi Alchemy spices have been a game-changer for me. Their Chhole Masala, Garam Masala, Chat Masala, and Bharwa Masala help me create authentic, homemade flavors in a fraction of the time. Earlier, achieving that rich aroma and balanced taste required preparing and blending multiple spices. With Sukhdevi Alchemy, I can enjoy the same homemade taste and aroma effortlessly. The Chhole Masala gives my chhole the perfect Punjabi flavor, the Garam Masala adds warmth and depth to curries, the Chat Masala instantly enhances snacks and salads, and the Bharwa Masala makes stuffed vegetables incredibly flavorful. These masalas have helped me save valuable time while ensuring my family enjoys restaurant-quality dishes with the comfort and authenticity of home-cooked food.',
-          },
-        ])
+        setTestimonials([])
       }
 
       if (!reviews || reviews.length === 0) {
         setReviews([
-          {
-            id: 'review-aditi-garam',
-            productId: 'garam-masala-premium',
-            customerName: 'Aditi',
-            rating: 5,
-            comment: 'Sukhdevi Alchemy has truly transformed my cooking! The quality, aroma, and freshness of their spices are unmatched. Their Chat Masala adds the perfect tangy punch to snacks and salads, while the Chhole Masala helps me create rich, authentic North Indian flavors at home. The Garam Masala brings exceptional depth and warmth to my curries, and the Bharwa Masala has made stuffed vegetables a family favorite. Every dish I prepare now carries that authentic restaurant-style taste. I highly recommend Sukhdevi Alchemy to anyone who loves flavorful, high-quality spices.',
-            date: '2026-01-25',
-            verified: true,
-          },
-          {
-            id: 'review-subhash-chhole',
-            productId: 'chhole-masala-premium',
-            customerName: 'Subhash',
-            rating: 5,
-            comment: 'As a food lover, I may not know how to cook, but I definitely know good taste when I experience it. After trying dishes prepared with Sukhdevi Alchemy spices, I was genuinely impressed by the rich flavors and authentic aroma. The Chat Masala adds a perfect burst of tangy flavor to snacks and fruits, while the Chhole Masala delivers the classic North Indian taste that makes every plate irresistible. The Garam Masala enhances the depth and richness of curries, and the Bharwa Masala brings a unique and delicious flavor to stuffed vegetable dishes. Every meal tastes more flavorful and memorable. Sukhdevi Alchemy spices have truly elevated my dining experience.',
-            date: '2026-01-27',
-            verified: true,
-          },
           {
             id: 'review-geetika-bharwa',
             productId: 'bharwa-masala-premium',

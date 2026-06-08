@@ -11,7 +11,6 @@ import { CartDrawer } from "@/components/CartDrawer"
 import { ProductDetailDialog } from "@/components/ProductDetailDialog"
 import { CheckoutView } from "@/components/CheckoutView"
 import { OrderTrackingView } from "@/components/OrderTrackingView"
-import { TestimonialsSection } from "@/components/TestimonialsSection"
 import { ContactUsSection } from "@/components/ContactUsSection"
 import { AdminPanel } from "@/components/AdminPanel"
 import { AuthView } from "@/components/AuthView"
@@ -963,7 +962,7 @@ function App() {
                   variant="outline"
                   size="icon"
                   onClick={handleOpenAccount}
-                  className="h-9 w-9 rounded-full border-orange-300 bg-orange-50 text-orange-600 hover:bg-orange-100"
+                  className="h-9 w-9 rounded-full"
                   aria-label="Account"
                 >
                   <UserCircle size={18} />
@@ -1261,7 +1260,6 @@ function App() {
         </div>
       </nav>
 
-      <TestimonialsSection />
       <ContactUsSection />
 
       <footer className="mt-16 border-t bg-slate-900 text-slate-100">
@@ -1269,7 +1267,7 @@ function App() {
           <img
             src={BRAND_LOGO_PATH}
             alt="Sukhdevi Alchemy logo"
-            className="mx-auto mb-3 h-12 w-12 rounded-full object-cover border"
+            className="mx-auto mb-3 h-12 w-12 rounded-full border border-slate-300 bg-white p-1 object-contain"
             loading="lazy"
           />
           <p className="text-slate-100">© 2026 Sukhdevi Alchemy. Premium Masala & Organic Spices.</p>

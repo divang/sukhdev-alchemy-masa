@@ -30,7 +30,7 @@ export const CATALOG_SEED_PRODUCTS: Product[] = [
     packGrams: 50,
     image: "images/products/garam-masala-premium.png",
     rating: 4.8,
-    reviewCount: 5,
+    reviewCount: 0,
     description:
       "Our flagship, rich, and highly aromatic blend crafted with rare and expensive spices like Stone Flower, Long Pepper, and Mace. No added salt or fillers.",
     ingredients: [
@@ -59,13 +59,13 @@ export const CATALOG_SEED_PRODUCTS: Product[] = [
   },
   {
     id: "bharwa-masala-premium",
-    name: "Bharwa Masala",
+    name: "Bharwa Masala Premium",
     category: "premium-masala",
     price: 125,
     packGrams: 50,
     image: "images/products/bharwa-masala-premium.png",
     rating: 4.7,
-    reviewCount: 4,
+    reviewCount: 0,
     description:
       "A fragrant, coarsely ground blend dominated by roasted cumin and fennel. Designed specifically to bring out the best in stuffed karela, bhindi, or baingan.",
     ingredients: [
@@ -83,13 +83,13 @@ export const CATALOG_SEED_PRODUCTS: Product[] = [
   },
   {
     id: "chat-masala-premium",
-    name: "Chaat Masala",
+    name: "Chaat Masala Premium",
     category: "premium-masala",
     price: 145,
     packGrams: 50,
     image: "images/products/chat-masala-premium.png",
     rating: 4.9,
-    reviewCount: 3,
+    reviewCount: 0,
     description:
       "A highly addictive, lip-smacking blend that balances tartness with a spicy kick. Perfect for sprinkling on fruits, salads, and street-style snacks.",
     ingredients: [
@@ -113,13 +113,13 @@ export const CATALOG_SEED_PRODUCTS: Product[] = [
   },
   {
     id: "chhole-masala-premium",
-    name: "Chole Masala",
+    name: "Chole Masala Premium",
     category: "premium-masala",
     price: 160,
     packGrams: 50,
     image: "images/products/chhole-masala-premium.png",
     rating: 4.8,
-    reviewCount: 6,
+    reviewCount: 0,
     description:
       "A perfectly balanced, dark, and tangy blend featuring premium Bedgi chillies and Anardana for that authentic Punjabi Chole flavor.",
     ingredients: [
