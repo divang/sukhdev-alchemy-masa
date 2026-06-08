@@ -184,6 +184,30 @@ function isAllowedAuthRedirect(urlValue: string) {
   }
 }
 
+function parseHashParams(hash: string) {
+  const raw = hash.startsWith("#") ? hash.slice(1) : hash
+  return new URLSearchParams(raw)
+}
+
+function isSupabaseAuthHash(hashParams: URLSearchParams) {
+  return ["access_token", "refresh_token", "error", "error_description", "error_code", "type"].some((key) => hashParams.has(key))
+}
+
+function getCleanLocationForOAuth(url: URL) {
+  const cleanUrl = new URL(url.toString())
+  cleanUrl.searchParams.delete("code")
+  cleanUrl.searchParams.delete("error")
+  cleanUrl.searchParams.delete("error_description")
+  cleanUrl.searchParams.delete("error_code")
+
+  const hashParams = parseHashParams(cleanUrl.hash)
+  if (isSupabaseAuthHash(hashParams)) {
+    cleanUrl.hash = ""
+  }
+
+  return `${cleanUrl.pathname}${cleanUrl.search}${cleanUrl.hash}`
+}
+
 function getEmailRedirectTo() {
   const configured = import.meta.env.VITE_AUTH_REDIRECT_URL as string | undefined
   if (configured && configured.trim()) {
@@ -977,6 +1001,7 @@ export async function signInWithGoogle(): Promise<string | undefined> {
   }
 
   const redirectTo = getEmailRedirectTo()
+  authDebug("signInWithGoogle started", { redirectTo })
   const { error } = await supabase.auth.signInWithOAuth({
     provider: "google",
     options: {
@@ -1000,25 +1025,50 @@ export async function finalizeOAuthRedirect(): Promise<string | undefined> {
   const code = url.searchParams.get("code")
   const error = url.searchParams.get("error")
   const errorDescription = url.searchParams.get("error_description")
+  const hashParams = parseHashParams(url.hash)
+  const accessToken = hashParams.get("access_token")
+  const refreshToken = hashParams.get("refresh_token")
+  const hashError = hashParams.get("error")
+  const hashErrorDescription = hashParams.get("error_description")
 
   function clearOAuthParams() {
-    window.history.replaceState({}, document.title, `${url.origin}${url.pathname}${url.hash}`)
+    window.history.replaceState({}, document.title, getCleanLocationForOAuth(url))
   }
 
-  if (error) {
+  if (error || hashError) {
     clearOAuthParams()
-    return mapAuthErrorMessage(errorDescription || error)
+    return mapAuthErrorMessage(errorDescription || hashErrorDescription || error || hashError)
   }
 
-  if (!code) {
+  if (!code && !(accessToken && refreshToken)) {
     return undefined
   }
 
   try {
-    const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code)
-    if (exchangeError) {
-      clearOAuthParams()
-      return mapAuthErrorMessage(exchangeError.message)
+    if (code) {
+      authDebug("finalizeOAuthRedirect exchanging code for session", {
+        pathname: url.pathname,
+      })
+
+      const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code)
+      if (exchangeError) {
+        clearOAuthParams()
+        return mapAuthErrorMessage(exchangeError.message)
+      }
+    } else if (accessToken && refreshToken) {
+      authDebug("finalizeOAuthRedirect restoring session from hash tokens", {
+        pathname: url.pathname,
+      })
+
+      const { error: sessionError } = await supabase.auth.setSession({
+        access_token: accessToken,
+        refresh_token: refreshToken,
+      })
+
+      if (sessionError) {
+        clearOAuthParams()
+        return mapAuthErrorMessage(sessionError.message)
+      }
     }
   } catch (exchangeError) {
     clearOAuthParams()
