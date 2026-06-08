@@ -211,7 +211,7 @@ export async function triggerShipmentForOrderByAdmin(orderId: string): Promise<{
   }
 }
 
-export async function syncShiprocketAwbForOrderByAdmin(orderId: string): Promise<{
+export async function syncShiprocketAwbForOrder(orderId: string): Promise<{
   success: boolean
   synced?: boolean
   reason?: string
@@ -264,3 +264,6 @@ export async function syncShiprocketAwbForOrderByAdmin(orderId: string): Promise
     externalStatus: json.externalStatus,
   }
 }
+
+// Backward-compatible export used by admin UI.
+export const syncShiprocketAwbForOrderByAdmin = syncShiprocketAwbForOrder

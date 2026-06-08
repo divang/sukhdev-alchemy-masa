@@ -8,7 +8,7 @@ import { Progress } from "@/components/ui/progress"
 import { ArrowLeft, Package, Truck, CheckCircle, Link as LinkIcon } from "@phosphor-icons/react"
 import { cn } from "@/lib/utils"
 import type { Order } from "@/lib/types"
-import { fetchLatestShipmentForOrder, type LatestOrderShipment } from "@/lib/order-shipments"
+import { fetchLatestShipmentForOrder, syncShiprocketAwbForOrder, type LatestOrderShipment } from "@/lib/order-shipments"
 
 type OrderTrackingViewProps = {
   order: Order | null
@@ -28,6 +28,7 @@ export function OrderTrackingView({ order, orders, onBack, onSelectOrder }: Orde
   const [trackingId, setTrackingId] = useState("")
   const [shipment, setShipment] = useState<LatestOrderShipment | null>(null)
   const [isLoadingShipment, setIsLoadingShipment] = useState(false)
+  const [isSyncingShipment, setIsSyncingShipment] = useState(false)
   const [shipmentError, setShipmentError] = useState<string | null>(null)
   const recentOrders = orders.slice(0, 5)
 
@@ -66,6 +67,51 @@ export function OrderTrackingView({ order, orders, onBack, onSelectOrder }: Orde
       }
 
       setShipment(result.shipment ?? null)
+
+      const loadedShipment = result.shipment
+      const shouldSyncAwb = Boolean(
+        loadedShipment
+        && loadedShipment.providerKey === "shiprocket"
+        && !loadedShipment.awbCode
+        && loadedShipment.shipmentId
+        && (loadedShipment.shipmentStatus === "created" || loadedShipment.shipmentStatus === "pending")
+      )
+
+      if (!shouldSyncAwb) {
+        return
+      }
+
+      setIsSyncingShipment(true)
+      const syncResult = await syncShiprocketAwbForOrder(order.id)
+      if (!isActive) {
+        return
+      }
+
+      setIsSyncingShipment(false)
+
+      if (!syncResult.success) {
+        setShipmentError(syncResult.error ?? "Unable to refresh shipment details from Shiprocket.")
+        return
+      }
+
+      if (!syncResult.synced) {
+        return
+      }
+
+      setShipment((current) => {
+        if (!current) {
+          return current
+        }
+
+        return {
+          ...current,
+          shipmentId: syncResult.shipmentId ?? current.shipmentId,
+          awbCode: syncResult.awbCode ?? current.awbCode,
+          trackingUrl: syncResult.trackingUrl ?? current.trackingUrl,
+          externalStatus: syncResult.externalStatus ?? current.externalStatus,
+          externalEventAt: new Date().toISOString(),
+        }
+      })
     }
 
     void loadShipment()
@@ -241,6 +287,10 @@ export function OrderTrackingView({ order, orders, onBack, onSelectOrder }: Orde
                 <div className="rounded-lg border p-4 space-y-3 text-sm">
                   {isLoadingShipment && (
                     <p className="text-muted-foreground">Loading shipment details...</p>
+                  )}
+
+                  {!isLoadingShipment && isSyncingShipment && (
+                    <p className="text-muted-foreground">Fetching latest AWB from Shiprocket...</p>
                   )}
 
                   {!isLoadingShipment && !shipment && !shipmentError && (

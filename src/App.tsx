@@ -44,6 +44,9 @@ import { triggerOrderCreatedNotification, triggerOrderNotification } from "@/lib
 
 type View = "store" | "account" | "checkout" | "payment" | "tracking" | "admin" | "account-details"
 
+// Flip this to false to instantly revert mobile cards back to the original layout.
+const ENABLE_AMAZON_STYLE_MOBILE_PRODUCT_CARDS = true
+
 function mergeOrders(primary: Order[], secondary: Order[]) {
   const deduped = new Map<string, Order>()
 
@@ -997,6 +1000,19 @@ function App() {
                 </Button>
               )}
 
+              {profile && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleOpenTracking}
+                  className="sm:hidden h-9 px-2 flex flex-col items-center justify-center leading-none"
+                  aria-label="My Orders"
+                >
+                  <Package size={14} />
+                  <span className="text-[10px]">My Orders</span>
+                </Button>
+              )}
+
               <Button variant="ghost" size="icon" onClick={handleOpenAccount} className="sm:hidden h-9 w-9" aria-label="Account">
                 <UserCircle size={18} />
               </Button>
@@ -1070,13 +1086,14 @@ function App() {
               <p className="text-muted-foreground">{filteredProducts.length} products available</p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className={ENABLE_AMAZON_STYLE_MOBILE_PRODUCT_CARDS ? "grid grid-cols-2 md:grid-cols-2 gap-3 sm:gap-6" : "grid grid-cols-1 md:grid-cols-2 gap-6"}>
               {filteredProducts.map((product) => (
                 <ProductCard
                   key={product.id}
                   product={product}
                   onViewDetails={setSelectedProduct}
                   onAddToCart={handleAddToCart}
+                  mobileDenseLayout={ENABLE_AMAZON_STYLE_MOBILE_PRODUCT_CARDS}
                 />
               ))}
             </div>

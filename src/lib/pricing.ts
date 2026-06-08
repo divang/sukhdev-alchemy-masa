@@ -6,16 +6,16 @@ export const FREE_SHIPPING_THRESHOLD = 500
 export const MAX_PRODUCT_GRAMS_PER_CART = 500
 
 const rawPackPriceMap: Record<string, Record<number, number>> = {
-  "raw-cardamom-black": { 50: 135, 100: 265 },
-  "raw-cardamom-green": { 50: 255, 100: 510 },
-  "raw-clove": { 50: 90, 100: 175 },
-  "raw-cumin": { 50: 52, 100: 100 },
-  "raw-fennel-lucknow": { 50: 26, 100: 50 },
-  "raw-guntur-chilli": { 50: 23, 100: 45 },
-  "raw-pepper-black": { 50: 78, 100: 150 },
-  "raw-star-anise": { 50: 78, 100: 150 },
-  "raw-tej-patta": { 50: 38, 100: 75 },
-  "raw-turmeric": { 50: 33, 100: 65 },
+  "raw-cardamom-black": { 50: 140 },
+  "raw-cardamom-green": { 50: 260 },
+  "raw-clove": { 50: 90 },
+  "raw-cumin": { 50: 50 },
+  "raw-fennel-lucknow": { 50: 25 },
+  "raw-guntur-chilli": { 50: 25 },
+  "raw-pepper-black": { 50: 80 },
+  "raw-star-anise": { 50: 80 },
+  "raw-tej-patta": { 50: 40 },
+  "raw-turmeric": { 50: 35 },
 }
 
 export function isComboPack(product: Product) {
@@ -40,7 +40,7 @@ export function getProductPackGrams(product: Product) {
 
 export function getProductPackLabel(product: Product) {
   if (getRawPackPriceConfig(product)) {
-    return "50g or 100g pack"
+    return "50g pack"
   }
 
   return isComboPack(product) ? "4 x 50g packs" : `${getProductPackGrams(product)}g pack`
