@@ -23,8 +23,9 @@ export function ProductCard({ product, onViewDetails, onAddToCart, mobileDenseLa
     ? "w-full h-full object-cover object-bottom transition-transform hover:scale-105 duration-300"
     : "w-full h-full object-cover transition-transform hover:scale-105 duration-300"
   const currentPrice = resolveProductPackPrice(product, getProductPackGrams(product))
-  const referencePrice = Math.max(currentPrice + 20, Math.ceil(currentPrice * 1.45 / 10) * 10)
-  const discountPercent = Math.max(5, Math.round(((referencePrice - currentPrice) / referencePrice) * 100))
+  const discountSeed = [...product.id].reduce((sum, char) => sum + char.charCodeAt(0), 0)
+  const discountPercent = 10 + (discountSeed % 11)
+  const referencePrice = Math.ceil((currentPrice / (1 - discountPercent / 100)) / 5) * 5
 
   if (mobileDenseLayout) {
     return (
@@ -50,7 +51,7 @@ export function ProductCard({ product, onViewDetails, onAddToCart, mobileDenseLa
               </Badge>
             </button>
 
-            <CardContent className="space-y-0.5 p-2.5 pb-1.5">
+            <CardContent className="space-y-0.5 p-2.5 pb-1">
               <h3 className="line-clamp-1 text-[14px] font-medium leading-5">{product.name}</h3>
               <div className="flex items-end gap-1">
                 <span className="text-[22px] font-bold tracking-tight leading-none">₹{currentPrice}</span>
@@ -59,11 +60,11 @@ export function ProductCard({ product, onViewDetails, onAddToCart, mobileDenseLa
               <p className="text-[11px] leading-4 text-muted-foreground">200+ bought in past month</p>
             </CardContent>
 
-            <CardFooter className="justify-between p-2.5 pt-0.5">
+            <CardFooter className="justify-between p-2.5 pt-0">
               <button
                 type="button"
                 onClick={() => onViewDetails(product)}
-                className="text-[12px] font-medium text-slate-700"
+                className="text-[12px] leading-none font-medium text-slate-700"
               >
                 View details
               </button>
