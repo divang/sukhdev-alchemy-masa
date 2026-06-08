@@ -4,7 +4,7 @@ import { ShoppingCart, List, Package, CreditCard, Gear, SignOut, UserCircle, Ins
 import { QRCodeSVG as QRCode } from "qrcode.react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { CategorySidebar } from "@/components/CategorySidebar"
 import { ProductCard } from "@/components/ProductCard"
 import { CartDrawer } from "@/components/CartDrawer"
@@ -990,24 +990,96 @@ function App() {
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-20 border-b border-slate-200 bg-white text-slate-900 shadow-sm sm:border-border sm:bg-card sm:text-foreground">
         <div className="container mx-auto px-3 sm:px-4 py-2 sm:py-4">
+          <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
+            <SheetContent side="left" className="w-[85vw] max-w-xs">
+              <SheetHeader>
+                <SheetTitle>Sukhdevi Alchemy</SheetTitle>
+              </SheetHeader>
+              <div className="mt-4 space-y-5">
+                <CategorySidebar
+                  categories={categories || []}
+                  selectedCategory={selectedCategory}
+                  onSelectCategory={(category) => {
+                    setSelectedCategory(category)
+                    setMobileMenuOpen(false)
+                  }}
+                />
+
+                {profile?.role === "admin" && (
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start"
+                    onClick={() => {
+                      setMobileMenuOpen(false)
+                      handleOpenAdmin()
+                    }}
+                  >
+                    <Gear size={16} className="mr-2" />
+                    Admin Panel
+                  </Button>
+                )}
+
+                <div className="border-t pt-4">
+                  <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Your Account</p>
+                  <div className="space-y-2">
+                    {profile && (
+                      <Button variant="ghost" className="w-full justify-start" onClick={() => {
+                        setMobileMenuOpen(false)
+                        handleOpenTracking()
+                      }}>
+                        Your Orders
+                      </Button>
+                    )}
+                    <Button variant="ghost" className="w-full justify-start" onClick={() => {
+                      setMobileMenuOpen(false)
+                      handleOpenAccount()
+                    }}>
+                      {profile ? "Your Account" : "Sign In"}
+                    </Button>
+                    {profile && (
+                      <Button variant="ghost" className="w-full justify-start" onClick={() => {
+                        setMobileMenuOpen(false)
+                        handleSignOut()
+                      }}>
+                        Sign Out
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </SheetContent>
+          </Sheet>
+
           <div className="space-y-2 sm:hidden">
             <div className="flex items-center justify-between gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedCategory(null)
-                  window.scrollTo({ top: 0, behavior: "smooth" })
-                }}
-                className="flex min-w-0 items-center gap-2 text-left"
-              >
-                <img
-                  src={BRAND_LOGO_PATH}
-                  alt="Sukhdevi Alchemy logo"
-                  className="h-9 w-9 rounded-full border object-cover"
-                  loading="lazy"
-                />
-                <p className="truncate text-[22px] font-semibold leading-none">Sukhdevi Alchemy</p>
-              </button>
+              <div className="flex min-w-0 items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setMobileMenuOpen(true)}
+                  className="h-9 w-9 rounded-md"
+                  aria-label="Open category menu"
+                >
+                  <List size={18} />
+                </Button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedCategory(null)
+                    window.scrollTo({ top: 0, behavior: "smooth" })
+                  }}
+                  className="flex min-w-0 items-center gap-2 text-left"
+                >
+                  <img
+                    src={BRAND_LOGO_PATH}
+                    alt="Sukhdevi Alchemy logo"
+                    className="h-9 w-9 rounded-full border object-cover"
+                    loading="lazy"
+                  />
+                  <p className="truncate text-[22px] font-semibold leading-none">Sukhdevi Alchemy</p>
+                </button>
+              </div>
 
               <div className="flex items-center gap-2">
                 <Button
@@ -1063,70 +1135,9 @@ function App() {
           <div className="hidden sm:block">
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center min-w-0 gap-2 sm:gap-4">
-              <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
-                <SheetTrigger asChild>
-                  <Button variant="ghost" size="sm" className="lg:hidden h-9 w-9 p-0 text-slate-100 hover:bg-slate-800 hover:text-white sm:h-auto sm:w-auto sm:p-2 sm:text-foreground sm:hover:bg-accent sm:hover:text-accent-foreground">
-                    <List size={24} />
-                  </Button>
-                </SheetTrigger>
-                <SheetContent side="left" className="w-[85vw] max-w-xs">
-                  <SheetHeader>
-                    <SheetTitle>Sukhdevi Alchemy</SheetTitle>
-                  </SheetHeader>
-                  <div className="mt-4 space-y-5">
-                    <CategorySidebar
-                      categories={categories || []}
-                      selectedCategory={selectedCategory}
-                      onSelectCategory={(category) => {
-                        setSelectedCategory(category)
-                        setMobileMenuOpen(false)
-                      }}
-                    />
-
-                    {profile?.role === "admin" && (
-                      <Button
-                        variant="outline"
-                        className="w-full justify-start"
-                        onClick={() => {
-                          setMobileMenuOpen(false)
-                          handleOpenAdmin()
-                        }}
-                      >
-                        <Gear size={16} className="mr-2" />
-                        Admin Panel
-                      </Button>
-                    )}
-
-                    <div className="border-t pt-4">
-                      <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Your Account</p>
-                      <div className="space-y-2">
-                        {profile && (
-                          <Button variant="ghost" className="w-full justify-start" onClick={() => {
-                            setMobileMenuOpen(false)
-                            handleOpenTracking()
-                          }}>
-                            Your Orders
-                          </Button>
-                        )}
-                        <Button variant="ghost" className="w-full justify-start" onClick={() => {
-                          setMobileMenuOpen(false)
-                          handleOpenAccount()
-                        }}>
-                          {profile ? "Your Account" : "Sign In"}
-                        </Button>
-                        {profile && (
-                          <Button variant="ghost" className="w-full justify-start" onClick={() => {
-                            setMobileMenuOpen(false)
-                            handleSignOut()
-                          }}>
-                            Sign Out
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </SheetContent>
-              </Sheet>
+              <Button variant="ghost" size="sm" onClick={() => setMobileMenuOpen(true)} className="lg:hidden h-9 w-9 p-0 text-slate-100 hover:bg-slate-800 hover:text-white sm:h-auto sm:w-auto sm:p-2 sm:text-foreground sm:hover:bg-accent sm:hover:text-accent-foreground">
+                <List size={24} />
+              </Button>
 
               <img
                   src={BRAND_LOGO_PATH}
