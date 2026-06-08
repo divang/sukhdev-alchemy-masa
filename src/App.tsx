@@ -1051,13 +1051,13 @@ function App() {
           </Sheet>
 
           <div className="space-y-2 sm:hidden">
-            <div className="flex items-center justify-between gap-2 rounded-2xl border border-amber-200/70 bg-gradient-to-r from-orange-50 via-amber-50 to-stone-50 px-2 py-2 shadow-sm">
+            <div className="flex items-center justify-between gap-2 rounded-2xl border border-slate-200 bg-white px-2 py-2 shadow-sm">
               <div className="flex min-w-0 items-center gap-2">
                 <Button
                   variant="outline"
                   size="icon"
                   onClick={() => setMobileMenuOpen(true)}
-                  className="h-9 w-9 rounded-md border-amber-200 bg-white/90 text-amber-950 shadow-sm"
+                  className="h-9 w-9 rounded-md border-slate-200 bg-white text-slate-700 shadow-sm"
                   aria-label="Open category menu"
                 >
                   <List size={18} />
@@ -1069,15 +1069,15 @@ function App() {
                     setSelectedCategory(null)
                     window.scrollTo({ top: 0, behavior: "smooth" })
                   }}
-                  className="flex min-w-0 items-center gap-2 rounded-xl bg-white/75 px-1.5 py-1 text-left shadow-sm ring-1 ring-amber-100/80"
+                  className="flex min-w-0 items-center gap-2 rounded-xl bg-white px-1.5 py-1 text-left shadow-sm ring-1 ring-slate-100"
                 >
                   <img
                     src={BRAND_LOGO_PATH}
                     alt="Sukhdevi Alchemy logo"
-                    className="h-9 w-9 rounded-full border border-amber-200 object-cover"
+                    className="h-9 w-9 rounded-full border border-slate-200 object-cover"
                     loading="lazy"
                   />
-                  <p className="truncate text-[22px] font-semibold leading-none text-stone-900">Sukhdevi Alchemy</p>
+                  <p className="truncate text-[22px] font-semibold leading-none text-emerald-700">Sukhdevi Alchemy</p>
                 </button>
               </div>
 
@@ -1085,7 +1085,7 @@ function App() {
                 variant="outline"
                 size="icon"
                 onClick={handleOpenAccount}
-                className="h-9 w-9 rounded-full border-amber-200 bg-white/90 text-amber-950 shadow-sm"
+                className="h-9 w-9 rounded-full border-slate-200 bg-white text-slate-700 shadow-sm"
                 aria-label="Account"
               >
                 <UserCircle size={18} />
@@ -1093,13 +1093,13 @@ function App() {
             </div>
 
             <div className="flex items-center gap-2">
-              <div className="flex h-10 flex-1 items-center rounded-full border border-amber-200 bg-white px-3 shadow-sm">
+              <div className="flex h-10 flex-1 items-center rounded-full border border-slate-200 bg-white px-3 shadow-sm">
                 <input
                   ref={searchInputRef}
                   value={searchQuery}
                   onChange={(event) => setSearchQuery(event.target.value)}
                   placeholder="Discover products"
-                  className="w-full bg-transparent text-sm text-stone-900 outline-none placeholder:text-stone-400"
+                  className="w-full bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400"
                   aria-label="Search products"
                 />
               </div>
@@ -1108,7 +1108,7 @@ function App() {
                 size="icon"
                 variant="outline"
                 onClick={() => searchInputRef.current?.focus()}
-                className="h-10 w-10 rounded-full border-amber-200 bg-white text-amber-950 shadow-sm"
+                className="h-10 w-10 rounded-full border-slate-200 bg-white text-slate-700 shadow-sm"
                 aria-label="Search"
               >
                 <MagnifyingGlass size={18} />
