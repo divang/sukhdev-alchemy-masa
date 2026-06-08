@@ -411,6 +411,31 @@ export async function getCurrentAuthState(): Promise<AuthState> {
     })
     return buildAuthState(data.session)
   } catch (error) {
+    authDebug("getCurrentAuthState primary getSession failed; retrying once", {
+      error: error instanceof Error ? error.message : String(error),
+      ...networkDiagnostics(),
+    })
+
+    try {
+      const { data: retryData } = await withTimeout(
+        supabase.auth.getSession(),
+        10000,
+        "getSession retry timed out"
+      )
+      authDebug("getCurrentAuthState retry completed", {
+        hasSession: Boolean(retryData.session),
+        userId: retryData.session?.user?.id ?? null,
+      })
+      return buildAuthState(retryData.session)
+    } catch (retryError) {
+      authDebug("getCurrentAuthState retry FAILED", {
+        error: retryError instanceof Error ? retryError.message : String(retryError),
+        rcaCategory: retryError instanceof Error ? classifySupabaseError(retryError.message) : "unknown",
+        durationMs: Date.now() - start,
+        ...networkDiagnostics(),
+      })
+    }
+
     authDebug("getCurrentAuthState FAILED", {
       error: error instanceof Error ? error.message : String(error),
       rcaCategory: error instanceof Error ? classifySupabaseError(error.message) : "unknown",
@@ -432,14 +457,48 @@ export function subscribeToAuthStateChanges(callback: (state: AuthState) => void
       hasSession: Boolean(session),
       userId: session?.user?.id ?? null,
     })
+
+    let activeSession = session
+
+    // Avoid false sign-outs on transient session-read glitches by doing
+    // a best-effort re-check when the event is not an explicit sign-out.
+    if (!activeSession && _event !== "SIGNED_OUT") {
+      try {
+        const { data: recovered } = await withTimeout(
+          supabase.auth.getSession(),
+          5000,
+          "onAuthStateChange recovery getSession timed out"
+        )
+
+        if (recovered.session) {
+          activeSession = recovered.session
+          authDebug("onAuthStateChange recovered active session", {
+            event: _event,
+            userId: activeSession.user.id,
+          })
+        }
+      } catch (recoveryError) {
+        authDebug("onAuthStateChange session recovery failed", {
+          event: _event,
+          error: recoveryError instanceof Error ? recoveryError.message : String(recoveryError),
+        })
+      }
+    }
+
     try {
-      callback(await buildAuthState(session))
+      callback(await buildAuthState(activeSession))
     } catch (error) {
       authDebug("onAuthStateChange buildAuthState FAILED", {
         error: error instanceof Error ? error.message : String(error),
         rcaCategory: error instanceof Error ? classifySupabaseError(error.message) : "unknown",
         ...networkDiagnostics(),
       })
+
+      if (activeSession?.user) {
+        callback({ user: activeSession.user, profile: buildProfileFromMetadata(activeSession.user) })
+        return
+      }
+
       callback({ user: null, profile: null })
     }
   })

@@ -12,5 +12,12 @@ console.log("[auth] supabase module initialized", {
 })
 
 export const supabase = isSupabaseConfigured
-  ? createClient(supabaseUrl, supabaseAnonKey)
+  ? createClient(supabaseUrl, supabaseAnonKey, {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true,
+      storageKey: "sukhdevi-auth-token",
+    },
+  })
   : null
