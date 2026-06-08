@@ -795,6 +795,23 @@ function App() {
     }
   }
 
+  const handleResumePayment = (orderId: string) => {
+    const visibleOrders = profile?.role === "admin" ? adminOrders : customerOrders
+    const order = visibleOrders.find((item) => item.id === orderId)
+    if (!order) {
+      toast.error("Order not found.")
+      return
+    }
+
+    if (order.paymentStatus === "paid") {
+      toast.info("This order is already paid.")
+      return
+    }
+
+    setCurrentOrder(order)
+    setCurrentView("payment")
+  }
+
   if (currentView === "account") {
     return (
       <AuthView
@@ -985,9 +1002,11 @@ function App() {
     }
 
     const allVisibleOrders = profile.role === "admin" ? adminVisibleOrders : customerOrders
-    const trackingOrders = allVisibleOrders.filter(
-      (entry) => entry.id === TRACKING_VISIBLE_ORDER_ID && trackingOwnerAllowed
-    )
+    const trackingOrders = profile.role === "admin"
+      ? allVisibleOrders.filter((entry) => entry.id === TRACKING_VISIBLE_ORDER_ID && trackingOwnerAllowed)
+      : allVisibleOrders.filter(
+        (entry) => entry.paymentStatus === "pending" || (entry.id === TRACKING_VISIBLE_ORDER_ID && trackingOwnerAllowed)
+      )
     const trackingOrder = currentOrder?.id === TRACKING_VISIBLE_ORDER_ID
       ? currentOrder
       : (trackingOrders[0] ?? null)
@@ -998,6 +1017,7 @@ function App() {
         orders={trackingOrders}
         onBack={handleBackToStore}
         onSelectOrder={handleViewTracking}
+        onResumePayment={handleResumePayment}
         onAddToCart={(productId) => {
           const product = (products || []).find((entry) => entry.id === productId)
           if (!product) {
@@ -1032,7 +1052,7 @@ function App() {
                 <img
                   src={BRAND_LOGO_PATH}
                   alt="Sukhdevi Alchemy logo"
-                  className="h-10 w-10 rounded-full object-cover border"
+                  className="h-8 w-8 rounded-full object-cover border"
                   loading="lazy"
                 />
                 <h1 className="text-2xl font-bold truncate">Admin Panel</h1>
@@ -1155,7 +1175,7 @@ function App() {
                   <img
                     src={BRAND_LOGO_PATH}
                     alt="Sukhdevi Alchemy logo"
-                    className="h-9 w-9 rounded-full border border-slate-200 object-cover"
+                    className="h-7 w-7 rounded-full border border-slate-200 object-cover"
                     loading="lazy"
                   />
                   <p className="truncate text-[22px] font-semibold leading-none text-emerald-700">Sukhdevi Alchemy</p>
@@ -1207,7 +1227,7 @@ function App() {
               <img
                   src={BRAND_LOGO_PATH}
                 alt="Sukhdevi Alchemy logo"
-                className="h-9 w-9 rounded-full border object-cover sm:h-10 sm:w-10"
+                className="h-7 w-7 rounded-full border object-cover sm:h-8 sm:w-8"
                 loading="lazy"
               />
               <h1 className="truncate text-base font-semibold sm:text-2xl md:text-3xl sm:font-bold">Sukhdevi Alchemy</h1>
@@ -1409,7 +1429,7 @@ function App() {
           <img
             src={BRAND_LOGO_PATH}
             alt="Sukhdevi Alchemy logo"
-            className="mx-auto mb-3 h-12 w-12 rounded-full border border-slate-300 bg-white p-1 object-contain"
+            className="mx-auto mb-3 h-10 w-10 rounded-full border border-slate-300 bg-white p-1 object-contain"
             loading="lazy"
           />
           <p className="text-slate-100">© 2026 Sukhdevi Alchemy. Premium Masala & Organic Spices.</p>

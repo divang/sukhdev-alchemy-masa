@@ -15,6 +15,7 @@ type OrderTrackingViewProps = {
   orders: Order[]
   onBack: () => void
   onSelectOrder: (orderId: string) => void
+  onResumePayment?: (orderId: string) => void
 }
 
 const statusSteps = [
@@ -24,7 +25,7 @@ const statusSteps = [
   { key: "delivered", label: "Delivered", icon: CheckCircle }
 ]
 
-export function OrderTrackingView({ order, orders, onBack, onSelectOrder }: OrderTrackingViewProps) {
+export function OrderTrackingView({ order, orders, onBack, onSelectOrder, onResumePayment }: OrderTrackingViewProps) {
   const [trackingId, setTrackingId] = useState("")
   const [shipment, setShipment] = useState<LatestOrderShipment | null>(null)
   const [isLoadingShipment, setIsLoadingShipment] = useState(false)
@@ -175,6 +176,20 @@ export function OrderTrackingView({ order, orders, onBack, onSelectOrder }: Orde
                           <p className="text-sm text-muted-foreground capitalize">{item.status}</p>
                         </div>
                       </div>
+                      {item.paymentStatus === "pending" && (
+                        <div className="mt-3 flex justify-end">
+                          <Button
+                            type="button"
+                            size="sm"
+                            onClick={(event) => {
+                              event.stopPropagation()
+                              onResumePayment?.(item.id)
+                            }}
+                          >
+                            Complete Payment
+                          </Button>
+                        </div>
+                      )}
                     </button>
                   )
                 })}
@@ -404,6 +419,21 @@ export function OrderTrackingView({ order, orders, onBack, onSelectOrder }: Orde
                         </span>
                       </div>
                     </div>
+                  </div>
+                  <Separator />
+                </>
+              )}
+
+              {order.paymentStatus === "pending" && (
+                <>
+                  <div className="rounded-lg border border-amber-300 bg-amber-50 p-4">
+                    <p className="font-medium text-amber-900">Payment Pending</p>
+                    <p className="mt-1 text-sm text-amber-800">
+                      This order was created but payment is not completed yet. You can continue checkout now.
+                    </p>
+                    <Button className="mt-3" onClick={() => onResumePayment?.(order.id)}>
+                      Continue Payment
+                    </Button>
                   </div>
                   <Separator />
                 </>
