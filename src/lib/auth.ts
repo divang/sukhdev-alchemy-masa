@@ -1002,16 +1002,30 @@ export async function signInWithGoogle(): Promise<string | undefined> {
 
   const redirectTo = getEmailRedirectTo()
   authDebug("signInWithGoogle started", { redirectTo })
-  const { error } = await supabase.auth.signInWithOAuth({
+  const { data, error } = await supabase.auth.signInWithOAuth({
     provider: "google",
     options: {
       redirectTo,
+      skipBrowserRedirect: true,
     },
   })
 
   if (error) {
     return mapAuthErrorMessage(error.message)
   }
+
+  if (typeof window === "undefined") {
+    return "Google sign-in can only be started in a browser."
+  }
+
+  if (!data?.url) {
+    return "Could not start Google sign-in. Please try again."
+  }
+
+  authDebug("signInWithGoogle redirecting to provider", {
+    providerHost: new URL(data.url).host,
+  })
+  window.location.assign(data.url)
 
   return undefined
 }
