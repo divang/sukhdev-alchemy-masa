@@ -25,6 +25,7 @@ type OrderTrackingViewProps = {
   orders: Order[]
   onBack: () => void
   onSelectOrder: (orderId: string) => void
+  onAddToCart: (productId: string) => void
 }
 
 const statusSteps = [
@@ -55,12 +56,13 @@ function orderMatchesSearch(order: Order, query: string) {
   return haystack.includes(query.toLowerCase())
 }
 
-export function OrderTrackingView({ order, orders, onBack, onSelectOrder }: OrderTrackingViewProps) {
+export function OrderTrackingView({ order, orders, onBack, onSelectOrder, onAddToCart }: OrderTrackingViewProps) {
   const [products] = useKV<Product[]>("products", [])
   const [productImages] = useKV<Record<string, string>>("product-images", {})
   const [searchQuery, setSearchQuery] = useState("")
   const [orderFilter, setOrderFilter] = useState<OrderFilter>("all")
   const [shipment, setShipment] = useState<LatestOrderShipment | null>(null)
+  const [shipmentByOrderId, setShipmentByOrderId] = useState<Record<string, LatestOrderShipment | null>>({})
   const [isLoadingShipment, setIsLoadingShipment] = useState(false)
   const [isSyncingShipment, setIsSyncingShipment] = useState(false)
   const [shipmentError, setShipmentError] = useState<string | null>(null)
@@ -198,6 +200,46 @@ export function OrderTrackingView({ order, orders, onBack, onSelectOrder }: Orde
       isActive = false
     }
   }, [order?.id])
+
+  useEffect(() => {
+    let isActive = true
+
+    async function loadShipmentsForCards() {
+      const sampleOrders = filteredOrders.slice(0, 20)
+      if (sampleOrders.length === 0) {
+        if (isActive) {
+          setShipmentByOrderId({})
+        }
+        return
+      }
+
+      const results = await Promise.all(
+        sampleOrders.map(async (entry) => {
+          const result = await fetchLatestShipmentForOrder(entry.id)
+          return {
+            orderId: entry.id,
+            shipment: result.error ? null : (result.shipment ?? null),
+          }
+        })
+      )
+
+      if (!isActive) {
+        return
+      }
+
+      const next: Record<string, LatestOrderShipment | null> = {}
+      for (const item of results) {
+        next[item.orderId] = item.shipment
+      }
+      setShipmentByOrderId(next)
+    }
+
+    void loadShipmentsForCards()
+
+    return () => {
+      isActive = false
+    }
+  }, [filteredOrders])
   
   const getStatusIndex = (status: string) => {
     return statusSteps.findIndex(s => s.key === status)
@@ -256,18 +298,20 @@ export function OrderTrackingView({ order, orders, onBack, onSelectOrder }: Orde
               <div className="flex gap-2 overflow-x-auto pb-1">
                 {buyAgainItems.map((item) => (
                   <div key={item.key} className="w-24 flex-shrink-0">
-                    {getOrderItemThumbnail(item.productId) ? (
-                      <img
-                        src={getOrderItemThumbnail(item.productId)}
-                        alt={item.name}
-                        className="mb-1 h-20 w-full rounded-md border object-cover"
-                        loading="lazy"
-                      />
-                    ) : (
-                      <div className="mb-1 flex h-20 w-full items-center justify-center rounded-md border bg-muted">
-                        <Package size={26} className="text-muted-foreground" />
-                      </div>
-                    )}
+                    <button type="button" className="w-full text-left" onClick={() => onAddToCart(item.productId)}>
+                      {getOrderItemThumbnail(item.productId) ? (
+                        <img
+                          src={getOrderItemThumbnail(item.productId)}
+                          alt={item.name}
+                          className="mb-1 h-20 w-full rounded-md border object-cover"
+                          loading="lazy"
+                        />
+                      ) : (
+                        <div className="mb-1 flex h-20 w-full items-center justify-center rounded-md border bg-muted">
+                          <Package size={26} className="text-muted-foreground" />
+                        </div>
+                      )}
+                    </button>
                     <p className="line-clamp-2 text-xs text-muted-foreground">{item.name}</p>
                   </div>
                 ))}
@@ -291,6 +335,7 @@ export function OrderTrackingView({ order, orders, onBack, onSelectOrder }: Orde
             {filteredOrders.map((entry) => {
               const selected = entry.id === order?.id
               const isDelivered = entry.status === "delivered"
+              const trackingUrlForCard = shipmentByOrderId[entry.id]?.trackingUrl
 
               return (
                 <div
@@ -346,7 +391,14 @@ export function OrderTrackingView({ order, orders, onBack, onSelectOrder }: Orde
                   <Button
                     variant="ghost"
                     className="h-auto w-full justify-between px-0 py-1 text-base"
-                    onClick={() => onSelectOrder(entry.id)}
+                    onClick={() => {
+                      if (trackingUrlForCard) {
+                        window.open(trackingUrlForCard, "_blank", "noopener,noreferrer")
+                        return
+                      }
+
+                      onSelectOrder(entry.id)
+                    }}
                   >
                     Track package
                     <CaretRight size={18} />

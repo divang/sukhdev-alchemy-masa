@@ -934,6 +934,16 @@ function App() {
         orders={trackingOrders}
         onBack={handleBackToStore}
         onSelectOrder={handleViewTracking}
+        onAddToCart={(productId) => {
+          const product = (products || []).find((entry) => entry.id === productId)
+          if (!product) {
+            toast.error("Product not found.")
+            return
+          }
+
+          handleAddToCart(product)
+          setSearchQuery("")
+        }}
       />
     )
   }
@@ -1113,7 +1123,7 @@ function App() {
                 loading="lazy"
               />
               <h1 className="truncate text-base font-semibold sm:text-2xl md:text-3xl sm:font-bold">Sukhdevi Alchemy</h1>
-              <Badge variant="secondary" className="hidden md:inline-flex text-xs sm:text-sm">Premium Masala</Badge>
+              <Badge variant="secondary" className="hidden md:inline-flex text-xs sm:text-sm">Premium Blended Masala</Badge>
               {runtimeMode === "dev" && <Badge variant="destructive" className="hidden md:inline-flex">DEV MODE</Badge>}
               {devModeLocked && <Badge variant="outline" className="hidden md:inline-flex">PROD LOCKED</Badge>}
               <div className="hidden xl:flex items-center gap-1.5 pl-1">

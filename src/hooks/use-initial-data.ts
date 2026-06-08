@@ -23,7 +23,7 @@ export function useInitialData() {
 
   useEffect(() => {
     const initializeData = async () => {
-      const currentVersion = 17
+      const currentVersion = 18
       const cacheBuster = (import.meta.env.VITE_CATALOG_CACHE_BUSTER as string | undefined)?.trim() || CATALOG_CACHE_FALLBACK_BUSTER
       const now = Date.now()
       const hasLocalCatalog = Boolean(categories?.length) && Boolean(products?.length)
@@ -41,7 +41,7 @@ export function useInitialData() {
         setCategories([
           {
             id: 'premium-masala',
-            name: 'Premium Masala',
+            name: 'Premium Blended Masala',
             slug: 'premium-masala',
             enabled: true,
           },

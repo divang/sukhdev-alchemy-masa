@@ -133,7 +133,7 @@ export function AdminPanel({ orders = [], runtimeMode = "prod" }: AdminPanelProp
       return categories
     }
 
-    return [{ id: "premium-masala", name: "Premium Masala", slug: "premium-masala", enabled: true }]
+    return [{ id: "premium-masala", name: "Premium Blended Masala", slug: "premium-masala", enabled: true }]
   }, [categories])
 
   useEffect(() => {

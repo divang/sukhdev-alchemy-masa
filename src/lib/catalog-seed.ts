@@ -3,7 +3,7 @@ import type { Category, Product } from "@/lib/types"
 export const CATALOG_SEED_CATEGORIES: Category[] = [
   {
     id: "premium-masala",
-    name: "Premium Masala",
+    name: "Premium Blended Masala",
     slug: "premium-masala",
     enabled: true,
   },

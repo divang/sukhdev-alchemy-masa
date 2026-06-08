@@ -56,6 +56,25 @@ type CatalogSnapshot = {
   source: "supabase" | "fallback"
 }
 
+const CANONICAL_PREMIUM_PRODUCT_NAMES: Record<string, string> = {
+  "garam-masala-premium": "Mix Masala Premium Blend",
+  "bharwa-masala-premium": "Bharwa Masala Premium",
+  "chat-masala-premium": "Chaat Masala Premium",
+  "chhole-masala-premium": "Chole Masala Premium",
+}
+
+function normalizeCategoryName(id: string, name: string) {
+  if (id === "premium-masala") {
+    return "Premium Blended Masala"
+  }
+
+  return name
+}
+
+function normalizeProductName(id: string, name: string) {
+  return CANONICAL_PREMIUM_PRODUCT_NAMES[id] ?? name
+}
+
 function inferPackGrams(row: Pick<ProductRow, "id" | "tags" | "sku">) {
   if (Array.isArray(row.tags) && row.tags.includes("combo-pack")) {
     return 200
@@ -121,7 +140,7 @@ export async function loadCatalogFromSupabase(): Promise<CatalogSnapshot> {
 
   const categories = ((categoriesData as CategoryRow[] | null) ?? []).map((row) => ({
     id: row.id,
-    name: row.name,
+    name: normalizeCategoryName(row.id, row.name),
     slug: row.slug,
     enabled: row.enabled,
   }))
@@ -141,7 +160,7 @@ export async function loadCatalogFromSupabase(): Promise<CatalogSnapshot> {
     category: row.id === "sukhdevi-combo-pack" || row.sku === "PM-COMBO-001"
       ? "combo-pack-masala"
       : row.category_id,
-    name: row.name,
+    name: normalizeProductName(row.id, row.name),
     price: Number(row.price_per_100g),
     packGrams: inferPackGrams(row),
     image: row.image_path,
@@ -312,7 +331,7 @@ function mapProductRowToProduct(row: ProductRow): Product {
   return {
     id: row.id,
     category: row.category_id,
-    name: row.name,
+    name: normalizeProductName(row.id, row.name),
     price: Number(row.price_per_100g),
     packGrams: inferPackGrams(row),
     image: row.image_path,
@@ -417,7 +436,7 @@ export async function setCategoryEnabledByAdmin(categoryId: string, enabled: boo
     success: true,
     category: {
       id: row.id,
-      name: row.name,
+      name: normalizeCategoryName(row.id, row.name),
       slug: row.slug,
       enabled: row.enabled,
     },

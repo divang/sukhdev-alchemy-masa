@@ -3,7 +3,7 @@
 
 insert into public.categories (id, name, slug, enabled, sort_order)
 values
-  ('premium-masala', 'Premium Masala', 'premium-masala', true, 1),
+  ('premium-masala', 'Premium Blended Masala', 'premium-masala', true, 1),
   ('combo-pack-masala', 'Combo Pack Masala', 'combo-pack-masala', true, 2),
   ('raw-organic-spices', 'Raw Organic Spices', 'raw-organic-spices', true, 3)
 on conflict (id) do update
@@ -50,7 +50,7 @@ values
     'bharwa-masala-premium',
     'premium-masala',
     'PM-BHARWA-001',
-    'Bharwa Masala',
+    'Bharwa Masala Premium',
     'A fragrant, coarsely ground blend dominated by roasted cumin and fennel. Designed specifically to bring out the best in stuffed karela, bhindi, or baingan.',
     125,
     'images/products/bharwa-masala-premium.png',
@@ -66,7 +66,7 @@ values
     'chat-masala-premium',
     'premium-masala',
     'PM-CHAT-001',
-    'Chaat Masala',
+    'Chaat Masala Premium',
     'A highly addictive, lip-smacking blend that balances tartness with a spicy kick. Perfect for sprinkling on fruits, salads, and street-style snacks.',
     145,
     'images/products/chat-masala-premium.png',
@@ -82,7 +82,7 @@ values
     'chhole-masala-premium',
     'premium-masala',
     'PM-CHHOLE-001',
-    'Chole Masala',
+    'Chole Masala Premium',
     'A perfectly balanced, dark, and tangy blend featuring premium Bedgi chillies and Anardana for that authentic Punjabi Chole flavor.',
     160,
     'images/products/chhole-masala-premium.png',

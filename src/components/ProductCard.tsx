@@ -57,7 +57,6 @@ export function ProductCard({ product, onViewDetails, onAddToCart, mobileDenseLa
                 <span className="text-[22px] font-bold tracking-tight leading-none">₹{currentPrice}</span>
                 <span className="pb-0.5 text-[12px] text-muted-foreground line-through">₹{referencePrice}</span>
               </div>
-              <p className="text-[11px] leading-4 text-muted-foreground">200+ bought in past month</p>
             </CardContent>
 
             <CardFooter className="justify-between px-2.5 pb-2 pt-0">
