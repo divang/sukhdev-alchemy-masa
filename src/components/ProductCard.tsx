@@ -30,7 +30,7 @@ export function ProductCard({ product, onViewDetails, onAddToCart, mobileDenseLa
     return (
       <>
         <motion.div whileHover={{ y: -2 }} transition={{ duration: 0.2 }} className="md:hidden">
-          <Card className="h-full overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">
+          <Card className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">
             <button
               type="button"
               onClick={() => onViewDetails(product)}
@@ -50,11 +50,11 @@ export function ProductCard({ product, onViewDetails, onAddToCart, mobileDenseLa
               </Badge>
             </button>
 
-            <CardContent className="space-y-1.5 p-2.5">
-              <h3 className="line-clamp-2 min-h-9 text-sm font-medium leading-4">{product.name}</h3>
+            <CardContent className="space-y-1 p-2.5 pb-2">
+              <h3 className="line-clamp-1 text-[15px] font-medium leading-5">{product.name}</h3>
               <div className="flex items-end gap-1.5">
-                <span className="text-2xl font-extrabold tracking-tight">₹{currentPrice}</span>
-                <span className="pb-0.5 text-xs text-muted-foreground line-through">₹{referencePrice}</span>
+                <span className="text-[34px] font-extrabold tracking-tight leading-none">₹{currentPrice}</span>
+                <span className="pb-1 text-xs text-muted-foreground line-through">₹{referencePrice}</span>
               </div>
               <p className="text-[11px] text-muted-foreground">200+ bought in past month</p>
             </CardContent>
@@ -63,7 +63,7 @@ export function ProductCard({ product, onViewDetails, onAddToCart, mobileDenseLa
               <button
                 type="button"
                 onClick={() => onViewDetails(product)}
-                className="text-xs font-medium text-slate-700"
+                className="text-[13px] font-medium text-slate-700"
               >
                 View details
               </button>

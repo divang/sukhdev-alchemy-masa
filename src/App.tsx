@@ -927,21 +927,21 @@ function App() {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="border-b bg-card sticky top-0 z-10 shadow-sm">
-        <div className="container mx-auto px-3 sm:px-4 py-3 sm:py-4">
+      <header className="sticky top-0 z-10 border-b border-slate-200 bg-slate-900 text-slate-100 shadow-sm sm:border-border sm:bg-card sm:text-foreground">
+        <div className="container mx-auto px-3 sm:px-4 py-2 sm:py-4">
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center min-w-0 gap-2 sm:gap-4">
               <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
                 <SheetTrigger asChild>
-                  <Button variant="ghost" size="sm" className="lg:hidden">
+                  <Button variant="ghost" size="sm" className="lg:hidden h-9 w-9 p-0 text-slate-100 hover:bg-slate-800 hover:text-white sm:h-auto sm:w-auto sm:p-2 sm:text-foreground sm:hover:bg-accent sm:hover:text-accent-foreground">
                     <List size={24} />
                   </Button>
                 </SheetTrigger>
                 <SheetContent side="left" className="w-[85vw] max-w-xs">
                   <SheetHeader>
-                    <SheetTitle>Categories</SheetTitle>
+                    <SheetTitle>Sukhdevi Alchemy</SheetTitle>
                   </SheetHeader>
-                  <div className="mt-4">
+                  <div className="mt-4 space-y-5">
                     <CategorySidebar
                       categories={categories || []}
                       selectedCategory={selectedCategory}
@@ -950,6 +950,34 @@ function App() {
                         setMobileMenuOpen(false)
                       }}
                     />
+
+                    <div className="border-t pt-4">
+                      <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Your Account</p>
+                      <div className="space-y-2">
+                        {profile && (
+                          <Button variant="ghost" className="w-full justify-start" onClick={() => {
+                            setMobileMenuOpen(false)
+                            handleOpenTracking()
+                          }}>
+                            Your Orders
+                          </Button>
+                        )}
+                        <Button variant="ghost" className="w-full justify-start" onClick={() => {
+                          setMobileMenuOpen(false)
+                          handleOpenAccount()
+                        }}>
+                          {profile ? "Your Account" : "Sign In"}
+                        </Button>
+                        {profile && (
+                          <Button variant="ghost" className="w-full justify-start" onClick={() => {
+                            setMobileMenuOpen(false)
+                            handleSignOut()
+                          }}>
+                            Sign Out
+                          </Button>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 </SheetContent>
               </Sheet>
@@ -957,10 +985,10 @@ function App() {
               <img
                   src={BRAND_LOGO_PATH}
                 alt="Sukhdevi Alchemy logo"
-                className="h-9 w-9 sm:h-10 sm:w-10 rounded-full object-cover border"
+                className="h-9 w-9 rounded-full border border-slate-500 object-cover sm:h-10 sm:w-10 sm:border"
                 loading="lazy"
               />
-              <h1 className="truncate text-lg sm:text-2xl md:text-3xl font-bold">Sukhdevi Alchemy</h1>
+              <h1 className="truncate text-base font-semibold sm:text-2xl md:text-3xl sm:font-bold">Sukhdevi Alchemy</h1>
               <Badge variant="secondary" className="hidden md:inline-flex text-xs sm:text-sm">Premium Masala</Badge>
               {runtimeMode === "dev" && <Badge variant="destructive" className="hidden md:inline-flex">DEV MODE</Badge>}
               {devModeLocked && <Badge variant="outline" className="hidden md:inline-flex">PROD LOCKED</Badge>}
@@ -1002,18 +1030,18 @@ function App() {
 
               {profile && (
                 <Button
-                  variant="ghost"
+                  variant="outline"
                   size="sm"
                   onClick={handleOpenTracking}
-                  className="sm:hidden h-9 px-2 flex flex-col items-center justify-center leading-none"
+                  className="sm:hidden h-9 border-slate-500 bg-slate-800 px-2 text-[11px] text-slate-100 hover:bg-slate-700"
                   aria-label="My Orders"
                 >
-                  <Package size={14} />
-                  <span className="text-[10px]">My Orders</span>
+                  <Package size={14} className="mr-1" />
+                  <span>My Orders</span>
                 </Button>
               )}
 
-              <Button variant="ghost" size="icon" onClick={handleOpenAccount} className="sm:hidden h-9 w-9" aria-label="Account">
+              <Button variant="outline" size="icon" onClick={handleOpenAccount} className="sm:hidden h-9 w-9 border-slate-500 bg-slate-800 text-slate-100 hover:bg-slate-700" aria-label="Account">
                 <UserCircle size={18} />
               </Button>
 
@@ -1028,12 +1056,12 @@ function App() {
               </Button>
 
               {profile && (
-                <Button variant="ghost" size="icon" onClick={handleSignOut} className="h-9 w-9">
+                <Button variant="ghost" size="icon" onClick={handleSignOut} className="hidden h-9 w-9 sm:inline-flex">
                   <SignOut size={18} />
                 </Button>
               )}
 
-              <Button variant="outline" size="icon" onClick={() => setCartOpen(true)} className="relative h-9 w-9 sm:h-10 sm:w-10" aria-label="Open Cart">
+              <Button variant="outline" size="icon" onClick={() => setCartOpen(true)} className="relative h-9 w-9 border-slate-500 bg-slate-800 text-slate-100 hover:bg-slate-700 sm:h-10 sm:w-10 sm:border-input sm:bg-background sm:text-foreground" aria-label="Open Cart">
                 <ShoppingCart size={20} />
                 {cartItemCount > 0 && (
                   <Badge className="absolute -top-2 -right-2 h-5 min-w-5 flex items-center justify-center p-0 px-1 text-[10px]">
@@ -1044,7 +1072,7 @@ function App() {
             </div>
           </div>
 
-          <div className="mt-2 flex items-center gap-2 xl:hidden">
+          <div className="mt-2 hidden items-center gap-2 xl:hidden sm:flex">
             {socialProfiles.map((profile) => (
               <a
                 key={`mobile-${profile.name}`}
@@ -1064,7 +1092,7 @@ function App() {
         </div>
       </header>
 
-      <div className="container mx-auto px-4 py-8">
+      <div className="container mx-auto px-3 py-4 sm:px-4 sm:py-8">
         <div className="flex gap-8">
           <aside className="hidden lg:block w-64 flex-shrink-0">
             <div className="sticky top-24">
@@ -1077,7 +1105,7 @@ function App() {
           </aside>
 
           <main className="flex-1">
-            <div className="mb-6">
+            <div className="mb-4 sm:mb-6">
               <h2 className="text-2xl font-bold mb-2">
                 {selectedCategory
                   ? (categories || []).find((category) => category.id === selectedCategory)?.name || "Products"
@@ -1110,15 +1138,26 @@ function App() {
       <TestimonialsSection />
       <ContactUsSection />
 
-      <footer className="border-t bg-card mt-16">
-        <div className="container mx-auto px-4 py-8 text-center text-sm text-muted-foreground">
+      <footer className="mt-16 border-t bg-slate-900 text-slate-100">
+        <div className="container mx-auto px-4 py-8 text-center text-sm">
           <img
             src={BRAND_LOGO_PATH}
             alt="Sukhdevi Alchemy logo"
             className="mx-auto mb-3 h-12 w-12 rounded-full object-cover border"
             loading="lazy"
           />
-          <p>© 2026 Sukhdevi Alchemy. Premium Masala & Organic Spices.</p>
+          <p className="text-slate-100">© 2026 Sukhdevi Alchemy. Premium Masala & Organic Spices.</p>
+          <p className="mx-auto mt-2 max-w-2xl text-xs text-slate-300">
+            By using this website, you agree to our terms, privacy policy, returns process, and shipping rules.
+            Product colors and pack appearance may vary slightly due to natural sourcing and display differences.
+          </p>
+          <div className="mt-4 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-xs text-slate-200">
+            <a href="/terms-and-conditions.html" target="_blank" rel="noreferrer" className="transition hover:text-white">Terms & Conditions</a>
+            <a href="/privacy-policy.html" target="_blank" rel="noreferrer" className="transition hover:text-white">Privacy Policy</a>
+            <a href="/shipping-policy.html" target="_blank" rel="noreferrer" className="transition hover:text-white">Shipping Policy</a>
+            <a href="/returns-refunds-policy.html" target="_blank" rel="noreferrer" className="transition hover:text-white">Returns & Refunds</a>
+            <a href="mailto:hello@sukhdevialchemy.com" className="transition hover:text-white">Contact Legal</a>
+          </div>
         </div>
       </footer>
 
