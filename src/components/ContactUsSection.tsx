@@ -1,31 +1,8 @@
-import { FacebookLogo, InstagramLogo, LinkedinLogo, Phone, TwitterLogo, YoutubeLogo } from "@phosphor-icons/react"
-
-const CONTACT_LINKS = [
-  {
-    name: "Instagram",
-    href: "https://www.instagram.com/sukhdevialchemy/",
-    icon: InstagramLogo,
-    handle: "@sukhdevialchemy",
-  },
-  {
-    name: "Facebook",
-    href: "https://www.facebook.com/sukhdevialchemy",
-    icon: FacebookLogo,
-    handle: "Sukhdevi Alchemy",
-  },
-  {
-    name: "YouTube",
-    href: "https://www.youtube.com/@sukhdevialchemy",
-    icon: YoutubeLogo,
-    handle: "@sukhdevialchemy",
-  },
-]
+import { FacebookLogo, InstagramLogo, YoutubeLogo } from "@phosphor-icons/react"
 
 const FOLLOW_US_LINKS = [
   { name: "Facebook", href: "https://www.facebook.com/sukhdevialchemy", icon: FacebookLogo },
   { name: "Instagram", href: "https://www.instagram.com/sukhdevialchemy/", icon: InstagramLogo },
-  { name: "X", href: "https://x.com/sukhdevialchemy", icon: TwitterLogo },
-  { name: "LinkedIn", href: "https://www.linkedin.com/company/sukhdevialchemy", icon: LinkedinLogo },
   { name: "YouTube", href: "https://www.youtube.com/@sukhdevialchemy", icon: YoutubeLogo },
 ]
 
@@ -53,7 +30,7 @@ export function ContactUsSection() {
                       target="_blank"
                       rel="noopener noreferrer"
                       aria-label={`Open ${link.name}`}
-                      className="rounded-full border p-1.5 text-foreground transition hover:bg-accent"
+                      className="text-foreground transition-opacity hover:opacity-70"
                     >
                       <Icon size={16} weight="fill" />
                     </a>
@@ -61,43 +38,6 @@ export function ContactUsSection() {
                 })}
               </div>
             </div>
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-2">
-            {CONTACT_LINKS.map((link) => {
-              const Icon = link.icon
-
-              return (
-                <a
-                  key={link.name}
-                  href={link.href}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="group flex items-center justify-between rounded-xl border bg-card px-4 py-3 transition-colors hover:bg-accent"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="rounded-lg bg-primary/10 p-2 text-primary">
-                      <Icon size={18} weight="duotone" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-semibold">{link.name}</p>
-                      <p className="text-xs text-muted-foreground">{link.handle}</p>
-                    </div>
-                  </div>
-                  <span className="text-xs font-medium text-muted-foreground group-hover:text-foreground">Open</span>
-                </a>
-              )
-            })}
-          </div>
-
-          <div className="mt-5 rounded-xl border bg-muted/40 p-4">
-            <p className="flex items-center gap-2 text-sm font-medium">
-              <Phone size={16} />
-              Support follows secure in-app checkout and tracked delivery flow.
-            </p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Service hours: Monday to Saturday, 9:00 AM to 8:00 PM IST.
-            </p>
           </div>
         </div>
       </div>

@@ -10,12 +10,118 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter&family=PT+Serif&family=Roboto+Mono&display=swap">
-  <script type="module" crossorigin src="/assets/index-hkk81N3o.js"></script>
-  <link rel="stylesheet" crossorigin href="/assets/index-CVsS_H6C.css">
+    <style>
+        #static-fallback {
+            position: fixed;
+            inset: 0;
+            z-index: 9999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(180deg, #f8fafc 0%, #fff7ed 100%);
+            color: #0f172a;
+            font-family: Inter, system-ui, sans-serif;
+            padding: 24px;
+        }
+
+        #static-fallback.is-hidden {
+            display: none;
+        }
+
+        .fallback-card {
+            max-width: 640px;
+            width: 100%;
+            border: 1px solid #e2e8f0;
+            border-radius: 16px;
+            background: #ffffff;
+            box-shadow: 0 12px 40px rgba(15, 23, 42, 0.08);
+            padding: 24px;
+        }
+
+        .fallback-title {
+            margin: 0;
+            font-size: 28px;
+            line-height: 1.2;
+        }
+
+        .fallback-text {
+            margin: 10px 0 0;
+            color: #334155;
+            line-height: 1.5;
+        }
+
+        .fallback-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 18px;
+        }
+
+        .fallback-link {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 999px;
+            border: 1px solid #fdba74;
+            background: #fff7ed;
+            color: #9a3412;
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 600;
+            padding: 10px 14px;
+        }
+    </style>
+  <script type="module" crossorigin src="/assets/index-Vho6dcJU.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/index-DJArPu4a.css">
 </head>
 
 <body>
+    <div id="static-fallback" role="status" aria-live="polite">
+        <div class="fallback-card">
+            <h1 class="fallback-title">Sukhdevi Alchemy</h1>
+            <p class="fallback-text">
+                Store is loading. If app scripts fail, this safe page remains visible so users never see a blank screen.
+            </p>
+            <div class="fallback-actions">
+                <a class="fallback-link" href="/shipping-policy.html">Shipping Policy</a>
+                <a class="fallback-link" href="/returns-refunds-policy.html">Returns & Refunds</a>
+                <a class="fallback-link" href="/privacy-policy.html">Privacy Policy</a>
+                <a class="fallback-link" href="/terms-and-conditions.html">Terms & Conditions</a>
+            </div>
+        </div>
+    </div>
+
     <div id="root"></div>
+    <script>
+        (function () {
+            const root = document.getElementById("root")
+            const fallback = document.getElementById("static-fallback")
+            if (!root || !fallback) {
+                return
+            }
+
+            const hideFallback = () => fallback.classList.add("is-hidden")
+            const hasMountedApp = () => root.childElementCount > 0 || (root.textContent || "").trim().length > 0
+
+            if (hasMountedApp()) {
+                hideFallback()
+                return
+            }
+
+            const observer = new MutationObserver(() => {
+                if (hasMountedApp()) {
+                    hideFallback()
+                    observer.disconnect()
+                }
+            })
+
+            observer.observe(root, { childList: true, subtree: true, characterData: true })
+
+            window.addEventListener("error", () => {
+                fallback.classList.remove("is-hidden")
+            })
+        })()
+    </script>
 </body>
 
 </html>

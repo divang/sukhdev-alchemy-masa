@@ -20,9 +20,8 @@ async function ensureDistExists() {
 
 async function main() {
   await ensureDistExists()
-  await rm(docsDir, { recursive: true, force: true })
   await mkdir(docsDir, { recursive: true })
-  await cp(distDir, docsDir, { recursive: true })
+  await cp(distDir, docsDir, { recursive: true, force: true })
   await cp(cnamePath, docsCnamePath)
   console.log("docs/ generated from dist/")
 }
