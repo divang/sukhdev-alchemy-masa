@@ -482,7 +482,7 @@ export function AuthView({ mode, onBack, onAuthenticated }: AuthViewProps) {
                             type="password"
                             value={resetPasswordData.newPassword}
                             onChange={(e) => setResetPasswordData((current) => ({ ...current, newPassword: e.target.value }))}
-                            placeholder="12+ chars, mixed case, number, symbol"
+                            placeholder="Enter at least 6 characters"
                           />
                           <p className="mt-1 text-xs text-muted-foreground">{getPasswordPolicyMessage()}</p>
                         </div>
@@ -544,7 +544,7 @@ export function AuthView({ mode, onBack, onAuthenticated }: AuthViewProps) {
                           type="password"
                           value={signUpData.password}
                           onChange={(e) => setSignUpData((current) => ({ ...current, password: e.target.value }))}
-                          placeholder="12+ chars, mixed case, number, symbol"
+                          placeholder="Enter at least 6 characters"
                         />
                         <p className="mt-1 text-xs text-muted-foreground">{getPasswordPolicyMessage()}</p>
                       </div>

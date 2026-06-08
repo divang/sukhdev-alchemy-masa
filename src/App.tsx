@@ -45,6 +45,27 @@ type View = "store" | "account" | "checkout" | "payment" | "tracking" | "admin" 
 
 // Flip this to false to instantly revert mobile cards back to the original layout.
 const ENABLE_AMAZON_STYLE_MOBILE_PRODUCT_CARDS = true
+const TRACKING_VISIBLE_ORDER_ID = "ORD-1780827393392"
+const TRACKING_OWNER_EMAIL = "divang.s@gmail.com"
+
+function parseOrderIdTimestamp(orderId: string) {
+  const match = orderId.match(/ORD-(\d{8,})$/)
+  if (!match) {
+    return 0
+  }
+
+  const value = Number(match[1])
+  return Number.isFinite(value) ? value : 0
+}
+
+function getOrderTimestamp(order: Order) {
+  const createdAtValue = new Date(order.createdAt).getTime()
+  if (Number.isFinite(createdAtValue) && createdAtValue > 0) {
+    return createdAtValue
+  }
+
+  return parseOrderIdTimestamp(order.id)
+}
 
 function mergeOrders(primary: Order[], secondary: Order[]) {
   const deduped = new Map<string, Order>()
@@ -387,6 +408,16 @@ function App() {
     : localOrders
   const customerOrders = profile ? mergeOrders(cloudOrders, localOrdersForProfile) : localOrders
   const adminOrders = mergeOrders(cloudOrders, localOrders)
+  const trackingOwnerEmail = profile?.email?.trim().toLowerCase() ?? ""
+  const trackingOwnerAllowed = trackingOwnerEmail === TRACKING_OWNER_EMAIL
+
+  const anchorOrder = adminOrders.find((entry) => entry.id === TRACKING_VISIBLE_ORDER_ID)
+  const adminCutoffTimestamp = anchorOrder
+    ? getOrderTimestamp(anchorOrder)
+    : parseOrderIdTimestamp(TRACKING_VISIBLE_ORDER_ID)
+  const adminVisibleOrders = adminOrders.filter((entry) =>
+    entry.id === TRACKING_VISIBLE_ORDER_ID || getOrderTimestamp(entry) >= adminCutoffTimestamp
+  )
   const cartItemCount = (cartItems || []).reduce((sum, item) => sum + item.quantity, 0)
 
   const persistCartItem = async (item: CartItem) => {
@@ -712,8 +743,13 @@ function App() {
 
   if (currentView === "account-details") {
     if (!profile) {
-      setCurrentView("store")
-      return null
+      return (
+        <AuthView
+          mode="customer"
+          onBack={handleBackToStore}
+          onAuthenticated={handleAuthenticated}
+        />
+      )
     }
 
     return (
@@ -884,10 +920,18 @@ function App() {
       )
     }
 
+    const allVisibleOrders = profile.role === "admin" ? adminVisibleOrders : customerOrders
+    const trackingOrders = allVisibleOrders.filter(
+      (entry) => entry.id === TRACKING_VISIBLE_ORDER_ID && trackingOwnerAllowed
+    )
+    const trackingOrder = currentOrder?.id === TRACKING_VISIBLE_ORDER_ID
+      ? currentOrder
+      : (trackingOrders[0] ?? null)
+
     return (
       <OrderTrackingView
-        order={currentOrder}
-        orders={profile.role === "admin" ? adminOrders : customerOrders}
+        order={trackingOrder}
+        orders={trackingOrders}
         onBack={handleBackToStore}
         onSelectOrder={handleViewTracking}
       />
@@ -928,7 +972,7 @@ function App() {
         </header>
 
         <div className="container mx-auto px-4 py-8">
-          <AdminPanel orders={adminOrders} runtimeMode={runtimeMode} />
+          <AdminPanel orders={adminVisibleOrders} runtimeMode={runtimeMode} />
         </div>
       </div>
     )

@@ -1,4 +1,4 @@
-const PASSWORD_MIN_LENGTH = 12
+const PASSWORD_MIN_LENGTH = 6
 const PASSWORD_MAX_LENGTH = 128
 
 const ADDRESS_MIN_LENGTH = 8
@@ -8,7 +8,7 @@ const CITY_MAX_LENGTH = 60
 const COUNTRY_ALLOWED = "india"
 
 export function getPasswordPolicyMessage() {
-  return "Use 12+ characters with uppercase, lowercase, number, and special character."
+  return "Use at least 6 characters. Password is simple and not case-format restricted."
 }
 
 export function validateStrongPassword(password: string): string | undefined {
@@ -22,22 +22,6 @@ export function validateStrongPassword(password: string): string | undefined {
 
   if (/\s/.test(password)) {
     return "Password cannot contain spaces."
-  }
-
-  if (!/[a-z]/.test(password)) {
-    return "Password must include at least one lowercase letter."
-  }
-
-  if (!/[A-Z]/.test(password)) {
-    return "Password must include at least one uppercase letter."
-  }
-
-  if (!/\d/.test(password)) {
-    return "Password must include at least one number."
-  }
-
-  if (!/[^A-Za-z0-9]/.test(password)) {
-    return "Password must include at least one special character."
   }
 
   return undefined

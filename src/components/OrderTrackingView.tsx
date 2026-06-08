@@ -15,8 +15,10 @@ import {
   CaretRight,
 } from "@phosphor-icons/react"
 import { cn } from "@/lib/utils"
-import type { Order } from "@/lib/types"
+import type { Order, Product } from "@/lib/types"
 import { fetchLatestShipmentForOrder, syncShiprocketAwbForOrder, type LatestOrderShipment } from "@/lib/order-shipments"
+import { useKV } from "@/hooks/use-kv"
+import { getProductImage } from "@/lib/product-images"
 
 type OrderTrackingViewProps = {
   order: Order | null
@@ -54,12 +56,27 @@ function orderMatchesSearch(order: Order, query: string) {
 }
 
 export function OrderTrackingView({ order, orders, onBack, onSelectOrder }: OrderTrackingViewProps) {
+  const [products] = useKV<Product[]>("products", [])
+  const [productImages] = useKV<Record<string, string>>("product-images", {})
   const [searchQuery, setSearchQuery] = useState("")
   const [orderFilter, setOrderFilter] = useState<OrderFilter>("all")
   const [shipment, setShipment] = useState<LatestOrderShipment | null>(null)
   const [isLoadingShipment, setIsLoadingShipment] = useState(false)
   const [isSyncingShipment, setIsSyncingShipment] = useState(false)
   const [shipmentError, setShipmentError] = useState<string | null>(null)
+
+  const getOrderItemThumbnail = (productId?: string) => {
+    if (!productId) {
+      return undefined
+    }
+
+    const product = (products || []).find((entry) => entry.id === productId)
+    if (!product) {
+      return undefined
+    }
+
+    return getProductImage(product, productImages ?? {})
+  }
 
   const filteredOrders = useMemo(() => {
     return orders
@@ -79,13 +96,13 @@ export function OrderTrackingView({ order, orders, onBack, onSelectOrder }: Orde
   }, [orders, orderFilter, searchQuery])
 
   const buyAgainItems = useMemo(() => {
-    const map = new Map<string, { key: string; name: string }>()
+    const map = new Map<string, { key: string; name: string; productId: string }>()
 
     const sorted = [...orders].sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())
     for (const entry of sorted) {
       for (const item of entry.items) {
         if (!map.has(item.productId)) {
-          map.set(item.productId, { key: `${entry.id}-${item.productId}`, name: item.productName })
+          map.set(item.productId, { key: `${entry.id}-${item.productId}`, name: item.productName, productId: item.productId })
         }
       }
     }
@@ -239,9 +256,18 @@ export function OrderTrackingView({ order, orders, onBack, onSelectOrder }: Orde
               <div className="flex gap-2 overflow-x-auto pb-1">
                 {buyAgainItems.map((item) => (
                   <div key={item.key} className="w-24 flex-shrink-0">
-                    <div className="mb-1 flex h-20 w-full items-center justify-center rounded-md border bg-muted">
-                      <Package size={26} className="text-muted-foreground" />
-                    </div>
+                    {getOrderItemThumbnail(item.productId) ? (
+                      <img
+                        src={getOrderItemThumbnail(item.productId)}
+                        alt={item.name}
+                        className="mb-1 h-20 w-full rounded-md border object-cover"
+                        loading="lazy"
+                      />
+                    ) : (
+                      <div className="mb-1 flex h-20 w-full items-center justify-center rounded-md border bg-muted">
+                        <Package size={26} className="text-muted-foreground" />
+                      </div>
+                    )}
                     <p className="line-clamp-2 text-xs text-muted-foreground">{item.name}</p>
                   </div>
                 ))}
@@ -285,10 +311,26 @@ export function OrderTrackingView({ order, orders, onBack, onSelectOrder }: Orde
                     </div>
                   </div>
 
-                  <p className="mb-1 line-clamp-1 text-base font-medium">{entry.items[0]?.productName ?? "Order item"}</p>
-                  <p className="mb-3 text-sm text-muted-foreground">
-                    {isDelivered ? "Package was handed to resident" : "Your shipment is being prepared for dispatch"}
-                  </p>
+                  <div className="mb-3 flex items-start gap-3">
+                    {getOrderItemThumbnail(entry.items[0]?.productId) ? (
+                      <img
+                        src={getOrderItemThumbnail(entry.items[0]?.productId)}
+                        alt={entry.items[0]?.productName ?? "Order item"}
+                        className="h-16 w-16 rounded-md border object-cover"
+                        loading="lazy"
+                      />
+                    ) : (
+                      <div className="flex h-16 w-16 items-center justify-center rounded-md border bg-muted">
+                        <Package size={22} className="text-muted-foreground" />
+                      </div>
+                    )}
+                    <div className="min-w-0">
+                      <p className="mb-1 line-clamp-2 text-base font-medium">{entry.items[0]?.productName ?? "Order item"}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {isDelivered ? "Package was handed to resident" : "Your shipment is being prepared for dispatch"}
+                      </p>
+                    </div>
+                  </div>
 
                   {isDelivered && (
                     <div className="mb-3">
