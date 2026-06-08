@@ -1334,7 +1334,7 @@ function App() {
             <a href="/privacy-policy.html" target="_blank" rel="noreferrer" className="transition hover:text-white">Privacy Policy</a>
             <a href="/shipping-policy.html" target="_blank" rel="noreferrer" className="transition hover:text-white">Shipping Policy</a>
             <a href="/returns-refunds-policy.html" target="_blank" rel="noreferrer" className="transition hover:text-white">Returns & Refunds</a>
-            <a href="mailto:hello@sukhdevialchemy.com" className="transition hover:text-white">Contact Legal</a>
+            <a href="mailto:care@sukhdevialchemy.com" className="transition hover:text-white">Contact Legal</a>
           </div>
         </div>
       </footer>
