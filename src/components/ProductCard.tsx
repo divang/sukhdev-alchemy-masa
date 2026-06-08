@@ -50,20 +50,20 @@ export function ProductCard({ product, onViewDetails, onAddToCart, mobileDenseLa
               </Badge>
             </button>
 
-            <CardContent className="space-y-1 p-2.5 pb-2">
-              <h3 className="line-clamp-1 text-[15px] font-medium leading-5">{product.name}</h3>
-              <div className="flex items-end gap-1.5">
-                <span className="text-[34px] font-extrabold tracking-tight leading-none">₹{currentPrice}</span>
-                <span className="pb-1 text-xs text-muted-foreground line-through">₹{referencePrice}</span>
+            <CardContent className="space-y-0.5 p-2.5 pb-1.5">
+              <h3 className="line-clamp-1 text-[14px] font-medium leading-5">{product.name}</h3>
+              <div className="flex items-end gap-1">
+                <span className="text-[22px] font-bold tracking-tight leading-none">₹{currentPrice}</span>
+                <span className="pb-0.5 text-[12px] text-muted-foreground line-through">₹{referencePrice}</span>
               </div>
-              <p className="text-[11px] text-muted-foreground">200+ bought in past month</p>
+              <p className="text-[11px] leading-4 text-muted-foreground">200+ bought in past month</p>
             </CardContent>
 
-            <CardFooter className="justify-between p-2.5 pt-0">
+            <CardFooter className="justify-between p-2.5 pt-0.5">
               <button
                 type="button"
                 onClick={() => onViewDetails(product)}
-                className="text-[13px] font-medium text-slate-700"
+                className="text-[12px] font-medium text-slate-700"
               >
                 View details
               </button>
