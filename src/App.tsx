@@ -261,27 +261,49 @@ function App() {
     let isActive = true
 
     async function initializeAuthState() {
-      const oauthError = await finalizeOAuthRedirect()
-      if (!isActive) {
-        return
-      }
+      try {
+        const oauthError = await finalizeOAuthRedirect()
+        if (!isActive) {
+          return
+        }
 
-      if (oauthError) {
-        toast.error(oauthError)
-      }
+        if (oauthError) {
+          console.error("[app-auth] OAuth callback failed", oauthError)
+          setCurrentOrder(null)
+          setCurrentView("store")
 
-      console.log("[app-auth] getCurrentAuthState requested")
-      const state = await getCurrentAuthState()
-      if (!isActive) {
-        return
-      }
+          if (typeof window !== "undefined") {
+            window.history.replaceState({}, document.title, `${window.location.origin}/`)
+          }
+          return
+        }
 
-      console.log("[app-auth] getCurrentAuthState resolved", {
-        hasUser: Boolean(state.user),
-        hasProfile: Boolean(state.profile),
-        role: state.profile?.role ?? null,
-      })
-      setProfile(state.profile)
+        console.log("[app-auth] getCurrentAuthState requested")
+        const state = await getCurrentAuthState()
+        if (!isActive) {
+          return
+        }
+
+        console.log("[app-auth] getCurrentAuthState resolved", {
+          hasUser: Boolean(state.user),
+          hasProfile: Boolean(state.profile),
+          role: state.profile?.role ?? null,
+        })
+        setProfile(state.profile)
+      } catch (error) {
+        if (!isActive) {
+          return
+        }
+
+        console.error("[app-auth] initializeAuthState failed", error)
+        setProfile(null)
+        setCurrentOrder(null)
+        setCurrentView("store")
+
+        if (typeof window !== "undefined") {
+          window.location.replace(`${window.location.origin}/`)
+        }
+      }
     }
 
     void initializeAuthState()

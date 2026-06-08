@@ -1,36 +1,63 @@
-import { Alert, AlertTitle, AlertDescription } from "./components/ui/alert";
-import { Button } from "./components/ui/button";
+import { useEffect } from "react"
+import { Alert, AlertTitle, AlertDescription } from "./components/ui/alert"
+import { Button } from "./components/ui/button"
+import { AlertTriangleIcon, HouseIcon, RefreshCwIcon } from "lucide-react"
 
-import { AlertTriangleIcon, RefreshCwIcon } from "lucide-react";
+const RUNTIME_ERROR_REDIRECT_KEY = "runtime-error-home-redirected"
 
 export const ErrorFallback = ({ error, resetErrorBoundary }) => {
+  useEffect(() => {
+    console.error("[runtime] Unhandled application error", error)
+
+    if (typeof window === "undefined") {
+      return
+    }
+
+    const isHomeRoute = window.location.pathname === "/" && !window.location.search && !window.location.hash
+    const alreadyRedirected = window.sessionStorage.getItem(RUNTIME_ERROR_REDIRECT_KEY) === "1"
+
+    if (!isHomeRoute && !alreadyRedirected) {
+      window.sessionStorage.setItem(RUNTIME_ERROR_REDIRECT_KEY, "1")
+      window.location.replace(`${window.location.origin}/`)
+      return
+    }
+
+    window.sessionStorage.removeItem(RUNTIME_ERROR_REDIRECT_KEY)
+  }, [error])
+
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <Alert variant="destructive" className="mb-6">
           <AlertTriangleIcon />
-          <AlertTitle>This spark has encountered a runtime error</AlertTitle>
+          <AlertTitle>Something went wrong</AlertTitle>
           <AlertDescription>
-            Something unexpected happened while running the application. The error details are shown below. Contact the spark author and let them know about this issue.
+            The error was logged in the console. Redirecting to the home page when possible.
           </AlertDescription>
         </Alert>
-        
-        <div className="bg-card border rounded-lg p-4 mb-6">
-          <h3 className="font-semibold text-sm text-muted-foreground mb-2">Error Details:</h3>
-          <pre className="text-xs text-destructive bg-muted/50 p-3 rounded border overflow-auto max-h-32">
-            {error.message}
-          </pre>
+
+        <div className="flex gap-3">
+          <Button
+            onClick={() => {
+              if (typeof window !== "undefined") {
+                window.location.replace(`${window.location.origin}/`)
+              }
+            }}
+            className="flex-1"
+          >
+            <HouseIcon />
+            Go to Home
+          </Button>
+          <Button
+            onClick={resetErrorBoundary}
+            className="flex-1"
+            variant="outline"
+          >
+            <RefreshCwIcon />
+            Try Again
+          </Button>
         </div>
-        
-        <Button 
-          onClick={resetErrorBoundary} 
-          className="w-full"
-          variant="outline"
-        >
-          <RefreshCwIcon />
-          Try Again
-        </Button>
       </div>
     </div>
-  );
+  )
 }
