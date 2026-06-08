@@ -1,31 +1,20 @@
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
 import { Progress } from "@/components/ui/progress"
-import {
-  ArrowLeft,
-  Package,
-  Truck,
-  CheckCircle,
-  Link as LinkIcon,
-  MagnifyingGlass,
-  Star,
-  CaretRight,
-} from "@phosphor-icons/react"
+import { ArrowLeft, Package, Truck, CheckCircle, Link as LinkIcon } from "@phosphor-icons/react"
 import { cn } from "@/lib/utils"
-import type { Order, Product } from "@/lib/types"
+import type { Order } from "@/lib/types"
 import { fetchLatestShipmentForOrder, syncShiprocketAwbForOrder, type LatestOrderShipment } from "@/lib/order-shipments"
-import { useKV } from "@/hooks/use-kv"
-import { getProductImage } from "@/lib/product-images"
 
 type OrderTrackingViewProps = {
   order: Order | null
   orders: Order[]
   onBack: () => void
   onSelectOrder: (orderId: string) => void
-  onAddToCart: (productId: string) => void
 }
 
 const statusSteps = [
@@ -35,82 +24,13 @@ const statusSteps = [
   { key: "delivered", label: "Delivered", icon: CheckCircle }
 ]
 
-type OrderFilter = "all" | "active" | "delivered"
-
-function getOrderDateLabel(order: Order) {
-  return new Date(order.createdAt).toLocaleDateString(undefined, {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  })
-}
-
-function orderMatchesSearch(order: Order, query: string) {
-  const haystack = [
-    order.id,
-    order.customer.name,
-    order.customer.city,
-    ...order.items.map((item) => item.productName),
-  ].join(" ").toLowerCase()
-
-  return haystack.includes(query.toLowerCase())
-}
-
-export function OrderTrackingView({ order, orders, onBack, onSelectOrder, onAddToCart }: OrderTrackingViewProps) {
-  const [products] = useKV<Product[]>("products", [])
-  const [productImages] = useKV<Record<string, string>>("product-images", {})
-  const [searchQuery, setSearchQuery] = useState("")
-  const [orderFilter, setOrderFilter] = useState<OrderFilter>("all")
+export function OrderTrackingView({ order, orders, onBack, onSelectOrder }: OrderTrackingViewProps) {
+  const [trackingId, setTrackingId] = useState("")
   const [shipment, setShipment] = useState<LatestOrderShipment | null>(null)
-  const [shipmentByOrderId, setShipmentByOrderId] = useState<Record<string, LatestOrderShipment | null>>({})
   const [isLoadingShipment, setIsLoadingShipment] = useState(false)
   const [isSyncingShipment, setIsSyncingShipment] = useState(false)
   const [shipmentError, setShipmentError] = useState<string | null>(null)
-
-  const getOrderItemThumbnail = (productId?: string) => {
-    if (!productId) {
-      return undefined
-    }
-
-    const product = (products || []).find((entry) => entry.id === productId)
-    if (!product) {
-      return undefined
-    }
-
-    return getProductImage(product, productImages ?? {})
-  }
-
-  const filteredOrders = useMemo(() => {
-    return orders
-      .filter((entry) => {
-        if (orderFilter === "delivered") {
-          return entry.status === "delivered"
-        }
-
-        if (orderFilter === "active") {
-          return entry.status !== "delivered"
-        }
-
-        return true
-      })
-      .filter((entry) => (searchQuery.trim() ? orderMatchesSearch(entry, searchQuery.trim()) : true))
-      .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())
-  }, [orders, orderFilter, searchQuery])
-
-  const buyAgainItems = useMemo(() => {
-    const map = new Map<string, { key: string; name: string; productId: string }>()
-
-    const sorted = [...orders].sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())
-    for (const entry of sorted) {
-      for (const item of entry.items) {
-        if (!map.has(item.productId)) {
-          map.set(item.productId, { key: `${entry.id}-${item.productId}`, name: item.productName, productId: item.productId })
-        }
-      }
-    }
-
-    return [...map.values()].slice(0, 8)
-  }, [orders])
+  const recentOrders = orders.slice(0, 5)
 
   const handlePrintReceipt = () => {
     if (typeof window !== "undefined") {
@@ -200,46 +120,11 @@ export function OrderTrackingView({ order, orders, onBack, onSelectOrder, onAddT
       isActive = false
     }
   }, [order?.id])
-
-  useEffect(() => {
-    let isActive = true
-
-    async function loadShipmentsForCards() {
-      const sampleOrders = filteredOrders.slice(0, 20)
-      if (sampleOrders.length === 0) {
-        if (isActive) {
-          setShipmentByOrderId({})
-        }
-        return
-      }
-
-      const results = await Promise.all(
-        sampleOrders.map(async (entry) => {
-          const result = await fetchLatestShipmentForOrder(entry.id)
-          return {
-            orderId: entry.id,
-            shipment: result.error ? null : (result.shipment ?? null),
-          }
-        })
-      )
-
-      if (!isActive) {
-        return
-      }
-
-      const next: Record<string, LatestOrderShipment | null> = {}
-      for (const item of results) {
-        next[item.orderId] = item.shipment
-      }
-      setShipmentByOrderId(next)
-    }
-
-    void loadShipmentsForCards()
-
-    return () => {
-      isActive = false
-    }
-  }, [filteredOrders])
+  
+  const handleTrack = () => {
+    if (!trackingId.trim()) return
+    onSelectOrder(trackingId)
+  }
   
   const getStatusIndex = (status: string) => {
     return statusSteps.findIndex(s => s.key === status)
@@ -250,7 +135,7 @@ export function OrderTrackingView({ order, orders, onBack, onSelectOrder, onAddT
   
   return (
     <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-10 border-b bg-card no-print">
+      <header className="border-b bg-card sticky top-0 z-10 no-print">
         <div className="container mx-auto px-4 py-4">
           <Button variant="ghost" onClick={onBack}>
             <ArrowLeft size={20} className="mr-2" />
@@ -260,157 +145,66 @@ export function OrderTrackingView({ order, orders, onBack, onSelectOrder, onAddT
       </header>
       
       <div className="container mx-auto px-4 py-8 max-w-4xl">
-        <h1 className="mb-4 text-3xl font-bold">Your Orders</h1>
+        <h1 className="text-3xl font-bold mb-8">Track Your Order</h1>
 
-        <Card className="mb-5 border-slate-200 py-3 shadow-none">
-          <CardContent className="px-3">
-            <div className="grid grid-cols-[1fr_auto] gap-2">
-              <div className="flex items-center rounded-md border bg-background px-3">
-                <MagnifyingGlass size={18} className="mr-2 text-muted-foreground" />
-                <Input
-                  value={searchQuery}
-                  onChange={(event) => setSearchQuery(event.target.value)}
-                  placeholder="Search all orders"
-                  className="border-0 px-0 shadow-none focus-visible:ring-0"
-                />
-              </div>
-              <div className="min-w-[112px]">
-                <select
-                  value={orderFilter}
-                  onChange={(event) => setOrderFilter(event.target.value as OrderFilter)}
-                  className="h-10 w-full rounded-md border bg-background px-2 text-sm"
-                >
-                  <option value="all">Filter: All</option>
-                  <option value="active">Filter: Active</option>
-                  <option value="delivered">Filter: Delivered</option>
-                </select>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {buyAgainItems.length > 0 && (
-          <Card className="mb-5 border-slate-200 py-3 shadow-none">
-            <CardHeader className="px-3 pb-2">
-              <CardTitle className="text-2xl">Buy again</CardTitle>
+        {recentOrders.length > 0 && (
+          <Card className="mb-8 no-print">
+            <CardHeader>
+              <CardTitle>Recent Orders</CardTitle>
             </CardHeader>
-            <CardContent className="px-3">
-              <div className="flex gap-2 overflow-x-auto pb-1">
-                {buyAgainItems.map((item) => (
-                  <div key={item.key} className="w-24 flex-shrink-0">
-                    <button type="button" className="w-full text-left" onClick={() => onAddToCart(item.productId)}>
-                      {getOrderItemThumbnail(item.productId) ? (
-                        <img
-                          src={getOrderItemThumbnail(item.productId)}
-                          alt={item.name}
-                          className="mb-1 h-20 w-full rounded-md border object-cover"
-                          loading="lazy"
-                        />
-                      ) : (
-                        <div className="mb-1 flex h-20 w-full items-center justify-center rounded-md border bg-muted">
-                          <Package size={26} className="text-muted-foreground" />
-                        </div>
+            <CardContent>
+              <div className="space-y-3">
+                {recentOrders.map((item) => {
+                  const isSelected = item.id === order?.id
+                  return (
+                    <button
+                      key={item.id}
+                      onClick={() => onSelectOrder(item.id)}
+                      className={cn(
+                        "w-full text-left p-4 border rounded-lg transition-colors",
+                        isSelected ? "border-primary bg-primary/5" : "hover:bg-muted"
                       )}
+                    >
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                        <div>
+                          <p className="font-semibold break-all">Order ID: {item.id}</p>
+                          <p className="text-sm text-muted-foreground">{new Date(item.createdAt).toLocaleDateString()}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-semibold text-primary">₹{item.totalAmount.toFixed(2)}</p>
+                          <p className="text-sm text-muted-foreground capitalize">{item.status}</p>
+                        </div>
+                      </div>
                     </button>
-                    <p className="line-clamp-2 text-xs text-muted-foreground">{item.name}</p>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             </CardContent>
           </Card>
         )}
-
-        <Card className="mb-8 border-slate-200 py-3 shadow-none">
-          <CardHeader className="px-3 pb-2">
-            <CardTitle className="text-2xl">Purchase history</CardTitle>
-            <p className="text-sm text-muted-foreground">Past three months</p>
-          </CardHeader>
-          <CardContent className="space-y-3 px-3">
-            {filteredOrders.length === 0 && (
-              <div className="rounded-lg border p-4 text-sm text-muted-foreground">
-                No orders found for current filter.
+        
+        <Card className="mb-8">
+          <CardContent className="pt-6">
+            <div className="flex gap-4">
+              <div className="flex-1">
+                <Label htmlFor="tracking-id">Order ID</Label>
+                <Input
+                  id="tracking-id"
+                  value={trackingId}
+                  onChange={(e) => setTrackingId(e.target.value)}
+                  placeholder="Enter your order ID"
+                  onKeyDown={(e) => e.key === "Enter" && handleTrack()}
+                />
               </div>
-            )}
-
-            {filteredOrders.map((entry) => {
-              const selected = entry.id === order?.id
-              const isDelivered = entry.status === "delivered"
-              const trackingUrlForCard = shipmentByOrderId[entry.id]?.trackingUrl
-
-              return (
-                <div
-                  key={entry.id}
-                  className={cn(
-                    "rounded-xl border bg-background p-4 transition-colors",
-                    selected ? "border-primary bg-primary/5" : "border-slate-200"
-                  )}
-                >
-                  <div className="mb-3 flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-semibold">Order #{entry.id}</p>
-                      <p className="text-xs text-muted-foreground">{getOrderDateLabel(entry)}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-sm font-semibold">₹{entry.totalAmount.toFixed(2)}</p>
-                      <p className="text-xs capitalize text-muted-foreground">{entry.status}</p>
-                    </div>
-                  </div>
-
-                  <div className="mb-3 flex items-start gap-3">
-                    {getOrderItemThumbnail(entry.items[0]?.productId) ? (
-                      <img
-                        src={getOrderItemThumbnail(entry.items[0]?.productId)}
-                        alt={entry.items[0]?.productName ?? "Order item"}
-                        className="h-16 w-16 rounded-md border object-cover"
-                        loading="lazy"
-                      />
-                    ) : (
-                      <div className="flex h-16 w-16 items-center justify-center rounded-md border bg-muted">
-                        <Package size={22} className="text-muted-foreground" />
-                      </div>
-                    )}
-                    <div className="min-w-0">
-                      <p className="mb-1 line-clamp-2 text-base font-medium">{entry.items[0]?.productName ?? "Order item"}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {isDelivered ? "Package was handed to resident" : "Your shipment is being prepared for dispatch"}
-                      </p>
-                    </div>
-                  </div>
-
-                  {isDelivered && (
-                    <div className="mb-3">
-                      <p className="mb-2 text-sm">Rate your delivery experience</p>
-                      <div className="flex items-center gap-1">
-                        {Array.from({ length: 5 }).map((_, index) => (
-                          <Star key={`${entry.id}-${index}`} size={24} className="text-muted-foreground" />
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  <Button
-                    variant="ghost"
-                    className="h-auto w-full justify-between px-0 py-1 text-base"
-                    onClick={() => {
-                      if (trackingUrlForCard) {
-                        window.open(trackingUrlForCard, "_blank", "noopener,noreferrer")
-                        return
-                      }
-
-                      onSelectOrder(entry.id)
-                    }}
-                  >
-                    Track package
-                    <CaretRight size={18} />
-                  </Button>
-                </div>
-              )
-            })}
+              <Button onClick={handleTrack} className="mt-6">
+                Track Order
+              </Button>
+            </div>
           </CardContent>
         </Card>
         
         {order && (
-          <Card className="print-receipt-card border-slate-200 py-4 shadow-none">
+          <Card className="print-receipt-card">
             <CardHeader>
               <CardTitle className="flex items-center justify-between">
                 <span>Order #{order.id}</span>
@@ -652,6 +446,38 @@ export function OrderTrackingView({ order, orders, onBack, onSelectOrder, onAddT
                     </div>
                   </div>
                 </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+        
+        {!order && orders.length > 0 && (
+          <Card className="no-print">
+            <CardHeader>
+              <CardTitle>Your Recent Orders</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {orders.slice(-5).reverse().map((o) => (
+                  <button
+                    key={o.id}
+                    onClick={() => onSelectOrder(o.id)}
+                    className="w-full text-left p-4 border rounded-lg hover:bg-muted transition-colors"
+                  >
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <p className="font-semibold">#{o.id}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {new Date(o.createdAt).toLocaleDateString()}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-semibold text-primary">₹{o.totalAmount.toFixed(2)}</p>
+                        <p className="text-sm text-muted-foreground capitalize">{o.status}</p>
+                      </div>
+                    </div>
+                  </button>
+                ))}
               </div>
             </CardContent>
           </Card>

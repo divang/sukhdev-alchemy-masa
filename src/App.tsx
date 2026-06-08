@@ -13,6 +13,7 @@ import { CheckoutView } from "@/components/CheckoutView"
 import { OrderTrackingView } from "@/components/OrderTrackingView"
 import { ContactUsSection } from "@/components/ContactUsSection"
 import { AdminPanel } from "@/components/AdminPanel"
+import { AdminFulfillmentPanel } from "@/components/AdminFulfillmentPanel"
 import { AuthView } from "@/components/AuthView"
 import { AccountDetailsView } from "@/components/AccountDetailsView"
 import type { Category, Product, CartItem, Order, UserProfile } from "@/lib/types"
@@ -41,7 +42,7 @@ import { isPaymentGatewayEnabled, startRazorpayCheckout } from "@/lib/payment-ga
 import { getRequestedRuntimeModeFromSearch, resolveRuntimeMode } from "@/lib/runtime-mode"
 import { triggerOrderCreatedNotification, triggerOrderNotification } from "@/lib/order-notifications"
 
-type View = "store" | "account" | "checkout" | "payment" | "tracking" | "admin" | "account-details"
+type View = "store" | "account" | "checkout" | "payment" | "tracking" | "admin" | "admin-advanced" | "account-details"
 
 // Flip this to false to instantly revert mobile cards back to the original layout.
 const ENABLE_AMAZON_STYLE_MOBILE_PRODUCT_CARDS = true
@@ -1011,7 +1012,7 @@ function App() {
     )
   }
 
-  if (currentView === "admin") {
+  if (currentView === "admin" || currentView === "admin-advanced") {
     if (!profile || profile.role !== "admin") {
       return (
         <AuthView
@@ -1037,15 +1038,30 @@ function App() {
                 <h1 className="text-2xl font-bold truncate">Admin Panel</h1>
                 {runtimeMode === "dev" && <Badge variant="destructive">DEV MODE</Badge>}
               </div>
-              <Button variant="outline" onClick={handleBackToStore}>
-                Back to Store
-              </Button>
+              <div className="flex items-center gap-2">
+                {currentView === "admin" ? (
+                  <Button variant="secondary" onClick={() => setCurrentView("admin-advanced")}>
+                    Advanced Features
+                  </Button>
+                ) : (
+                  <Button variant="secondary" onClick={() => setCurrentView("admin")}>
+                    Back to Priority Queue
+                  </Button>
+                )}
+                <Button variant="outline" onClick={handleBackToStore}>
+                  Back to Store
+                </Button>
+              </div>
             </div>
           </div>
         </header>
 
         <div className="container mx-auto px-4 py-8">
-          <AdminPanel orders={adminVisibleOrders} runtimeMode={runtimeMode} />
+          {currentView === "admin" ? (
+            <AdminFulfillmentPanel orders={adminVisibleOrders} />
+          ) : (
+            <AdminPanel orders={adminVisibleOrders} runtimeMode={runtimeMode} />
+          )}
         </div>
       </div>
     )
