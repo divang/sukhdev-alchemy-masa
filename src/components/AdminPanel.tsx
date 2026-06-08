@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react"
+import { CaretDown, CaretUp } from "@phosphor-icons/react"
 import { useKV } from "@/hooks/use-kv"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -127,6 +128,7 @@ export function AdminPanel({ orders = [], runtimeMode = "prod" }: AdminPanelProp
   const [triggeringShipmentOrderId, setTriggeringShipmentOrderId] = useState<string | null>(null)
   const [syncingAwbOrderId, setSyncingAwbOrderId] = useState<string | null>(null)
   const [notifications, setNotifications] = useState<AdminNotification[]>([])
+  const [expandedRecentOrderId, setExpandedRecentOrderId] = useState<string | null>(null)
 
   const categoryOptions = useMemo(() => {
     if (categories && categories.length > 0) {
@@ -1258,7 +1260,7 @@ export function AdminPanel({ orders = [], runtimeMode = "prod" }: AdminPanelProp
         <CardHeader>
           <CardTitle>Recent Orders</CardTitle>
           <CardDescription>
-            Admin accounts can review every customer order from one place.
+            Click an order row to view full order details.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -1266,37 +1268,58 @@ export function AdminPanel({ orders = [], runtimeMode = "prod" }: AdminPanelProp
             <p className="text-sm text-muted-foreground">No orders available yet.</p>
           ) : (
             <div className="space-y-3">
-              {orders.slice(0, 10).map((order) => (
-                <div key={order.id} className="rounded-lg border p-4">
-                  <div className="flex flex-wrap items-start justify-between gap-4">
-                    <div>
-                      <p className="font-semibold">#{order.id}</p>
-                      <p className="text-sm text-muted-foreground">{order.customer.name} • {order.customer.email}</p>
-                      <p className="text-sm text-muted-foreground">{order.customer.phone}</p>
-                      <div className="mt-3">
-                        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Ordered Products</p>
-                        <ul className="mt-1 space-y-1">
-                          {order.items.map((item) => (
-                            <li key={`${order.id}-${item.productId}-${item.grams}`} className="flex items-center justify-between gap-3 text-sm text-foreground">
-                              <span>{item.productName} - {item.quantity} x {item.grams}g</span>
-                              <span className="font-medium">₹{(item.pricePerUnit * item.quantity).toFixed(2)}</span>
-                            </li>
-                          ))}
-                        </ul>
+              {orders.slice(0, 10).map((order) => {
+                const isExpanded = expandedRecentOrderId === order.id
+
+                return (
+                  <div key={order.id} className="rounded-lg border p-4">
+                    <button
+                      type="button"
+                      className="w-full text-left"
+                      onClick={() => setExpandedRecentOrderId((current) => (current === order.id ? null : order.id))}
+                    >
+                      <div className="flex flex-wrap items-start justify-between gap-4">
+                        <div>
+                          <p className="font-semibold">#{order.id}</p>
+                          <p className="text-sm text-muted-foreground">{order.customer.name}</p>
+                          <p className="text-xs text-muted-foreground">{new Date(order.createdAt).toLocaleString()}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-semibold text-primary">₹{order.totalAmount.toFixed(2)}</p>
+                          <div className="mt-2 flex items-center justify-end gap-2">
+                            <Badge variant="secondary" className="capitalize">{order.status}</Badge>
+                            <Badge variant={order.paymentStatus === "paid" ? "default" : "outline"} className="capitalize">
+                              {order.paymentStatus}
+                            </Badge>
+                            {isExpanded ? <CaretUp size={16} /> : <CaretDown size={16} />}
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-semibold text-primary">₹{order.totalAmount.toFixed(2)}</p>
-                      <div className="mt-2 flex flex-wrap justify-end gap-2">
-                        <Badge variant="secondary" className="capitalize">{order.status}</Badge>
-                        <Badge variant={order.paymentStatus === "paid" ? "default" : "outline"} className="capitalize">
-                          {order.paymentStatus}
-                        </Badge>
+                    </button>
+
+                    {isExpanded && (
+                      <div className="mt-3 border-t pt-3">
+                        <p className="text-sm text-muted-foreground">{order.customer.email} • {order.customer.phone}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {order.customer.address}, {order.customer.city} - {order.customer.pincode}
+                        </p>
+
+                        <div className="mt-3">
+                          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Ordered Products</p>
+                          <ul className="mt-1 space-y-1">
+                            {order.items.map((item) => (
+                              <li key={`${order.id}-${item.productId}-${item.grams}`} className="flex items-center justify-between gap-3 text-sm text-foreground">
+                                <span>{item.productName} - {item.quantity} x {item.grams}g</span>
+                                <span className="font-medium">₹{(item.pricePerUnit * item.quantity).toFixed(2)}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
                       </div>
-                    </div>
+                    )}
                   </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           )}
         </CardContent>

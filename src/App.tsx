@@ -1085,6 +1085,20 @@ function App() {
                       }}
                     />
 
+                    {profile?.role === "admin" && (
+                      <Button
+                        variant="outline"
+                        className="w-full justify-start"
+                        onClick={() => {
+                          setMobileMenuOpen(false)
+                          handleOpenAdmin()
+                        }}
+                      >
+                        <Gear size={16} className="mr-2" />
+                        Admin Panel
+                      </Button>
+                    )}
+
                     <div className="border-t pt-4">
                       <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Your Account</p>
                       <div className="space-y-2">
