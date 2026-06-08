@@ -1051,13 +1051,13 @@ function App() {
           </Sheet>
 
           <div className="space-y-2 sm:hidden">
-            <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center justify-between gap-2 rounded-2xl border border-amber-200/70 bg-gradient-to-r from-orange-50 via-amber-50 to-stone-50 px-2 py-2 shadow-sm">
               <div className="flex min-w-0 items-center gap-2">
                 <Button
                   variant="outline"
                   size="icon"
                   onClick={() => setMobileMenuOpen(true)}
-                  className="h-9 w-9 rounded-md"
+                  className="h-9 w-9 rounded-md border-amber-200 bg-white/90 text-amber-950 shadow-sm"
                   aria-label="Open category menu"
                 >
                   <List size={18} />
@@ -1069,53 +1069,37 @@ function App() {
                     setSelectedCategory(null)
                     window.scrollTo({ top: 0, behavior: "smooth" })
                   }}
-                  className="flex min-w-0 items-center gap-2 text-left"
+                  className="flex min-w-0 items-center gap-2 rounded-xl bg-white/75 px-1.5 py-1 text-left shadow-sm ring-1 ring-amber-100/80"
                 >
                   <img
                     src={BRAND_LOGO_PATH}
                     alt="Sukhdevi Alchemy logo"
-                    className="h-9 w-9 rounded-full border object-cover"
+                    className="h-9 w-9 rounded-full border border-amber-200 object-cover"
                     loading="lazy"
                   />
-                  <p className="truncate text-[22px] font-semibold leading-none">Sukhdevi Alchemy</p>
+                  <p className="truncate text-[22px] font-semibold leading-none text-stone-900">Sukhdevi Alchemy</p>
                 </button>
               </div>
 
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={handleOpenAccount}
-                  className="h-9 w-9 rounded-full"
-                  aria-label="Account"
-                >
-                  <UserCircle size={18} />
-                </Button>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={() => setCartOpen(true)}
-                  className="relative h-9 w-9 rounded-full"
-                  aria-label="Open Cart"
-                >
-                  <ShoppingCart size={18} />
-                  {cartItemCount > 0 && (
-                    <Badge className="absolute -top-2 -right-2 h-5 min-w-5 flex items-center justify-center p-0 px-1 text-[10px]">
-                      {cartItemCount}
-                    </Badge>
-                  )}
-                </Button>
-              </div>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={handleOpenAccount}
+                className="h-9 w-9 rounded-full border-amber-200 bg-white/90 text-amber-950 shadow-sm"
+                aria-label="Account"
+              >
+                <UserCircle size={18} />
+              </Button>
             </div>
 
             <div className="flex items-center gap-2">
-              <div className="flex h-10 flex-1 items-center rounded-full border bg-slate-50 px-3">
+              <div className="flex h-10 flex-1 items-center rounded-full border border-amber-200 bg-white px-3 shadow-sm">
                 <input
                   ref={searchInputRef}
                   value={searchQuery}
                   onChange={(event) => setSearchQuery(event.target.value)}
                   placeholder="Discover products"
-                  className="w-full bg-transparent text-sm outline-none"
+                  className="w-full bg-transparent text-sm text-stone-900 outline-none placeholder:text-stone-400"
                   aria-label="Search products"
                 />
               </div>
@@ -1124,7 +1108,7 @@ function App() {
                 size="icon"
                 variant="outline"
                 onClick={() => searchInputRef.current?.focus()}
-                className="h-10 w-10 rounded-full"
+                className="h-10 w-10 rounded-full border-amber-200 bg-white text-amber-950 shadow-sm"
                 aria-label="Search"
               >
                 <MagnifyingGlass size={18} />
