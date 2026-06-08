@@ -1052,7 +1052,7 @@ function App() {
                 <img
                   src={BRAND_LOGO_PATH}
                   alt="Sukhdevi Alchemy logo"
-                  className="h-8 w-8 rounded-full object-cover border"
+                  className="h-7 w-7 rounded-full object-contain border bg-white p-0.5"
                   loading="lazy"
                 />
                 <h1 className="text-2xl font-bold truncate">Admin Panel</h1>
@@ -1175,7 +1175,7 @@ function App() {
                   <img
                     src={BRAND_LOGO_PATH}
                     alt="Sukhdevi Alchemy logo"
-                    className="h-7 w-7 rounded-full border border-slate-200 object-cover"
+                    className="h-6 w-6 rounded-full border border-slate-200 bg-white p-0.5 object-contain"
                     loading="lazy"
                   />
                   <p className="truncate text-[22px] font-semibold leading-none text-emerald-700">Sukhdevi Alchemy</p>
@@ -1227,7 +1227,7 @@ function App() {
               <img
                   src={BRAND_LOGO_PATH}
                 alt="Sukhdevi Alchemy logo"
-                className="h-7 w-7 rounded-full border object-cover sm:h-8 sm:w-8"
+                className="h-6 w-6 rounded-full border bg-white p-0.5 object-contain sm:h-7 sm:w-7"
                 loading="lazy"
               />
               <h1 className="truncate text-base font-semibold sm:text-2xl md:text-3xl sm:font-bold">Sukhdevi Alchemy</h1>
@@ -1429,7 +1429,7 @@ function App() {
           <img
             src={BRAND_LOGO_PATH}
             alt="Sukhdevi Alchemy logo"
-            className="mx-auto mb-3 h-10 w-10 rounded-full border border-slate-300 bg-white p-1 object-contain"
+            className="mx-auto mb-3 h-9 w-9 rounded-full border border-slate-300 bg-white p-0.5 object-contain"
             loading="lazy"
           />
           <p className="text-slate-100">© 2026 Sukhdevi Alchemy. Premium Masala & Organic Spices.</p>

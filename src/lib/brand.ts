@@ -1,1 +1,1 @@
-export const BRAND_LOGO_PATH = "/images/products/SDA_Logo-v2.png"
+export const BRAND_LOGO_PATH = "/branding/SDA-Logo-V3.png"

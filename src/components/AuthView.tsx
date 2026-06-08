@@ -325,11 +325,11 @@ export function AuthView({ mode, onBack, onAuthenticated }: AuthViewProps) {
       <div className="container mx-auto px-4 py-10 max-w-xl">
         <Card>
           <CardHeader>
-            <div className="mx-auto flex h-12 w-12 items-center justify-center overflow-hidden rounded-full border bg-card">
+            <div className="mx-auto flex h-10 w-10 items-center justify-center overflow-hidden rounded-full border bg-card">
               <img
                 src={BRAND_LOGO_PATH}
                 alt="Sukhdevi Alchemy logo"
-                className="h-full w-full object-cover"
+                className="h-full w-full bg-white p-0.5 object-contain"
                 loading="lazy"
               />
             </div>
