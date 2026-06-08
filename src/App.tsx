@@ -477,7 +477,6 @@ function App() {
       return
     }
 
-    toast.success(`${product.name} added to cart!`)
   }
 
   const handleUpdateQuantity = (productId: string, grams: number, quantity: number) => {
@@ -517,7 +516,6 @@ function App() {
       void persistCartRemoval(targetItem.productId, targetItem.grams)
     }
 
-    toast.info("Item removed from cart")
   }
 
   const handleOpenAccount = () => {
