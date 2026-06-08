@@ -1,4 +1,4 @@
-import { FacebookLogo, InstagramLogo, Phone, WhatsappLogo, YoutubeLogo } from "@phosphor-icons/react"
+import { FacebookLogo, InstagramLogo, LinkedinLogo, Phone, TwitterLogo, YoutubeLogo } from "@phosphor-icons/react"
 
 const CONTACT_LINKS = [
   {
@@ -19,12 +19,14 @@ const CONTACT_LINKS = [
     icon: YoutubeLogo,
     handle: "@sukhdevialchemy",
   },
-  {
-    name: "WhatsApp",
-    href: "https://wa.me/917889480171",
-    icon: WhatsappLogo,
-    handle: "+91 78894 80171",
-  },
+]
+
+const FOLLOW_US_LINKS = [
+  { name: "Facebook", href: "https://www.facebook.com/sukhdevialchemy", icon: FacebookLogo },
+  { name: "Instagram", href: "https://www.instagram.com/sukhdevialchemy/", icon: InstagramLogo },
+  { name: "X", href: "https://x.com/sukhdevialchemy", icon: TwitterLogo },
+  { name: "LinkedIn", href: "https://www.linkedin.com/company/sukhdevialchemy", icon: LinkedinLogo },
+  { name: "YouTube", href: "https://www.youtube.com/@sukhdevialchemy", icon: YoutubeLogo },
 ]
 
 export function ContactUsSection() {
@@ -36,8 +38,29 @@ export function ContactUsSection() {
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">Contact Us</p>
             <h2 className="mt-2 text-2xl font-bold sm:text-3xl">Talk to Sukhdevi Alchemy</h2>
             <p className="mt-2 text-sm text-muted-foreground sm:text-base">
-              Reach us for product help, bulk orders, and delivery updates. We respond fastest on WhatsApp.
+              Reach us for product help, platform support, and delivery updates.
             </p>
+
+            <div className="mt-4 flex items-center gap-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Follow us</p>
+              <div className="flex items-center gap-2">
+                {FOLLOW_US_LINKS.map((link) => {
+                  const Icon = link.icon
+                  return (
+                    <a
+                      key={link.name}
+                      href={link.href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-label={`Open ${link.name}`}
+                      className="rounded-full border p-1.5 text-foreground transition hover:bg-accent"
+                    >
+                      <Icon size={16} weight="fill" />
+                    </a>
+                  )
+                })}
+              </div>
+            </div>
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2">
@@ -70,7 +93,7 @@ export function ContactUsSection() {
           <div className="mt-5 rounded-xl border bg-muted/40 p-4">
             <p className="flex items-center gap-2 text-sm font-medium">
               <Phone size={16} />
-              WhatsApp Direct: +91 78894 80171
+              Support follows secure in-app checkout and tracked delivery flow.
             </p>
             <p className="mt-1 text-xs text-muted-foreground">
               Service hours: Monday to Saturday, 9:00 AM to 8:00 PM IST.

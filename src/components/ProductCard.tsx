@@ -31,7 +31,7 @@ export function ProductCard({ product, onViewDetails, onAddToCart, mobileDenseLa
     return (
       <>
         <motion.div whileHover={{ y: -2 }} transition={{ duration: 0.2 }} className="md:hidden">
-          <Card className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">
+          <Card className="gap-0 overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 py-0">
             <button
               type="button"
               onClick={() => onViewDetails(product)}
@@ -60,7 +60,7 @@ export function ProductCard({ product, onViewDetails, onAddToCart, mobileDenseLa
               <p className="text-[11px] leading-4 text-muted-foreground">200+ bought in past month</p>
             </CardContent>
 
-            <CardFooter className="justify-between p-2.5 pt-0">
+            <CardFooter className="justify-between px-2.5 pb-2 pt-0">
               <button
                 type="button"
                 onClick={() => onViewDetails(product)}
@@ -82,7 +82,7 @@ export function ProductCard({ product, onViewDetails, onAddToCart, mobileDenseLa
         </motion.div>
 
         <motion.div whileHover={{ y: -4 }} transition={{ duration: 0.2 }} className="hidden md:block">
-          <Card className="overflow-hidden h-full flex flex-col hover:shadow-lg transition-shadow">
+          <Card className="gap-0 overflow-hidden h-full flex flex-col py-0 transition-shadow hover:shadow-lg">
             <div className="relative h-48 bg-muted overflow-hidden">
               {imageUrl ? (
                 <img
@@ -142,7 +142,7 @@ export function ProductCard({ product, onViewDetails, onAddToCart, mobileDenseLa
       whileHover={{ y: -4 }}
       transition={{ duration: 0.2 }}
     >
-      <Card className="overflow-hidden h-full flex flex-col hover:shadow-lg transition-shadow">
+      <Card className="gap-0 overflow-hidden h-full flex flex-col py-0 transition-shadow hover:shadow-lg">
         <div className="relative h-48 bg-muted overflow-hidden">
           {imageUrl ? (
             <img

@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useKV } from "@/hooks/use-kv"
-import { ShoppingCart, List, Package, CreditCard, Gear, SignOut, UserCircle, InstagramLogo, WhatsappLogo, YoutubeLogo } from "@phosphor-icons/react"
+import { ShoppingCart, List, Package, CreditCard, Gear, SignOut, UserCircle, InstagramLogo, YoutubeLogo, House, MagnifyingGlass, SquaresFour } from "@phosphor-icons/react"
 import { QRCodeSVG as QRCode } from "qrcode.react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -119,6 +119,7 @@ function App() {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
   const [cartOpen, setCartOpen] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [searchQuery, setSearchQuery] = useState("")
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
   const [currentView, setCurrentView] = useState<View>("store")
   const [currentOrder, setCurrentOrder] = useState<Order | null>(null)
@@ -133,10 +134,10 @@ function App() {
   const [featureFlags, setFeatureFlags] = useKV("feature-flags", defaultFeatureFlags)
   const [activeUpiConfig, setActiveUpiConfig] = useState(fallbackUpiConfig)
   const [isProcessingGatewayPayment, setIsProcessingGatewayPayment] = useState(false)
+  const searchInputRef = useRef<HTMLInputElement | null>(null)
   const socialProfiles = [
     { name: "Instagram", handle: "@sukhdevialchemy", url: "https://instagram.com/sukhdevialchemy" },
     { name: "YouTube", handle: "@sukhdevialchemy", url: "https://youtube.com/@sukhdevialchemy" },
-    { name: "WhatsApp", handle: "Sukhdevi Alchemy", url: "https://wa.me/?text=Hi%20Sukhdevi%20Alchemy" },
   ]
   const runtimeMode = resolveRuntimeMode(requestedRuntimeMode, profile)
   const devModeRequested = requestedRuntimeMode === "dev"
@@ -368,9 +369,18 @@ function App() {
     }
   }, [profile?.id])
 
-  const filteredProducts = selectedCategory
+  const categoryFilteredProducts = selectedCategory
     ? (products || []).filter((product) => product.category === selectedCategory)
     : products || []
+  const normalizedSearch = searchQuery.trim().toLowerCase()
+  const filteredProducts = normalizedSearch
+    ? categoryFilteredProducts.filter((product) =>
+      [product.name, product.description, ...(product.ingredients || [])]
+        .join(" ")
+        .toLowerCase()
+        .includes(normalizedSearch)
+    )
+    : categoryFilteredProducts
 
   const localOrders = orders || []
   const localOrdersForProfile = profile
@@ -927,8 +937,79 @@ function App() {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-10 border-b border-slate-200 bg-slate-900 text-slate-100 shadow-sm sm:border-border sm:bg-card sm:text-foreground">
+      <header className="sticky top-0 z-20 border-b border-slate-200 bg-white text-slate-900 shadow-sm sm:border-border sm:bg-card sm:text-foreground">
         <div className="container mx-auto px-3 sm:px-4 py-2 sm:py-4">
+          <div className="space-y-2 sm:hidden">
+            <div className="flex items-center justify-between gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedCategory(null)
+                  window.scrollTo({ top: 0, behavior: "smooth" })
+                }}
+                className="flex min-w-0 items-center gap-2 text-left"
+              >
+                <img
+                  src={BRAND_LOGO_PATH}
+                  alt="Sukhdevi Alchemy logo"
+                  className="h-9 w-9 rounded-full border object-cover"
+                  loading="lazy"
+                />
+                <p className="truncate text-[22px] font-semibold leading-none">Sukhdevi Alchemy</p>
+              </button>
+
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={handleOpenAccount}
+                  className="h-9 w-9 rounded-full border-orange-300 bg-orange-50 text-orange-600 hover:bg-orange-100"
+                  aria-label="Account"
+                >
+                  <UserCircle size={18} />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setCartOpen(true)}
+                  className="relative h-9 w-9 rounded-full"
+                  aria-label="Open Cart"
+                >
+                  <ShoppingCart size={18} />
+                  {cartItemCount > 0 && (
+                    <Badge className="absolute -top-2 -right-2 h-5 min-w-5 flex items-center justify-center p-0 px-1 text-[10px]">
+                      {cartItemCount}
+                    </Badge>
+                  )}
+                </Button>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <div className="flex h-10 flex-1 items-center rounded-full border bg-slate-50 px-3">
+                <input
+                  ref={searchInputRef}
+                  value={searchQuery}
+                  onChange={(event) => setSearchQuery(event.target.value)}
+                  placeholder="Discover products"
+                  className="w-full bg-transparent text-sm outline-none"
+                  aria-label="Search products"
+                />
+              </div>
+              <Button
+                type="button"
+                size="icon"
+                variant="outline"
+                onClick={() => searchInputRef.current?.focus()}
+                className="h-10 w-10 rounded-full"
+                aria-label="Search"
+              >
+                <MagnifyingGlass size={18} />
+              </Button>
+            </div>
+          </div>
+
+          <div className="hidden sm:block">
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center min-w-0 gap-2 sm:gap-4">
               <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
@@ -985,7 +1066,7 @@ function App() {
               <img
                   src={BRAND_LOGO_PATH}
                 alt="Sukhdevi Alchemy logo"
-                className="h-9 w-9 rounded-full border border-slate-500 object-cover sm:h-10 sm:w-10 sm:border"
+                className="h-9 w-9 rounded-full border object-cover sm:h-10 sm:w-10"
                 loading="lazy"
               />
               <h1 className="truncate text-base font-semibold sm:text-2xl md:text-3xl sm:font-bold">Sukhdevi Alchemy</h1>
@@ -1005,7 +1086,6 @@ function App() {
                   >
                     {profile.name === "Instagram" && <InstagramLogo size={14} weight="duotone" />}
                     {profile.name === "YouTube" && <YoutubeLogo size={14} weight="duotone" />}
-                    {profile.name === "WhatsApp" && <WhatsappLogo size={14} weight="duotone" />}
                   </a>
                 ))}
               </div>
@@ -1033,7 +1113,7 @@ function App() {
                   variant="outline"
                   size="sm"
                   onClick={handleOpenTracking}
-                  className="sm:hidden h-9 border-slate-500 bg-slate-800 px-2 text-[11px] text-slate-100 hover:bg-slate-700"
+                  className="sm:hidden h-9 px-2 text-[11px]"
                   aria-label="My Orders"
                 >
                   <Package size={14} className="mr-1" />
@@ -1041,7 +1121,7 @@ function App() {
                 </Button>
               )}
 
-              <Button variant="outline" size="icon" onClick={handleOpenAccount} className="sm:hidden h-9 w-9 border-slate-500 bg-slate-800 text-slate-100 hover:bg-slate-700" aria-label="Account">
+              <Button variant="outline" size="icon" onClick={handleOpenAccount} className="sm:hidden h-9 w-9" aria-label="Account">
                 <UserCircle size={18} />
               </Button>
 
@@ -1061,7 +1141,7 @@ function App() {
                 </Button>
               )}
 
-              <Button variant="outline" size="icon" onClick={() => setCartOpen(true)} className="relative h-9 w-9 border-slate-500 bg-slate-800 text-slate-100 hover:bg-slate-700 sm:h-10 sm:w-10 sm:border-input sm:bg-background sm:text-foreground" aria-label="Open Cart">
+              <Button variant="outline" size="icon" onClick={() => setCartOpen(true)} className="relative h-9 w-9 sm:h-10 sm:w-10" aria-label="Open Cart">
                 <ShoppingCart size={20} />
                 {cartItemCount > 0 && (
                   <Badge className="absolute -top-2 -right-2 h-5 min-w-5 flex items-center justify-center p-0 px-1 text-[10px]">
@@ -1085,14 +1165,14 @@ function App() {
               >
                 {profile.name === "Instagram" && <InstagramLogo size={14} weight="duotone" />}
                 {profile.name === "YouTube" && <YoutubeLogo size={14} weight="duotone" />}
-                {profile.name === "WhatsApp" && <WhatsappLogo size={14} weight="duotone" />}
               </a>
             ))}
+          </div>
           </div>
         </div>
       </header>
 
-      <div className="container mx-auto px-3 py-4 sm:px-4 sm:py-8">
+      <div className="container mx-auto px-3 py-4 pb-24 sm:px-4 sm:py-8 sm:pb-8">
         <div className="flex gap-8">
           <aside className="hidden lg:block w-64 flex-shrink-0">
             <div className="sticky top-24">
@@ -1134,6 +1214,52 @@ function App() {
           </main>
         </div>
       </div>
+
+      <nav className="fixed inset-x-0 bottom-0 z-30 border-t bg-white sm:hidden">
+        <div className="grid grid-cols-4">
+          <button
+            type="button"
+            onClick={() => {
+              setSelectedCategory(null)
+              setSearchQuery("")
+              window.scrollTo({ top: 0, behavior: "smooth" })
+            }}
+            className="flex flex-col items-center gap-1 py-2 text-xs"
+          >
+            <House size={18} />
+            Home
+          </button>
+          <button
+            type="button"
+            onClick={() => searchInputRef.current?.focus()}
+            className="flex flex-col items-center gap-1 py-2 text-xs"
+          >
+            <MagnifyingGlass size={18} />
+            Search
+          </button>
+          <button
+            type="button"
+            onClick={() => setMobileMenuOpen(true)}
+            className="flex flex-col items-center gap-1 py-2 text-xs"
+          >
+            <SquaresFour size={18} />
+            Category
+          </button>
+          <button
+            type="button"
+            onClick={() => setCartOpen(true)}
+            className="relative flex flex-col items-center gap-1 py-2 text-xs"
+          >
+            <ShoppingCart size={18} />
+            Cart
+            {cartItemCount > 0 && (
+              <span className="absolute right-6 top-1 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-red-600 px-1 text-[10px] text-white">
+                {cartItemCount}
+              </span>
+            )}
+          </button>
+        </div>
+      </nav>
 
       <TestimonialsSection />
       <ContactUsSection />
