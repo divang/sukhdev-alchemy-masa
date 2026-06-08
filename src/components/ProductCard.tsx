@@ -49,6 +49,9 @@ export function ProductCard({ product, onViewDetails, onAddToCart, mobileDenseLa
               <Badge className="absolute left-2 top-2 bg-red-600 px-1.5 py-0 text-[10px] font-semibold text-white hover:bg-red-600">
                 -{discountPercent}%
               </Badge>
+              <Badge className="absolute right-2 top-2 bg-slate-900 px-1.5 py-0 text-[10px] font-semibold text-white hover:bg-slate-900">
+                50g
+              </Badge>
             </button>
 
             <CardContent className="space-y-0.5 p-2.5 pb-1">
@@ -94,6 +97,9 @@ export function ProductCard({ product, onViewDetails, onAddToCart, mobileDenseLa
                   <span className="text-muted-foreground">No image</span>
                 </div>
               )}
+              <Badge className="absolute right-2 top-2 bg-slate-900 px-1.5 py-0 text-[10px] font-semibold text-white hover:bg-slate-900">
+                50g
+              </Badge>
             </div>
 
             <CardContent className="flex-1 p-4 flex flex-col gap-2">
@@ -154,6 +160,9 @@ export function ProductCard({ product, onViewDetails, onAddToCart, mobileDenseLa
               <span className="text-muted-foreground">No image</span>
             </div>
           )}
+          <Badge className="absolute right-2 top-2 bg-slate-900 px-1.5 py-0 text-[10px] font-semibold text-white hover:bg-slate-900">
+            50g
+          </Badge>
         </div>
         
         <CardContent className="flex-1 p-4 flex flex-col gap-2">
