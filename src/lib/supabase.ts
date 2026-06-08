@@ -16,7 +16,9 @@ export const supabase = isSupabaseConfigured
     auth: {
       persistSession: true,
       autoRefreshToken: true,
-      detectSessionInUrl: true,
+      // OAuth callback exchange is handled explicitly in auth.ts.
+      // Leaving this enabled causes double-processing of the auth code.
+      detectSessionInUrl: false,
       storageKey: "sukhdevi-auth-token",
     },
   })

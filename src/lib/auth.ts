@@ -1001,7 +1001,12 @@ export async function finalizeOAuthRedirect(): Promise<string | undefined> {
   const error = url.searchParams.get("error")
   const errorDescription = url.searchParams.get("error_description")
 
+  function clearOAuthParams() {
+    window.history.replaceState({}, document.title, `${url.origin}${url.pathname}${url.hash}`)
+  }
+
   if (error) {
+    clearOAuthParams()
     return mapAuthErrorMessage(errorDescription || error)
   }
 
@@ -1009,13 +1014,19 @@ export async function finalizeOAuthRedirect(): Promise<string | undefined> {
     return undefined
   }
 
-  const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code)
-  if (exchangeError) {
-    return mapAuthErrorMessage(exchangeError.message)
+  try {
+    const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code)
+    if (exchangeError) {
+      clearOAuthParams()
+      return mapAuthErrorMessage(exchangeError.message)
+    }
+  } catch (exchangeError) {
+    clearOAuthParams()
+    return mapAuthErrorMessage(exchangeError instanceof Error ? exchangeError.message : String(exchangeError))
   }
 
   // Clean OAuth query params after successful exchange.
-  window.history.replaceState({}, document.title, `${url.origin}${url.pathname}${url.hash}`)
+  clearOAuthParams()
   return undefined
 }
 
