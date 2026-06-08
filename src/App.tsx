@@ -47,6 +47,51 @@ type View = "store" | "account" | "checkout" | "payment" | "tracking" | "admin" 
 const ENABLE_AMAZON_STYLE_MOBILE_PRODUCT_CARDS = true
 const TRACKING_VISIBLE_ORDER_ID = "ORD-1780827393392"
 const TRACKING_OWNER_EMAIL = "divang.s@gmail.com"
+const PRODUCT_SEARCH_SYNONYM_GROUPS = [
+  ["chilli", "chili", "mirchi", "mircha", "lal mirch", "red chilli", "red chili"],
+  ["black pepper", "kali mirch"],
+  ["cumin", "jeera"],
+  ["coriander", "dhaniya"],
+  ["fennel", "saunf"],
+  ["cardamom", "elaichi", "ilaichi"],
+  ["clove", "laung"],
+  ["turmeric", "haldi"],
+  ["dry ginger", "sonth"],
+  ["carom", "ajwain"],
+  ["mango powder", "amchoor", "amchur"],
+  ["pomegranate seeds", "anardana"],
+  ["mix masala", "garam masala"],
+  ["chole", "chhole", "chana masala"],
+  ["chaat", "chat"],
+  ["bharwa", "stuffed masala"],
+] as const
+
+function normalizeSearchText(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+}
+
+function buildProductSearchText(product: Product, categoryName?: string) {
+  const rawText = [
+    product.name,
+    product.description,
+    categoryName ?? "",
+    ...(Array.isArray(product.ingredients) ? product.ingredients : []),
+    ...(Array.isArray(product.tags) ? product.tags : []),
+  ]
+    .filter((value): value is string => typeof value === "string" && value.trim().length > 0)
+    .join(" ")
+
+  const normalizedBase = normalizeSearchText(rawText)
+  const synonyms = PRODUCT_SEARCH_SYNONYM_GROUPS
+    .filter((group) => group.some((term) => normalizedBase.includes(term)))
+    .flat()
+
+  return `${normalizedBase} ${synonyms.join(" ")}`.trim()
+}
 
 function parseOrderIdTimestamp(orderId: string) {
   const match = orderId.match(/ORD-(\d{8,})$/)
@@ -392,14 +437,12 @@ function App() {
   const categoryFilteredProducts = selectedCategory
     ? (products || []).filter((product) => product.category === selectedCategory)
     : products || []
-  const normalizedSearch = searchQuery.trim().toLowerCase()
+  const normalizedSearch = normalizeSearchText(searchQuery)
   const filteredProducts = normalizedSearch
-    ? categoryFilteredProducts.filter((product) =>
-      [product.name, product.description, ...(product.ingredients || [])]
-        .join(" ")
-        .toLowerCase()
-        .includes(normalizedSearch)
-    )
+    ? categoryFilteredProducts.filter((product) => {
+      const categoryName = (categories || []).find((category) => category.id === product.category)?.name
+      return buildProductSearchText(product, categoryName).includes(normalizedSearch)
+    })
     : categoryFilteredProducts
 
   const localOrders = orders || []

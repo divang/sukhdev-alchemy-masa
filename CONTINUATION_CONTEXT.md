@@ -1,10 +1,10 @@
 # Continuation Context
 
-Last updated: 2026-06-05 UTC
+Last updated: 2026-06-08 UTC
 Branch: main
-Latest pushed commit: 2a67184
-Latest local commit: 68add95
-Previous major feature commit: da1056d
+Latest pushed commit: eb307ed
+Latest local commit: eb307ed
+Previous major feature commit: 5c420f6
 
 ## Why This File Exists
 Use this as the single recovery document when chat/session history is unavailable.
@@ -269,13 +269,15 @@ order by tablename, policyname;
 
 ### Catalog + Product Model
 - Product catalog is DB-backed with static fallback.
+- Premium category label is now `Premium Blended Masala`.
 - Four primary 50g SKU products are configured:
-  - Bharwa Masala: ₹125
-  - Chaat Masala: ₹145
-  - Chole Masala: ₹160
+  - Bharwa Masala Premium: ₹125
+  - Chaat Masala Premium: ₹145
+  - Chole Masala Premium: ₹160
   - Mix Masala Premium Blend: ₹210
 - Combo pack exists:
   - Sukhdevi Combo Pack (4 x 50g): ₹640
+- Product cards now show a visible `50g` badge on product images.
 
 ### Cart + Wishlist Persistence
 - Signed-in cart items persist in Supabase (`cart_items`).
@@ -292,6 +294,7 @@ order by tablename, policyname;
 - Customer sign-in now supports Phone OTP flow.
 - Phone provider has been enabled in Supabase Auth; SMS delivery still depends on the configured provider credentials and successful real-device testing.
 - Google sign-in option is available (requires provider configuration in Supabase Auth).
+- Google auth session persistence was hardened with explicit Supabase persisted session settings and retry/recovery logic around `getSession()` / auth-state changes.
 - Email/password remains available as fallback.
 - Forgot password and password reset update flow are implemented.
 - Signup/profile provisioning now has DB audit logging + auth trigger profile auto-upsert.
@@ -308,13 +311,18 @@ order by tablename, policyname;
 
 ### Mobile UX Improvements
 - Header actions compacted for small screens.
-- Cart button/account actions now safer on narrow devices.
+- Mobile top header now uses a hamburger menu that opens the left category drawer, Amazon-style.
+- Mobile top-right cart button was removed; cart remains available in the bottom mobile nav.
+- Mobile header styling was refined to a white bar with green brand text for cleaner contrast.
+- Admin users now get an admin shortcut inside the mobile category drawer.
 - Product details dialog uses viewport-safe heights and safe-area padding.
 - Cart drawer bottom/actions adjusted for mobile safe-area.
+- Mobile My Orders visibility was improved for signed-in users.
 
 ### Brand Image Consistency
 - Use a single shared logo asset across all pages: `/branding/logo-header-256.png`.
 - Avoid mixing `/images/products/SDA-Logo.png` and `/branding/logo-header-256.png` so header, auth, payment, and tracking screens stay visually consistent.
+- `index.html` favicon / apple-touch-icon now point to the shared branding logo image with cache-busting for more reliable tab icon behavior.
 
 ### Contact Us
 Professional contact section is live with:
@@ -322,6 +330,14 @@ Professional contact section is live with:
 - Facebook: https://www.facebook.com/sukhdevialchemy
 - YouTube: https://www.youtube.com/@sukhdevialchemy
 - WhatsApp: +91 78894 80171 (wa.me link)
+- Legal/support contact email is now `care@sukhdevialchemy.com`.
+
+### Orders + Admin UX
+- Order tracking page was redesigned in a more Amazon-like layout.
+- `Buy Again` item image click now adds the item back to cart.
+- `Track package` opens the carrier tracking URL when available.
+- Admin recent orders now expand on click to show full order details.
+- Tracking visibility rules were tightened for the protected order flow introduced in recent sessions.
 
 ### Product Image Asset Filenames (Merged)
 If replacing product images, keep these filenames unless you also update `src/hooks/use-initial-data.ts` image paths:
@@ -340,21 +356,30 @@ After replacing images:
 - src/lib/cart-persistence.ts
 - src/lib/catalog.ts
 - src/lib/auth.ts
+- src/lib/supabase.ts
 - src/lib/promo-codes.ts
 - src/lib/runtime-mode.ts
 - src/hooks/use-initial-data.ts
 - src/App.tsx
 - src/components/AccountDetailsView.tsx
+- src/components/AdminPanel.tsx
 - src/components/CartDrawer.tsx
 - src/components/CheckoutView.tsx
+- src/components/OrderTrackingView.tsx
 - src/components/ProductDetailDialog.tsx
 - src/components/ProductCard.tsx
+- src/components/CategorySidebar.tsx
 - src/components/ContactUsSection.tsx
 - src/components/AuthView.tsx
 - src/components/TestimonialsSection.tsx
+- public/privacy-policy.html
+- public/returns-refunds-policy.html
+- public/terms-and-conditions.html
+- index.html
 - supabase/sql/004_catalog_seed_data.sql
 - supabase/sql/006_cart_items_and_review_purchase_gate.sql
 - supabase/sql/018_auth_audit_logging_and_profile_trigger.sql
+- supabase/sql/025_rename_premium_blended_masala_labels.sql
 
 ## Supabase SQL Migration Order (Current)
 Apply in this order:
@@ -462,12 +487,10 @@ where email = 'you@example.com';
 6. Verify deploy secrets and push to `main` for Pages deploy.
 
 ## Deployment / Git Status Notes
-- Latest pushed commit on `origin/main`: `2a67184`.
-- Latest local commits not yet pushed:
-  - `81a9a0b` - account details screen for signed-in users
-  - `68add95` - promo discount breakdown on payment screen + promo validation consistency
+- Latest pushed commit on `origin/main`: `eb307ed`.
 - Working tree was clean at last check.
-- If release reproducibility is needed, push or intentionally hold the two local commits above before further changes.
+- GitHub Pages production source is `main:/docs`.
+- Recent publish sequence included cleanup of stale hashed `docs/assets/index-*` files so Pages now contains only current referenced assets.
 
 ## Useful Verification Queries
 
