@@ -11,6 +11,8 @@ export type Product = {
   name: string
   category: string
   price: number
+  compareAtPrice?: number
+  discountPercent?: number
   packGrams?: number
   image: string
   rating: number

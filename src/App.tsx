@@ -47,6 +47,8 @@ type View = "store" | "account" | "checkout" | "payment" | "tracking" | "admin" 
 const ENABLE_AMAZON_STYLE_MOBILE_PRODUCT_CARDS = true
 const TRACKING_VISIBLE_ORDER_ID = "ORD-1780827393392"
 const TRACKING_OWNER_EMAIL = "divang.s@gmail.com"
+const HIDDEN_CATEGORY_IDS = new Set(["combo-pack-masala"])
+const HIDDEN_PRODUCT_IDS = new Set(["sukhdevi-combo-pack"])
 const PRODUCT_SEARCH_SYNONYM_GROUPS = [
   ["chilli", "chili", "mirchi", "mircha", "lal mirch", "red chilli", "red chili"],
   ["black pepper", "kali mirch"],
@@ -173,6 +175,20 @@ function getTotalGramsForProduct(cartItems: CartItem[], productId: string) {
     .reduce((sum, item) => sum + (item.grams * item.quantity), 0)
 }
 
+function hasOAuthParamsInLocation(href: string) {
+  try {
+    const url = new URL(href)
+    if (url.searchParams.has("code") || url.searchParams.has("error") || url.searchParams.has("error_description")) {
+      return true
+    }
+
+    const hashParams = new URLSearchParams(url.hash.startsWith("#") ? url.hash.slice(1) : url.hash)
+    return ["access_token", "refresh_token", "error", "error_description", "type"].some((key) => hashParams.has(key))
+  } catch {
+    return false
+  }
+}
+
 function App() {
   useInitialData()
 
@@ -199,7 +215,9 @@ function App() {
   const [featureFlags, setFeatureFlags] = useKV("feature-flags", defaultFeatureFlags)
   const [activeUpiConfig, setActiveUpiConfig] = useState(fallbackUpiConfig)
   const [isProcessingGatewayPayment, setIsProcessingGatewayPayment] = useState(false)
+  const [showAuthHandoffNotice, setShowAuthHandoffNotice] = useState(false)
   const searchInputRef = useRef<HTMLInputElement | null>(null)
+  const authHandoffTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const socialProfiles = [
     { name: "Instagram", handle: "@sukhdevialchemy", url: "https://instagram.com/sukhdevialchemy" },
     { name: "YouTube", handle: "@sukhdevialchemy", url: "https://youtube.com/@sukhdevialchemy" },
@@ -262,6 +280,17 @@ function App() {
 
     async function initializeAuthState() {
       try {
+        if (typeof window !== "undefined" && hasOAuthParamsInLocation(window.location.href)) {
+          setShowAuthHandoffNotice(true)
+          if (authHandoffTimeoutRef.current) {
+            clearTimeout(authHandoffTimeoutRef.current)
+          }
+
+          authHandoffTimeoutRef.current = setTimeout(() => {
+            setShowAuthHandoffNotice(false)
+          }, 1500)
+        }
+
         const oauthError = await finalizeOAuthRedirect()
         if (!isActive) {
           return
@@ -290,6 +319,7 @@ function App() {
           role: state.profile?.role ?? null,
         })
         setProfile(state.profile)
+        setShowAuthHandoffNotice(false)
       } catch (error) {
         if (!isActive) {
           return
@@ -299,6 +329,7 @@ function App() {
         setProfile(null)
         setCurrentOrder(null)
         setCurrentView("store")
+        setShowAuthHandoffNotice(false)
 
         if (typeof window !== "undefined") {
           window.location.replace(`${window.location.origin}/`)
@@ -316,11 +347,18 @@ function App() {
         role: state.profile?.role ?? null,
       })
       setProfile(state.profile)
+
+      if (state.user || state.profile) {
+        setShowAuthHandoffNotice(false)
+      }
     })
 
     return () => {
       isActive = false
       subscription.unsubscribe()
+      if (authHandoffTimeoutRef.current) {
+        clearTimeout(authHandoffTimeoutRef.current)
+      }
     }
   }, [])
 
@@ -456,13 +494,22 @@ function App() {
     }
   }, [profile?.id])
 
+  const visibleCategories = (categories || []).filter((category) => !HIDDEN_CATEGORY_IDS.has(category.id))
+  const visibleProducts = (products || []).filter((product) => !HIDDEN_PRODUCT_IDS.has(product.id) && !HIDDEN_CATEGORY_IDS.has(product.category))
+
+  useEffect(() => {
+    if (selectedCategory && HIDDEN_CATEGORY_IDS.has(selectedCategory)) {
+      setSelectedCategory(null)
+    }
+  }, [selectedCategory])
+
   const categoryFilteredProducts = selectedCategory
-    ? (products || []).filter((product) => product.category === selectedCategory)
-    : products || []
+    ? visibleProducts.filter((product) => product.category === selectedCategory)
+    : visibleProducts
   const normalizedSearch = normalizeSearchText(searchQuery)
   const filteredProducts = normalizedSearch
     ? categoryFilteredProducts.filter((product) => {
-      const categoryName = (categories || []).find((category) => category.id === product.category)?.name
+      const categoryName = visibleCategories.find((category) => category.id === product.category)?.name
       return buildProductSearchText(product, categoryName).includes(normalizedSearch)
     })
     : categoryFilteredProducts
@@ -1088,7 +1135,7 @@ function App() {
               </SheetHeader>
               <div className="mt-4 space-y-5">
                 <CategorySidebar
-                  categories={categories || []}
+                  categories={visibleCategories}
                   selectedCategory={selectedCategory}
                   onSelectCategory={(category) => {
                     setSelectedCategory(category)
@@ -1350,7 +1397,7 @@ function App() {
           <aside className="hidden lg:block w-64 flex-shrink-0">
             <div className="sticky top-24">
               <CategorySidebar
-                categories={categories || []}
+                categories={visibleCategories}
                 selectedCategory={selectedCategory}
                 onSelectCategory={setSelectedCategory}
               />
@@ -1361,7 +1408,7 @@ function App() {
             <div className="mb-4 sm:mb-6">
               <h2 className="text-2xl font-bold mb-2">
                 {selectedCategory
-                  ? (categories || []).find((category) => category.id === selectedCategory)?.name || "Products"
+                  ? visibleCategories.find((category) => category.id === selectedCategory)?.name || "Products"
                   : "All Products"}
               </h2>
               <p className="text-muted-foreground">{filteredProducts.length} products available</p>
@@ -1387,6 +1434,14 @@ function App() {
           </main>
         </div>
       </div>
+
+      {showAuthHandoffNotice && !profile && (
+        <div className="container mx-auto px-3 sm:px-4 -mt-1 mb-2">
+          <div className="rounded-md border border-blue-200 bg-blue-50 px-3 py-1 text-xs text-blue-700">
+            Signing you in...
+          </div>
+        </div>
+      )}
 
       <nav className="fixed inset-x-0 bottom-0 z-30 border-t bg-white sm:hidden">
         <div className="grid grid-cols-4">

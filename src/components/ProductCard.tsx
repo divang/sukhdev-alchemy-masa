@@ -7,7 +7,7 @@ import type { Product } from "@/lib/types"
 import { motion } from "framer-motion"
 import { getProductImage } from "@/lib/product-images"
 import { useKV } from "@/hooks/use-kv"
-import { getProductDisplayPriceLabel, getProductPackLabel, getProductPackGrams, resolveProductPackPrice } from "@/lib/pricing"
+import { getProductPackLabel, getProductPackGrams, resolveProductPackPrice } from "@/lib/pricing"
 
 type ProductCardProps = {
   product: Product
@@ -23,9 +23,25 @@ export function ProductCard({ product, onViewDetails, onAddToCart, mobileDenseLa
     ? "w-full h-full object-cover object-bottom transition-transform hover:scale-105 duration-300"
     : "w-full h-full object-cover transition-transform hover:scale-105 duration-300"
   const currentPrice = resolveProductPackPrice(product, getProductPackGrams(product))
-  const discountSeed = [...product.id].reduce((sum, char) => sum + char.charCodeAt(0), 0)
-  const discountPercent = 10 + (discountSeed % 11)
-  const referencePrice = Math.ceil((currentPrice / (1 - discountPercent / 100)) / 5) * 5
+  const discountFromTag = (() => {
+    for (const tag of product.tags || []) {
+      const match = /^discount-(\d{1,2})$/i.exec(tag)
+      if (match) {
+        const value = Number(match[1])
+        if (Number.isFinite(value) && value > 0 && value < 100) {
+          return value
+        }
+      }
+    }
+
+    return undefined
+  })()
+  const discountPercent = product.discountPercent ?? discountFromTag
+  const referencePrice = product.compareAtPrice
+    ?? (discountPercent
+      ? Math.ceil((currentPrice / (1 - discountPercent / 100)) / 5) * 5
+      : undefined)
+  const hasDiscount = Boolean(discountPercent && referencePrice && referencePrice > currentPrice)
 
   if (mobileDenseLayout) {
     return (
@@ -47,7 +63,7 @@ export function ProductCard({ product, onViewDetails, onAddToCart, mobileDenseLa
                 )}
               </div>
               <Badge className="absolute left-2 top-2 bg-red-600 px-1.5 py-0 text-[10px] font-semibold text-white hover:bg-red-600">
-                -{discountPercent}%
+                {hasDiscount ? `-${discountPercent}%` : "Best Price"}
               </Badge>
               <Badge className="absolute right-2 top-2 bg-slate-900 px-1.5 py-0 text-[10px] font-semibold text-white hover:bg-slate-900">
                 50g
@@ -58,7 +74,9 @@ export function ProductCard({ product, onViewDetails, onAddToCart, mobileDenseLa
               <h3 className="line-clamp-1 text-[14px] font-medium leading-5">{product.name}</h3>
               <div className="flex items-end gap-1">
                 <span className="text-[22px] font-bold tracking-tight leading-none">₹{currentPrice}</span>
-                <span className="pb-0.5 text-[12px] text-muted-foreground line-through">₹{referencePrice}</span>
+                {hasDiscount && (
+                  <span className="pb-0.5 text-[12px] text-muted-foreground line-through">₹{referencePrice}</span>
+                )}
               </div>
             </CardContent>
 
@@ -100,6 +118,11 @@ export function ProductCard({ product, onViewDetails, onAddToCart, mobileDenseLa
               <Badge className="absolute right-2 top-2 bg-slate-900 px-1.5 py-0 text-[10px] font-semibold text-white hover:bg-slate-900">
                 50g
               </Badge>
+              {hasDiscount && (
+                <Badge className="absolute left-2 top-2 bg-red-600 px-1.5 py-0 text-[10px] font-semibold text-white hover:bg-red-600">
+                  -{discountPercent}%
+                </Badge>
+              )}
             </div>
 
             <CardContent className="flex-1 p-4 flex flex-col gap-2">
@@ -113,7 +136,12 @@ export function ProductCard({ product, onViewDetails, onAddToCart, mobileDenseLa
 
             <CardFooter className="p-4 pt-0 flex flex-col gap-2">
               <div className="flex items-center justify-between w-full">
-                <span className="text-2xl font-bold text-primary">{getProductDisplayPriceLabel(product)}</span>
+                <div className="flex items-end gap-2">
+                  <span className="text-2xl font-bold text-primary">₹{currentPrice}</span>
+                  {hasDiscount && (
+                    <span className="text-xs text-muted-foreground line-through">₹{referencePrice}</span>
+                  )}
+                </div>
                 <span className="text-xs text-muted-foreground">{getProductPackLabel(product)}</span>
               </div>
               <div className="flex gap-2 w-full">
@@ -163,6 +191,11 @@ export function ProductCard({ product, onViewDetails, onAddToCart, mobileDenseLa
           <Badge className="absolute right-2 top-2 bg-slate-900 px-1.5 py-0 text-[10px] font-semibold text-white hover:bg-slate-900">
             50g
           </Badge>
+          {hasDiscount && (
+            <Badge className="absolute left-2 top-2 bg-red-600 px-1.5 py-0 text-[10px] font-semibold text-white hover:bg-red-600">
+              -{discountPercent}%
+            </Badge>
+          )}
         </div>
         
         <CardContent className="flex-1 p-4 flex flex-col gap-2">
@@ -176,7 +209,12 @@ export function ProductCard({ product, onViewDetails, onAddToCart, mobileDenseLa
         
         <CardFooter className="p-4 pt-0 flex flex-col gap-2">
           <div className="flex items-center justify-between w-full">
-            <span className="text-2xl font-bold text-primary">{getProductDisplayPriceLabel(product)}</span>
+            <div className="flex items-end gap-2">
+              <span className="text-2xl font-bold text-primary">₹{currentPrice}</span>
+              {hasDiscount && (
+                <span className="text-xs text-muted-foreground line-through">₹{referencePrice}</span>
+              )}
+            </div>
             <span className="text-xs text-muted-foreground">{getProductPackLabel(product)}</span>
           </div>
           <div className="flex gap-2 w-full">
