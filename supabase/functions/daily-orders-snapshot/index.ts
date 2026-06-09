@@ -1,11 +1,13 @@
-import { isSupabaseConfigured, supabase } from "@/lib/supabase"
+// @ts-nocheck
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
+import { corsHeaders, jsonResponse } from "../_shared/cors.ts"
 
-export type OrderExportRange = "today" | "week" | "month" | "custom" | "all"
-export type OrderExportFormat = "order-summary" | "line-item"
+type ExportRange = "today" | "week" | "month" | "custom" | "all"
+type ExportFormat = "order-summary" | "line-item"
 
-export type OrderExportOptions = {
-  range: OrderExportRange
-  format: OrderExportFormat
+type ExportOptions = {
+  range?: ExportRange
+  format?: ExportFormat
   customStartDate?: string
   customEndDate?: string
 }
@@ -67,17 +69,91 @@ type NormalizedPayment = {
   createdAt: string
 }
 
-type CsvBuildResult = {
+type CsvResult = {
   csv: string
   rowCount: number
 }
 
-type AdminExportData = {
-  error?: string
-  orders: OrderRow[]
-  shipmentByOrder: Map<string, ShipmentRow>
-  paymentByOrder: Map<string, NormalizedPayment>
-  paymentByUser: Map<string, NormalizedPayment>
+const supabaseUrl = Deno.env.get("SUPABASE_URL")
+const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")
+const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")
+const resendApiKey = Deno.env.get("RESEND_API_KEY")?.trim() || ""
+const fromEmail = Deno.env.get("ORDER_NOTIFICATION_FROM_EMAIL")?.trim() || ""
+const cronToken = Deno.env.get("DAILY_EXPORT_CRON_TOKEN")?.trim() || ""
+const recipientsCsv = Deno.env.get("ORDER_SNAPSHOT_RECIPIENTS")?.trim() || Deno.env.get("ORDER_NOTIFICATION_ADMIN_EMAILS")?.trim() || ""
+
+if (!supabaseUrl || !supabaseAnonKey || !supabaseServiceRoleKey) {
+  throw new Error("Missing required environment variables for daily-orders-snapshot function.")
+}
+
+function normalizeDateOnly(date: Date) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate())
+}
+
+function getRangeStart(options: ExportOptions) {
+  const now = new Date()
+  const today = normalizeDateOnly(now)
+
+  if (options.range === "all") {
+    return undefined
+  }
+
+  if (options.range === "today") {
+    return today
+  }
+
+  if (options.range === "week") {
+    const day = today.getDay()
+    const diff = day === 0 ? 6 : day - 1
+    const start = new Date(today)
+    start.setDate(today.getDate() - diff)
+    return start
+  }
+
+  if (options.range === "month" || !options.range) {
+    return new Date(today.getFullYear(), today.getMonth(), 1)
+  }
+
+  if (options.range === "custom" && options.customStartDate) {
+    const parsed = new Date(`${options.customStartDate}T00:00:00`)
+    return Number.isNaN(parsed.getTime()) ? undefined : parsed
+  }
+
+  return undefined
+}
+
+function getRangeEnd(options: ExportOptions) {
+  if (options.range !== "custom") {
+    return undefined
+  }
+  if (!options.customEndDate) {
+    return undefined
+  }
+
+  const parsed = new Date(`${options.customEndDate}T23:59:59.999`)
+  return Number.isNaN(parsed.getTime()) ? undefined : parsed
+}
+
+function filterOrdersByRange(orders: OrderRow[], options: ExportOptions) {
+  const start = getRangeStart(options)
+  const end = getRangeEnd(options)
+
+  return orders.filter((order) => {
+    const createdAt = new Date(order.created_at)
+    if (Number.isNaN(createdAt.getTime())) {
+      return false
+    }
+
+    if (start && createdAt < start) {
+      return false
+    }
+
+    if (end && createdAt > end) {
+      return false
+    }
+
+    return true
+  })
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -160,87 +236,62 @@ function formatItems(items: OrderRow["items"]) {
     .join(" || ")
 }
 
-function normalizeDateOnly(date: Date) {
-  return new Date(date.getFullYear(), date.getMonth(), date.getDate())
-}
-
-function getRangeStart(options: OrderExportOptions) {
-  const now = new Date()
-  const today = normalizeDateOnly(now)
-
-  if (options.range === "all") {
-    return undefined
-  }
-
-  if (options.range === "today") {
-    return today
-  }
-
-  if (options.range === "week") {
-    const day = today.getDay()
-    const diff = day === 0 ? 6 : day - 1
-    const start = new Date(today)
-    start.setDate(today.getDate() - diff)
-    return start
-  }
-
-  if (options.range === "month") {
-    return new Date(today.getFullYear(), today.getMonth(), 1)
-  }
-
-  if (options.range === "custom" && options.customStartDate) {
-    const parsed = new Date(`${options.customStartDate}T00:00:00`)
-    return Number.isNaN(parsed.getTime()) ? undefined : parsed
-  }
-
-  return undefined
-}
-
-function getRangeEnd(options: OrderExportOptions) {
-  if (options.range !== "custom") {
-    return undefined
-  }
-
-  if (!options.customEndDate) {
-    return undefined
-  }
-
-  const parsed = new Date(`${options.customEndDate}T23:59:59.999`)
-  return Number.isNaN(parsed.getTime()) ? undefined : parsed
-}
-
-function filterOrdersByRange(orders: OrderRow[], options: OrderExportOptions) {
-  const start = getRangeStart(options)
-  const end = getRangeEnd(options)
-
-  return orders.filter((order) => {
-    const createdAt = new Date(order.created_at)
-    if (Number.isNaN(createdAt.getTime())) {
-      return false
-    }
-
-    if (start && createdAt < start) {
-      return false
-    }
-
-    if (end && createdAt > end) {
-      return false
-    }
-
-    return true
-  })
-}
-
 function resolveTrackingId(shipment?: ShipmentRow) {
   return shipment?.awb_code || shipment?.shipment_id || ""
 }
 
-function buildOrderSummaryCsv(
+function splitRecipients(raw: string) {
+  return raw.split(",").map((entry) => entry.trim()).filter(Boolean)
+}
+
+function getBearerToken(req: Request) {
+  const authHeader = req.headers.get("Authorization") || ""
+  if (!authHeader.toLowerCase().startsWith("bearer ")) {
+    return ""
+  }
+  return authHeader.slice(7).trim()
+}
+
+async function isAuthorized(req: Request) {
+  const inboundCronToken = (req.headers.get("x-cron-token") || "").trim()
+  if (cronToken && inboundCronToken && inboundCronToken === cronToken) {
+    return true
+  }
+
+  const token = getBearerToken(req)
+  if (!token) {
+    return false
+  }
+
+  const authClient = createClient(supabaseUrl!, supabaseAnonKey!, {
+    global: {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    },
+  })
+
+  const { data: authData, error: authError } = await authClient.auth.getUser()
+  if (authError || !authData.user) {
+    return false
+  }
+
+  const serviceClient = createClient(supabaseUrl!, supabaseServiceRoleKey!)
+  const { data: profile } = await serviceClient
+    .from("profiles")
+    .select("role")
+    .eq("id", authData.user.id)
+    .maybeSingle()
+
+  return profile?.role === "admin"
+}
+
+function buildSummaryCsv(
   orders: OrderRow[],
   shipmentByOrder: Map<string, ShipmentRow>,
   paymentByOrder: Map<string, NormalizedPayment>,
   paymentByUser: Map<string, NormalizedPayment>,
-): CsvBuildResult {
+): CsvResult {
   const headers = [
     "OrderID",
     "OrderCreatedAt",
@@ -323,7 +374,7 @@ function buildLineItemCsv(
   shipmentByOrder: Map<string, ShipmentRow>,
   paymentByOrder: Map<string, NormalizedPayment>,
   paymentByUser: Map<string, NormalizedPayment>,
-): CsvBuildResult {
+): CsvResult {
   const headers = [
     "OrderID",
     "OrderCreatedAt",
@@ -403,82 +454,94 @@ function buildLineItemCsv(
   }
 }
 
-function triggerCsvDownload(csv: string, fileName: string) {
-  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" })
-  const url = URL.createObjectURL(blob)
-  const anchor = document.createElement("a")
-  anchor.href = url
-  anchor.download = fileName
-  document.body.appendChild(anchor)
-  anchor.click()
-  anchor.remove()
-  URL.revokeObjectURL(url)
-}
-
-function buildExportFileName(prefix: string) {
+function buildFileName(format: ExportFormat) {
   const now = new Date()
   const stamp = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}-${String(now.getHours()).padStart(2, "0")}${String(now.getMinutes()).padStart(2, "0")}${String(now.getSeconds()).padStart(2, "0")}`
+  const prefix = format === "line-item" ? "sukhdevi-orders-line-items" : "sukhdevi-orders-summary"
   return `${prefix}-${stamp}.csv`
 }
 
-async function fetchAdminExportData() {
-  if (!supabase || !isSupabaseConfigured) {
-    return {
-      error: "Supabase is not configured.",
-      orders: [],
-      shipmentByOrder: new Map<string, ShipmentRow>(),
-      paymentByOrder: new Map<string, NormalizedPayment>(),
-      paymentByUser: new Map<string, NormalizedPayment>(),
-    } satisfies AdminExportData
+async function sendEmailWithAttachment(recipients: string[], subject: string, csv: string, fileName: string) {
+  if (!resendApiKey || !fromEmail || recipients.length === 0) {
+    return { ok: false, error: "Email provider or recipients are not configured for snapshot delivery." }
   }
 
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${resendApiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from: fromEmail,
+      to: recipients,
+      subject,
+      text: "Attached is the latest Sukhdevi orders snapshot CSV.",
+      attachments: [
+        {
+          filename: fileName,
+          content: btoa(csv),
+        },
+      ],
+    }),
+  })
+
+  if (!response.ok) {
+    const payload = await response.text()
+    return { ok: false, error: payload || `Resend API failed (${response.status}).` }
+  }
+
+  return { ok: true }
+}
+
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders })
+  }
+
+  if (req.method !== "POST") {
+    return jsonResponse({ error: "Method not allowed" }, 405)
+  }
+
+  const authorized = await isAuthorized(req)
+  if (!authorized) {
+    return jsonResponse({ error: "Unauthorized request." }, 401)
+  }
+
+  const payload = (await req.json().catch(() => ({}))) as ExportOptions
+  const options: ExportOptions = {
+    range: payload.range ?? "month",
+    format: payload.format ?? "order-summary",
+    customStartDate: payload.customStartDate,
+    customEndDate: payload.customEndDate,
+  }
+
+  const serviceClient = createClient(supabaseUrl!, supabaseServiceRoleKey!)
   const [ordersResult, shipmentsResult, paymentsResult] = await Promise.all([
-    supabase
+    serviceClient
       .from("orders")
       .select("id, user_id, customer_name, customer_email, customer_phone, customer_address, customer_city, customer_pincode, items, total_amount, status, payment_status, created_at, updated_at")
       .order("created_at", { ascending: false })
-      .limit(5000),
-    supabase
+      .limit(10000),
+    serviceClient
       .from("order_shipments")
       .select("order_id, provider_key, shipment_status, shipment_id, awb_code, tracking_url, external_status, external_event_at, error_message, created_at")
       .order("created_at", { ascending: false })
-      .limit(10000),
-    supabase
+      .limit(20000),
+    serviceClient
       .from("billing_payments")
       .select("user_id, razorpay_order_id, razorpay_payment_id, amount, currency, status, created_at, raw")
       .order("created_at", { ascending: false })
-      .limit(10000),
+      .limit(20000),
   ])
 
-  if (ordersResult.error) {
-    return {
-      error: ordersResult.error.message,
-      orders: [],
-      shipmentByOrder: new Map<string, ShipmentRow>(),
-      paymentByOrder: new Map<string, NormalizedPayment>(),
-      paymentByUser: new Map<string, NormalizedPayment>(),
-    } satisfies AdminExportData
-  }
-  if (shipmentsResult.error) {
-    return {
-      error: shipmentsResult.error.message,
-      orders: [],
-      shipmentByOrder: new Map<string, ShipmentRow>(),
-      paymentByOrder: new Map<string, NormalizedPayment>(),
-      paymentByUser: new Map<string, NormalizedPayment>(),
-    } satisfies AdminExportData
-  }
-  if (paymentsResult.error) {
-    return {
-      error: paymentsResult.error.message,
-      orders: [],
-      shipmentByOrder: new Map<string, ShipmentRow>(),
-      paymentByOrder: new Map<string, NormalizedPayment>(),
-      paymentByUser: new Map<string, NormalizedPayment>(),
-    } satisfies AdminExportData
+  if (ordersResult.error || shipmentsResult.error || paymentsResult.error) {
+    return jsonResponse({
+      error: ordersResult.error?.message || shipmentsResult.error?.message || paymentsResult.error?.message || "Failed to fetch export data.",
+    }, 500)
   }
 
-  const orders = (ordersResult.data as OrderRow[] | null) ?? []
+  const filteredOrders = filterOrdersByRange((ordersResult.data as OrderRow[] | null) ?? [], options)
   const shipments = (shipmentsResult.data as ShipmentRow[] | null) ?? []
   const payments = ((paymentsResult.data as PaymentRow[] | null) ?? []).map(normalizePaymentRow)
 
@@ -507,49 +570,23 @@ async function fetchAdminExportData() {
     }
   }
 
-  return {
-    orders,
-    shipmentByOrder,
-    paymentByOrder,
-    paymentByUser,
-  } satisfies AdminExportData
-}
-
-export async function downloadAdminOrdersCsv(options: OrderExportOptions): Promise<{ success: boolean; error?: string; rowCount?: number }> {
-  const result = await fetchAdminExportData()
-  if (result.error) {
-    return { success: false, error: result.error }
-  }
-
-  const filteredOrders = filterOrdersByRange(result.orders, options)
   const csvResult = options.format === "line-item"
-    ? buildLineItemCsv(filteredOrders, result.shipmentByOrder, result.paymentByOrder, result.paymentByUser)
-    : buildOrderSummaryCsv(filteredOrders, result.shipmentByOrder, result.paymentByOrder, result.paymentByUser)
+    ? buildLineItemCsv(filteredOrders, shipmentByOrder, paymentByOrder, paymentByUser)
+    : buildSummaryCsv(filteredOrders, shipmentByOrder, paymentByOrder, paymentByUser)
 
-  const prefix = options.format === "line-item"
-    ? "sukhdevi-orders-line-items"
-    : "sukhdevi-orders-summary"
-  triggerCsvDownload(csvResult.csv, buildExportFileName(prefix))
+  const recipients = splitRecipients(recipientsCsv)
+  const fileName = buildFileName(options.format ?? "order-summary")
+  const subject = `Sukhdevi Daily Orders Snapshot (${csvResult.rowCount} rows)`
+  const emailResult = await sendEmailWithAttachment(recipients, subject, csvResult.csv, fileName)
 
-  return { success: true, rowCount: csvResult.rowCount }
-}
-
-export async function sendDailySnapshotEmailNow(options: OrderExportOptions): Promise<{ success: boolean; error?: string }> {
-  if (!supabase || !isSupabaseConfigured) {
-    return { success: false, error: "Supabase is not configured." }
+  if (!emailResult.ok) {
+    return jsonResponse({ error: emailResult.error ?? "Failed to send snapshot email." }, 500)
   }
 
-  const { data, error } = await supabase.functions.invoke("daily-orders-snapshot", {
-    body: options,
+  return jsonResponse({
+    ok: true,
+    rowCount: csvResult.rowCount,
+    fileName,
+    recipients,
   })
-
-  if (error) {
-    return { success: false, error: error.message }
-  }
-
-  if (!data?.ok) {
-    return { success: false, error: String(data?.error ?? "Failed to send snapshot email.") }
-  }
-
-  return { success: true }
-}
+})

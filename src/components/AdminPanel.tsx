@@ -50,6 +50,12 @@ import {
   triggerShipmentForOrderByAdmin,
   type AdminOrderShipment,
 } from "@/lib/order-shipments"
+import {
+  downloadAdminOrdersCsv,
+  sendDailySnapshotEmailNow,
+  type OrderExportFormat,
+  type OrderExportRange,
+} from "@/lib/admin-order-export"
 import { downloadAdminOrdersCsv } from "@/lib/admin-order-export"
 
 type EditableProduct = {
@@ -127,6 +133,11 @@ export function AdminPanel({ orders = [], runtimeMode = "prod" }: AdminPanelProp
   const [isSavingRawCategory, setIsSavingRawCategory] = useState(false)
   const [shipmentLogs, setShipmentLogs] = useState<AdminOrderShipment[]>([])
   const [isDownloadingOrdersCsv, setIsDownloadingOrdersCsv] = useState(false)
+  const [isSendingSnapshotEmail, setIsSendingSnapshotEmail] = useState(false)
+  const [exportRange, setExportRange] = useState<OrderExportRange>("month")
+  const [exportFormat, setExportFormat] = useState<OrderExportFormat>("order-summary")
+  const [customExportStartDate, setCustomExportStartDate] = useState("")
+  const [customExportEndDate, setCustomExportEndDate] = useState("")
   const [triggeringShipmentOrderId, setTriggeringShipmentOrderId] = useState<string | null>(null)
   const [syncingAwbOrderId, setSyncingAwbOrderId] = useState<string | null>(null)
   const [notifications, setNotifications] = useState<AdminNotification[]>([])
@@ -815,7 +826,12 @@ export function AdminPanel({ orders = [], runtimeMode = "prod" }: AdminPanelProp
 
   const handleDownloadOrdersCsv = async () => {
     setIsDownloadingOrdersCsv(true)
-    const result = await downloadAdminOrdersCsv()
+    const result = await downloadAdminOrdersCsv({
+      range: exportRange,
+      format: exportFormat,
+      customStartDate: customExportStartDate,
+      customEndDate: customExportEndDate,
+    })
     setIsDownloadingOrdersCsv(false)
 
     if (!result.success) {
@@ -824,6 +840,24 @@ export function AdminPanel({ orders = [], runtimeMode = "prod" }: AdminPanelProp
     }
 
     toast.success(`Orders CSV downloaded (${result.rowCount ?? 0} rows).`)
+  }
+
+  const handleSendSnapshotEmail = async () => {
+    setIsSendingSnapshotEmail(true)
+    const result = await sendDailySnapshotEmailNow({
+      range: exportRange,
+      format: exportFormat,
+      customStartDate: customExportStartDate,
+      customEndDate: customExportEndDate,
+    })
+    setIsSendingSnapshotEmail(false)
+
+    if (!result.success) {
+      toast.error(result.error ?? "Failed to send snapshot email.")
+      return
+    }
+
+    toast.success("Snapshot email sent to admin inbox.")
   }
 
   return (
@@ -1279,14 +1313,71 @@ export function AdminPanel({ orders = [], runtimeMode = "prod" }: AdminPanelProp
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="mb-4 flex justify-end">
-            <Button
-              variant="outline"
-              onClick={handleDownloadOrdersCsv}
-              disabled={isDownloadingOrdersCsv}
-            >
-              {isDownloadingOrdersCsv ? "Preparing CSV..." : "Download Orders CSV"}
-            </Button>
+          <div className="mb-4 rounded-lg border p-3 space-y-3">
+            <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+              <div>
+                <Label>Export Range</Label>
+                <select
+                  className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+                  value={exportRange}
+                  onChange={(event) => setExportRange(event.target.value as OrderExportRange)}
+                >
+                  <option value="today">Today</option>
+                  <option value="week">This Week</option>
+                  <option value="month">This Month</option>
+                  <option value="custom">Custom Date Range</option>
+                  <option value="all">All</option>
+                </select>
+              </div>
+
+              <div>
+                <Label>CSV Layout</Label>
+                <select
+                  className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+                  value={exportFormat}
+                  onChange={(event) => setExportFormat(event.target.value as OrderExportFormat)}
+                >
+                  <option value="order-summary">Order Summary (1 row per order)</option>
+                  <option value="line-item">Line Items (1 row per product)</option>
+                </select>
+              </div>
+
+              <div>
+                <Label>Start Date</Label>
+                <Input
+                  type="date"
+                  value={customExportStartDate}
+                  onChange={(event) => setCustomExportStartDate(event.target.value)}
+                  disabled={exportRange !== "custom"}
+                />
+              </div>
+
+              <div>
+                <Label>End Date</Label>
+                <Input
+                  type="date"
+                  value={customExportEndDate}
+                  onChange={(event) => setCustomExportEndDate(event.target.value)}
+                  disabled={exportRange !== "custom"}
+                />
+              </div>
+            </div>
+
+            <div className="flex flex-wrap justify-end gap-2">
+              <Button
+                variant="outline"
+                onClick={handleDownloadOrdersCsv}
+                disabled={isDownloadingOrdersCsv}
+              >
+                {isDownloadingOrdersCsv ? "Preparing CSV..." : "Download Orders CSV"}
+              </Button>
+              <Button
+                onClick={handleSendSnapshotEmail}
+                disabled={isSendingSnapshotEmail}
+              >
+                {isSendingSnapshotEmail ? "Sending..." : "Email Snapshot Now"}
+              </Button>
+            </div>
           </div>
 
           {orders.length === 0 ? (

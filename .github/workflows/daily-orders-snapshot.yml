@@ -1,0 +1,31 @@
+name: Daily Orders Snapshot Email
+
+on:
+  schedule:
+    - cron: "30 2 * * *"
+  workflow_dispatch:
+
+jobs:
+  send-snapshot:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate required secrets
+        env:
+          DAILY_SNAPSHOT_FUNCTION_URL: ${{ secrets.DAILY_SNAPSHOT_FUNCTION_URL }}
+          DAILY_EXPORT_CRON_TOKEN: ${{ secrets.DAILY_EXPORT_CRON_TOKEN }}
+        run: |
+          if [ -z "$DAILY_SNAPSHOT_FUNCTION_URL" ] || [ -z "$DAILY_EXPORT_CRON_TOKEN" ]; then
+            echo "Missing required secrets DAILY_SNAPSHOT_FUNCTION_URL and/or DAILY_EXPORT_CRON_TOKEN"
+            exit 1
+          fi
+
+      - name: Send daily snapshot
+        env:
+          DAILY_SNAPSHOT_FUNCTION_URL: ${{ secrets.DAILY_SNAPSHOT_FUNCTION_URL }}
+          DAILY_EXPORT_CRON_TOKEN: ${{ secrets.DAILY_EXPORT_CRON_TOKEN }}
+        run: |
+          curl --fail --show-error --silent \
+            -X POST "$DAILY_SNAPSHOT_FUNCTION_URL" \
+            -H "Content-Type: application/json" \
+            -H "x-cron-token: $DAILY_EXPORT_CRON_TOKEN" \
+            -d '{"range":"today","format":"line-item"}'
