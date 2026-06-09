@@ -773,3 +773,70 @@ from public.orders
 order by created_at desc
 limit 50;
 ```
+
+## UI Testing & Interaction Validation Approach
+
+### Local Development Server Setup
+To test UI interactions and link behavior locally, start the dev server in a terminal-accessible way:
+
+```bash
+npm run dev -- --host 0.0.0.0 --port 4173
+```
+
+This enables:
+- Accessible from http://localhost:5000/ (Vite default) or your machine IP on port 5000.
+- Persistent terminal session for monitoring build output and errors.
+- Background execution compatible with parallel browser testing.
+
+### Interactive Testing Workflow
+1. **Start dev server:**
+   ```bash
+   npm run dev -- --host 0.0.0.0 --port 4173 &
+   ```
+
+2. **Open app in browser:**
+   - Navigate to http://localhost:5000/
+
+3. **Reproduce user interactions:**
+   - Click product "View details" button → Modal opens.
+   - Check that dimmed background is visible on mobile (phone DevTools).
+   - Verify "Tap the dimmed background to close" hint appears on mobile only.
+   - Tap dimmed background → Modal closes.
+   - Tap details again → Add to cart works.
+   - Verify top menu / cart drawer remain accessible after modal closes.
+
+4. **Test state isolation:**
+   - Each link interaction should not get stuck behind a lingering modal.
+   - Escape key closes any open dialog.
+   - Close button on dialog is always visible.
+
+### Known Gotchas in Testing
+- Modal overlay (`z-50`, fixed inset) can temporarily block clicks if not closed.
+  - Workaround: Press Escape or click visible "Close" button.
+- On mobile, the dialog height is constrained to 85svh to keep top bar visible for contextual awareness.
+- Mobile footer hint is hidden on sm+ screens using `sm:hidden` utility.
+
+### Browser DevTools Mobile Testing
+- Use Chrome DevTools Device Toolbar (Ctrl+Shift+M / Cmd+Shift+M).
+- Test on common viewports: iPhone 375w, iPad 768w, Android 412w.
+- Verify dialog doesn't overflow viewport.
+- Verify fingertap tap areas are adequate (buttons ≥44px tall).
+
+### Environment Setup Notes
+- Default Supabase auth is disabled (`.env` not present). Expect "Supabase auth is not configured" messages in console.
+- This is **expected** — app works in read-only/demo mode without live auth.
+- To enable auth during development, copy `.env.example` to `.env` and fill in Supabase credentials.
+
+### Recent UX Hardening Changes (June 2026)
+- **Product Detail Dialog:**
+  - Mobile height reduced from 95svh to 85svh to keep top bar visible.
+  - Added mobile-only tap hint: "💡 Tip: Tap the dimmed background to close"
+  - Dialog description updated: "...On mobile, tap the dimmed background to close this panel."
+  - Close button is always visible alongside "Add to Cart".
+  - Escape key and background click remain as fallback close mechanisms.
+
+- **Button Layout:**
+  - Refactored from single-button "Add to Cart" to dual-button layout.
+  - "Add to Cart" button remains primary (flex-1 = takes more space).
+  - "Close" button is outline variant for clear secondary affordance.
+  - Mobile hint appears below buttons on small screens only.

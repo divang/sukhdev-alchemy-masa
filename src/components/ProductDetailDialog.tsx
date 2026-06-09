@@ -99,11 +99,11 @@ export function ProductDetailDialog({ product, currentUser, canReview, open, onO
   
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[calc(100vw-1rem)] sm:max-w-3xl max-h-[95svh] sm:max-h-[90vh] overflow-x-hidden overflow-y-auto p-4 sm:p-6 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+      <DialogContent className="max-w-[calc(100vw-1rem)] sm:max-w-3xl max-h-[85svh] sm:max-h-[90vh] overflow-x-hidden overflow-y-auto p-4 sm:p-6 pb-[calc(1rem+env(safe-area-inset-bottom))]">
         <DialogHeader>
           <DialogTitle className="text-xl sm:text-2xl pr-8">{product.name}</DialogTitle>
           <DialogDescription className="text-sm text-muted-foreground pr-8">
-            View ingredients, reviews, and pack details. Close this panel to continue browsing.
+            View ingredients, reviews, and pack details. On mobile, tap the dimmed background to close this panel.
           </DialogDescription>
         </DialogHeader>
         
@@ -172,23 +172,28 @@ export function ProductDetailDialog({ product, currentUser, canReview, open, onO
                   </p>
                 )}
                 
-                <div className="flex gap-2">
-                  <Button
-                    className="flex-1"
-                    size="lg"
-                    onClick={handleAddToCart}
-                  >
-                    <ShoppingCart size={20} className="mr-2" />
-                    Add to Cart
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="lg"
-                    onClick={() => onOpenChange(false)}
-                  >
-                    Close
-                  </Button>
+                <div className="flex flex-col gap-2">
+                  <div className="flex gap-2">
+                    <Button
+                      className="flex-1"
+                      size="lg"
+                      onClick={handleAddToCart}
+                    >
+                      <ShoppingCart size={20} className="mr-2" />
+                      Add to Cart
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="lg"
+                      onClick={() => onOpenChange(false)}
+                    >
+                      Close
+                    </Button>
+                  </div>
+                  <p className="sm:hidden text-xs text-center text-muted-foreground">
+                    💡 Tip: Tap the dimmed background to close
+                  </p>
                 </div>
               </div>
             </div>
