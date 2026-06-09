@@ -30,7 +30,6 @@ type OrderRow = {
   customer_address: string
   customer_city: string
   customer_pincode: string
-  items: Order["items"] | null
   subtotal_amount?: number | null
   shipping_amount?: number | null
   discount_amount?: number | null
@@ -62,7 +61,7 @@ function mapOrderRow(row: OrderRow): Order {
   return {
     id: row.id,
     userId: row.user_id,
-    items: Array.isArray(row.items) ? row.items : [],
+    items: [],
     customer: {
       name: row.customer_name,
       email: row.customer_email,
@@ -176,36 +175,11 @@ export async function persistOrderToSupabase(order: Order): Promise<PersistenceR
   if (!rpcResult.error) {
     return { persisted: true, provider: "supabase" }
   }
-
-  const { error } = await client.from("orders").insert({
-    id: order.id,
-    user_id: order.userId ?? null,
-    customer_name: order.customer.name,
-    customer_email: order.customer.email,
-    customer_phone: order.customer.phone,
-    customer_address: order.customer.address,
-    customer_city: order.customer.city,
-    customer_pincode: order.customer.pincode,
-    items: order.items,
-    subtotal_amount: order.subtotalAmount ?? null,
-    shipping_amount: order.shippingAmount ?? null,
-    discount_amount: order.discountAmount ?? null,
-    promo_code: order.promoCode ?? null,
-    billing_currency: "INR",
-    final_amount_paise: Math.round(order.totalAmount * 100),
-    total_amount: order.totalAmount,
-    status: order.status,
-    payment_status: order.paymentStatus,
-    created_at: order.createdAt,
-    updated_at: order.updatedAt,
-  })
-
-  if (error) {
-    const rpcMessage = rpcResult.error?.message ? ` RPC: ${rpcResult.error.message}` : ""
-    return { persisted: false, reason: "error", error: `${error.message}.${rpcMessage}` }
+  return {
+    persisted: false,
+    reason: "error",
+    error: rpcResult.error?.message ?? "Failed to create order with V2 write path.",
   }
-
-  return { persisted: true, provider: "supabase" }
 }
 
 export async function fetchOrdersForCurrentUser(): Promise<OrdersLoadResult> {
@@ -226,7 +200,7 @@ export async function fetchOrdersForCurrentUser(): Promise<OrdersLoadResult> {
   const [ordersResult, itemsResult] = await Promise.all([
     client
       .from("orders")
-      .select("id, user_id, customer_name, customer_email, customer_phone, customer_address, customer_city, customer_pincode, items, subtotal_amount, shipping_amount, discount_amount, promo_code, total_amount, status, payment_status, created_at, updated_at")
+      .select("id, user_id, customer_name, customer_email, customer_phone, customer_address, customer_city, customer_pincode, subtotal_amount, shipping_amount, discount_amount, promo_code, total_amount, status, payment_status, created_at, updated_at")
       .eq("user_id", user.id)
       .order("created_at", { ascending: false }),
     client
@@ -263,7 +237,7 @@ export async function fetchOrdersForAdmin(): Promise<OrdersLoadResult> {
   const [ordersResult, itemsResult] = await Promise.all([
     client
       .from("orders")
-      .select("id, user_id, customer_name, customer_email, customer_phone, customer_address, customer_city, customer_pincode, items, subtotal_amount, shipping_amount, discount_amount, promo_code, total_amount, status, payment_status, created_at, updated_at")
+      .select("id, user_id, customer_name, customer_email, customer_phone, customer_address, customer_city, customer_pincode, subtotal_amount, shipping_amount, discount_amount, promo_code, total_amount, status, payment_status, created_at, updated_at")
       .order("created_at", { ascending: false }),
     client
       .from("order_items")

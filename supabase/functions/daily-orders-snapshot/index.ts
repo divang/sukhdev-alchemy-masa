@@ -22,7 +22,7 @@ type OrderRow = {
   customer_address: string
   customer_city: string
   customer_pincode: string
-  items: Array<{
+  items?: Array<{
     productName?: string
     quantity?: number
     grams?: number
@@ -561,7 +561,7 @@ Deno.serve(async (req) => {
   const [ordersResult, shipmentsResult, paymentsResult] = await Promise.all([
     serviceClient
       .from("orders")
-      .select("id, user_id, customer_name, customer_email, customer_phone, customer_address, customer_city, customer_pincode, items, total_amount, status, payment_status, created_at, updated_at")
+      .select("id, user_id, customer_name, customer_email, customer_phone, customer_address, customer_city, customer_pincode, total_amount, status, payment_status, created_at, updated_at")
       .order("created_at", { ascending: false })
       .limit(10000),
     serviceClient

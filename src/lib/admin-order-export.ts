@@ -23,7 +23,7 @@ type OrderRow = {
   customer_address: string
   customer_city: string
   customer_pincode: string
-  items: Array<{
+  items?: Array<{
     productName?: string
     quantity?: number
     grams?: number
@@ -501,7 +501,7 @@ async function fetchAdminExportData() {
   const [ordersResult, orderItemsResult, shipmentsResult, paymentsResult] = await Promise.all([
     supabase
       .from("orders")
-      .select("id, user_id, customer_name, customer_email, customer_phone, customer_address, customer_city, customer_pincode, items, total_amount, status, payment_status, created_at, updated_at")
+      .select("id, user_id, customer_name, customer_email, customer_phone, customer_address, customer_city, customer_pincode, total_amount, status, payment_status, created_at, updated_at")
       .order("created_at", { ascending: false })
       .limit(5000),
     supabase
@@ -610,7 +610,7 @@ export async function downloadAdminOrdersCsv(options: OrderExportOptions): Promi
   const filteredOrders = filterOrdersByRange(result.orders, options)
   const normalizedOrders = filteredOrders.map((order) => ({
     ...order,
-    items: result.itemsByOrder.get(order.id) ?? order.items,
+    items: result.itemsByOrder.get(order.id) ?? [],
   }))
 
   const csvResult = options.format === "line-item"

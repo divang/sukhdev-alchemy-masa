@@ -417,6 +417,7 @@ V2 additive migrations for isolated normalized-commerce rollout:
 30. supabase/sql/030_reduce_legacy_order_json_dependencies.sql
 31. supabase/sql/031_fix_order_sync_trigger_order.sql
 32. supabase/sql/032_create_order_v2_rpc.sql
+33. supabase/sql/033_drop_legacy_order_items_json.sql
 
 ## Environment Configuration
 
@@ -738,24 +739,23 @@ Applied on linked project `ndjztlhfhupvydozuski`:
 - 20260609223000_reduce_legacy_order_json_dependencies.sql
 - 20260609224500_fix_order_sync_trigger_order.sql
 - 20260609230000_create_order_v2_rpc.sql
+- 20260609233000_drop_legacy_order_items_json.sql
 
 Current read model status:
-- Client order reads now prefer `public.order_items` and fall back to `orders.items` only when normalized rows are absent.
-- Review purchase verification now checks paid `order_items` instead of legacy `orders.items`.
-- Admin CSV export and daily snapshot now prefer normalized line items.
-- Payment verification, Razorpay webhook shipment creation, admin shipment creation, and order notifications now prefer normalized line items.
-- DB trigger `sync_order_items_from_legacy_order()` keeps `order_items` synchronized for any remaining legacy writes.
-- Trigger ordering now ensures normalized item sync runs before admin new-order notifications.
+- Client order reads use `public.order_items` as the source of truth.
+- Review purchase verification uses normalized `order_items`.
+- Admin CSV export and daily snapshot use normalized line items.
+- Payment verification, Razorpay webhook shipment creation, admin shipment creation, and order notifications use normalized line items.
 
 Current write model status:
-- New order creation now calls `public.create_order_v2(jsonb)` first from the client persistence layer.
+- New order creation calls `public.create_order_v2(jsonb)` from the client persistence layer.
 - `create_order_v2` writes both `orders` and `order_items` transactionally.
-- Legacy `orders.items` is still written as a compatibility shadow inside the transactional function.
+- `orders.items` is no longer part of the live schema.
 
-Remaining legacy footprint:
-- `orders.items` is still present as a compatibility shadow.
-- Final drop of `orders.items` is intentionally deferred until all frontend and edge-function runtime deployments are confirmed on the new V2-first codepath.
-- Dropping the column before that confirmation window would risk breaking new order creation.
+Legacy footprint status:
+- Legacy sync trigger/function for `orders.items` has been removed.
+- `orders.items` has been dropped from the live database.
+- Remaining V1 footprint is now limited to historical migration files kept for repository history.
 
 Admins:
 

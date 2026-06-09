@@ -106,7 +106,7 @@ Deno.serve(async (req)=>{
     }, 400);
   }
   const serviceClient = createClient(supabaseUrl, supabaseServiceRoleKey);
-  const { data: orderRow, error: orderError } = await serviceClient.from("orders").select("id, user_id, customer_name, customer_email, customer_phone, customer_address, customer_city, customer_pincode, items, total_amount, payment_status, status, created_at").eq("id", appOrderId).eq("user_id", auth.user.id).maybeSingle();
+  const { data: orderRow, error: orderError } = await serviceClient.from("orders").select("id, user_id, customer_name, customer_email, customer_phone, customer_address, customer_city, customer_pincode, total_amount, payment_status, status, created_at").eq("id", appOrderId).eq("user_id", auth.user.id).maybeSingle();
   if (orderError) {
     console.error("[order-notifications] order-fetch-failed", {
       appOrderId,

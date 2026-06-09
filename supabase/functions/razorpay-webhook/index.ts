@@ -154,7 +154,7 @@ Deno.serve(async (req) => {
   if (resolvedAppOrderId) {
     const { data: orderRow, error: orderFetchError } = await serviceClient
       .from("orders")
-      .select("id, user_id, customer_name, customer_email, customer_phone, customer_address, customer_city, customer_pincode, items, total_amount, payment_status")
+      .select("id, user_id, customer_name, customer_email, customer_phone, customer_address, customer_city, customer_pincode, total_amount, payment_status")
       .eq("id", resolvedAppOrderId)
       .maybeSingle()
 
@@ -181,7 +181,7 @@ Deno.serve(async (req) => {
           city: orderRow.customer_city,
           pincode: orderRow.customer_pincode,
         },
-        items: preferNormalizedItems(orderRow.id, normalizedItemsByOrder, (orderRow as OrderRow).items),
+        items: preferNormalizedItems(orderRow.id, normalizedItemsByOrder, undefined),
         totalAmount: Number(orderRow.total_amount ?? 0),
       })
 
