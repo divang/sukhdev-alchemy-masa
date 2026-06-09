@@ -856,7 +856,13 @@ export function AdminPanel({ orders = [], runtimeMode = "prod" }: AdminPanelProp
       return
     }
 
-    toast.success("Snapshot email sent to admin inbox.")
+    const recipients = result.recipients?.join(", ")
+    const summary = [
+      result.rowCount != null ? `${result.rowCount} rows` : null,
+      recipients ? `to ${recipients}` : null,
+    ].filter(Boolean).join(" | ")
+
+    toast.success(summary ? `Snapshot email sent (${summary}).` : "Snapshot email sent to admin inbox.")
   }
 
   return (
