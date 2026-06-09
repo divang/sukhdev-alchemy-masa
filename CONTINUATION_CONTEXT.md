@@ -414,6 +414,8 @@ V2 additive migrations for isolated normalized-commerce rollout:
 27. supabase/sql/027_normalized_commerce_v2.sql
 28. supabase/sql/028_backfill_normalized_commerce_v2.sql
 29. supabase/sql/029_cutover_order_items_read_model.sql
+30. supabase/sql/030_reduce_legacy_order_json_dependencies.sql
+31. supabase/sql/031_fix_order_sync_trigger_order.sql
 
 ## Environment Configuration
 
@@ -732,6 +734,8 @@ Applied on linked project `ndjztlhfhupvydozuski`:
 - 20260609211000_normalized_commerce_v2.sql
 - 20260609211100_backfill_normalized_commerce_v2.sql
 - 20260609221500_cutover_order_items_read_model.sql
+- 20260609223000_reduce_legacy_order_json_dependencies.sql
+- 20260609224500_fix_order_sync_trigger_order.sql
 
 Current read model status:
 - Client order reads now prefer `public.order_items` and fall back to `orders.items` only when normalized rows are absent.
@@ -739,10 +743,12 @@ Current read model status:
 - Admin CSV export and daily snapshot now prefer normalized line items.
 - Payment verification, Razorpay webhook shipment creation, admin shipment creation, and order notifications now prefer normalized line items.
 - DB trigger `sync_order_items_from_legacy_order()` keeps `order_items` synchronized for any remaining legacy writes.
+- Trigger ordering now ensures normalized item sync runs before admin new-order notifications.
 
 Remaining legacy footprint:
-- `orders.items` is still present as a compatibility shadow and should not be dropped yet.
-- Some UI/server code still carries fallback handling for legacy rows; remove only after one stable validation window.
+- `orders.items` is still present as a compatibility shadow.
+- Final drop of `orders.items` is intentionally deferred until all frontend and edge-function runtime deployments are confirmed on the new V2-first codepath.
+- Dropping the column before that confirmation window would risk breaking new order creation.
 
 Admins:
 

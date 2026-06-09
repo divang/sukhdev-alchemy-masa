@@ -123,7 +123,8 @@ end;
 $$;
 
 drop trigger if exists orders_sync_order_items_from_legacy on public.orders;
-create trigger orders_sync_order_items_from_legacy
+drop trigger if exists a_orders_sync_order_items_from_legacy on public.orders;
+create trigger a_orders_sync_order_items_from_legacy
 after insert or update of items, subtotal_amount, shipping_amount, discount_amount, total_amount, updated_at
 on public.orders
 for each row
