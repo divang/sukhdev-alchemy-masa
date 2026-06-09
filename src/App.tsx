@@ -1178,7 +1178,7 @@ function App() {
                     className="h-6 w-6 rounded-full border border-slate-200 bg-white p-0.5 object-contain"
                     loading="lazy"
                   />
-                  <p className="truncate text-[22px] font-semibold leading-none text-emerald-700">Sukhdevi Alchemy</p>
+                  <p className="truncate text-[22px] font-bold leading-none text-black">Sukhdevi Alchemy</p>
                 </button>
               </div>
 
