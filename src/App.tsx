@@ -189,6 +189,18 @@ function hasOAuthParamsInLocation(href: string) {
   }
 }
 
+function isTransientAuthConnectivityIssue(message: string | undefined) {
+  const normalized = String(message ?? "").toLowerCase()
+  return (
+    normalized.includes("timed out")
+    || normalized.includes("timeout")
+    || normalized.includes("network")
+    || normalized.includes("failed to fetch")
+    || normalized.includes("fetch failed")
+    || normalized.includes("load failed")
+  )
+}
+
 function App() {
   useInitialData()
 
@@ -219,6 +231,7 @@ function App() {
   const [isAuthInitializing, setIsAuthInitializing] = useState(false)
   const [isPostAuthSyncing, setIsPostAuthSyncing] = useState(false)
   const [isCartHydrating, setIsCartHydrating] = useState(false)
+  const [isAuthServiceDegraded, setIsAuthServiceDegraded] = useState(false)
   const searchInputRef = useRef<HTMLInputElement | null>(null)
   const socialProfiles = [
     { name: "Instagram", handle: "@sukhdevialchemy", url: "https://instagram.com/sukhdevialchemy" },
@@ -336,6 +349,7 @@ function App() {
 
         if (oauthError) {
           console.error("[app-auth] OAuth callback failed", oauthError)
+          setIsAuthServiceDegraded(isTransientAuthConnectivityIssue(oauthError))
           setCurrentOrder(null)
           setCurrentView("store")
           setIsPostAuthSyncing(false)
@@ -358,6 +372,7 @@ function App() {
           hasProfile: Boolean(state.profile),
           role: state.profile?.role ?? null,
         })
+        setIsAuthServiceDegraded(false)
         setProfile(state.profile)
         setIsAuthInitializing(false)
         if (!state.profile) {
@@ -370,16 +385,13 @@ function App() {
         }
 
         console.error("[app-auth] initializeAuthState failed", error)
+        setIsAuthServiceDegraded(true)
         setProfile(null)
         setCurrentOrder(null)
         setCurrentView("store")
         setIsAuthInitializing(false)
         setIsPostAuthSyncing(false)
         setShowAuthHandoffNotice(false)
-
-        if (typeof window !== "undefined") {
-          window.location.replace(`${window.location.origin}/`)
-        }
       }
     }
 
@@ -392,6 +404,7 @@ function App() {
         hasProfile: Boolean(state.profile),
         role: state.profile?.role ?? null,
       })
+      setIsAuthServiceDegraded(false)
       setProfile(state.profile)
       setIsAuthInitializing(false)
 
@@ -922,7 +935,7 @@ function App() {
         mode={authMode}
         onBack={handleBackToStore}
         onAuthenticated={handleAuthenticated}
-        autoStartGoogleOnOpen={authMode === "customer"}
+        autoStartGoogleOnOpen={authMode === "customer" && !isAuthServiceDegraded}
       />
     )
   }
@@ -934,7 +947,7 @@ function App() {
           mode="customer"
           onBack={handleBackToStore}
           onAuthenticated={handleAuthenticated}
-          autoStartGoogleOnOpen={true}
+          autoStartGoogleOnOpen={!isAuthServiceDegraded}
         />
       )
     }
@@ -955,7 +968,7 @@ function App() {
           mode="customer"
           onBack={handleBackToStore}
           onAuthenticated={handleAuthenticated}
-          autoStartGoogleOnOpen={true}
+          autoStartGoogleOnOpen={!isAuthServiceDegraded}
         />
       )
     }
@@ -1104,7 +1117,7 @@ function App() {
           mode="customer"
           onBack={handleBackToStore}
           onAuthenticated={handleAuthenticated}
-          autoStartGoogleOnOpen={true}
+          autoStartGoogleOnOpen={!isAuthServiceDegraded}
         />
       )
     }
@@ -1519,6 +1532,15 @@ function App() {
           <div className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-700">
             <p className="font-medium">Finishing sign-in</p>
             <p className="mt-1 text-[11px] text-blue-600">{authSyncMessage ?? "We are restoring your account, cart, and menu options."}</p>
+          </div>
+        </div>
+      )}
+
+      {!profile && isAuthServiceDegraded && (
+        <div className="container mx-auto px-3 sm:px-4 mb-2">
+          <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+            <p className="font-medium">Sign-in service is temporarily unavailable.</p>
+            <p className="mt-1 text-[11px] text-amber-700">You can still browse products, open category menu, and manage your local cart.</p>
           </div>
         </div>
       )}

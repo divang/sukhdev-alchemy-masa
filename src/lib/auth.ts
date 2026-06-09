@@ -169,6 +169,15 @@ function mapAuthErrorMessage(message: string) {
     return "Auth request timed out. Please retry. If this keeps happening, check Supabase region/network latency."
   }
 
+  if (
+    normalized.includes("failed to fetch")
+    || normalized.includes("fetch failed")
+    || normalized.includes("networkerror")
+    || normalized.includes("load failed")
+  ) {
+    return "We cannot reach the sign-in service right now. Please retry in a few moments."
+  }
+
   return message
 }
 
@@ -419,6 +428,11 @@ export async function getCurrentAuthState(): Promise<AuthState> {
     return { user: null, profile: null }
   }
 
+  if (typeof navigator !== "undefined" && navigator.onLine === false) {
+    authDebug("getCurrentAuthState skipped: browser is offline")
+    return { user: null, profile: null }
+  }
+
   const start = Date.now()
   authDebug("getCurrentAuthState started", networkDiagnostics())
 
@@ -435,8 +449,20 @@ export async function getCurrentAuthState(): Promise<AuthState> {
     })
     return buildAuthState(data.session)
   } catch (error) {
+    const primaryMessage = error instanceof Error ? error.message : String(error)
+    const primaryCategory = error instanceof Error ? classifySupabaseError(error.message) : "unknown"
+
+    if (primaryCategory === "timeout_or_network") {
+      authDebug("getCurrentAuthState skipping retry due to network/timeout failure", {
+        error: primaryMessage,
+        durationMs: Date.now() - start,
+        ...networkDiagnostics(),
+      })
+      return { user: null, profile: null }
+    }
+
     authDebug("getCurrentAuthState primary getSession failed; retrying once", {
-      error: error instanceof Error ? error.message : String(error),
+      error: primaryMessage,
       ...networkDiagnostics(),
     })
 
@@ -1017,13 +1043,27 @@ export async function signInWithGoogle(): Promise<string | undefined> {
 
   const redirectTo = getEmailRedirectTo()
   authDebug("signInWithGoogle started", { redirectTo })
-  const { data, error } = await supabase.auth.signInWithOAuth({
-    provider: "google",
-    options: {
-      redirectTo,
-      skipBrowserRedirect: true,
-    },
-  })
+  let data: Awaited<ReturnType<typeof supabase.auth.signInWithOAuth>>["data"] | undefined
+  let error: Awaited<ReturnType<typeof supabase.auth.signInWithOAuth>>["error"] | undefined
+
+  try {
+    const result = await withTimeout(
+      supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo,
+          skipBrowserRedirect: true,
+        },
+      }),
+      10000,
+      "Google sign-in request timed out"
+    )
+
+    data = result.data
+    error = result.error
+  } catch (exception) {
+    return mapAuthErrorMessage(exception instanceof Error ? exception.message : String(exception))
+  }
 
   if (error) {
     return mapAuthErrorMessage(error.message)
@@ -1079,7 +1119,11 @@ export async function finalizeOAuthRedirect(): Promise<string | undefined> {
         pathname: url.pathname,
       })
 
-      const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code)
+      const { error: exchangeError } = await withTimeout(
+        supabase.auth.exchangeCodeForSession(code),
+        10000,
+        "OAuth code exchange timed out"
+      )
       if (exchangeError) {
         clearOAuthParams()
         return mapAuthErrorMessage(exchangeError.message)
@@ -1089,10 +1133,14 @@ export async function finalizeOAuthRedirect(): Promise<string | undefined> {
         pathname: url.pathname,
       })
 
-      const { error: sessionError } = await supabase.auth.setSession({
-        access_token: accessToken,
-        refresh_token: refreshToken,
-      })
+      const { error: sessionError } = await withTimeout(
+        supabase.auth.setSession({
+          access_token: accessToken,
+          refresh_token: refreshToken,
+        }),
+        10000,
+        "OAuth session restore timed out"
+      )
 
       if (sessionError) {
         clearOAuthParams()
