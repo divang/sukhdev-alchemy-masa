@@ -1195,12 +1195,6 @@ function App() {
                 </SheetDescription>
               </SheetHeader>
               <div className="mt-4 space-y-5">
-                {authSyncMessage && (
-                  <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-700">
-                    {authSyncMessage} Your menu options will update automatically.
-                  </div>
-                )}
-
                 <CategorySidebar
                   categories={visibleCategories}
                   selectedCategory={selectedCategory}
@@ -1612,8 +1606,7 @@ function App() {
         onOpenChange={setCartOpen}
         cartItems={cartItems ?? []}
         products={products ?? []}
-        isLoading={Boolean(authSyncMessage)}
-        loadingMessage={authSyncMessage ?? undefined}
+        isSyncing={isCartHydrating}
         onUpdateQuantity={handleUpdateQuantity}
         onRemoveItem={handleRemoveItem}
         onCheckout={handleCheckout}

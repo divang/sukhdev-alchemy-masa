@@ -12,8 +12,7 @@ type CartDrawerProps = {
   onOpenChange: (open: boolean) => void
   cartItems: CartItem[]
   products: Product[]
-  isLoading?: boolean
-  loadingMessage?: string
+  isSyncing?: boolean
   onUpdateQuantity: (productId: string, grams: number, quantity: number) => void
   onRemoveItem: (productId: string, grams: number) => void
   onCheckout: () => void
@@ -24,8 +23,7 @@ export function CartDrawer({
   onOpenChange, 
   cartItems, 
   products,
-  isLoading = false,
-  loadingMessage = "Restoring your cart...",
+  isSyncing = false,
   onUpdateQuantity,
   onRemoveItem,
   onCheckout
@@ -50,14 +48,15 @@ export function CartDrawer({
           </SheetDescription>
         </SheetHeader>
         
+        {isSyncing && (
+          <div className="flex items-center gap-2 border-b bg-blue-50 px-6 py-1.5 text-xs text-blue-600">
+            <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-blue-400" />
+            Syncing your cart…
+          </div>
+        )}
+
         <div className="flex-1 overflow-y-auto px-6 py-4">
-          {isLoading ? (
-            <div className="flex h-full flex-col items-center justify-center text-center">
-              <ShoppingCart size={64} className="mb-4 text-muted-foreground" />
-              <p className="font-medium text-foreground">Preparing your cart</p>
-              <p className="mt-2 max-w-xs text-sm text-muted-foreground">{loadingMessage}</p>
-            </div>
-          ) : cartItems.length === 0 ? (
+          {cartItems.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-center">
               <ShoppingCart size={64} className="text-muted-foreground mb-4" />
               <p className="text-muted-foreground">Your cart is empty</p>
@@ -125,7 +124,7 @@ export function CartDrawer({
           )}
         </div>
         
-        {!isLoading && cartItems.length > 0 && (
+        {cartItems.length > 0 && (
           <>
             <Separator />
             <div className="space-y-4 px-6 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">

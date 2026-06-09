@@ -484,9 +484,15 @@ export function subscribeToAuthStateChanges(callback: (state: AuthState) => void
 
     let activeSession = session
 
-    // Avoid false sign-outs on transient session-read glitches by doing
-    // a best-effort re-check when the event is not an explicit sign-out.
-    if (!activeSession && _event !== "SIGNED_OUT") {
+    // Only attempt session recovery for non-initial events where Supabase
+    // signals a transient loss (TOKEN_REFRESHED failure, etc.).
+    // For INITIAL_SESSION with no session (genuine guest), skip recovery
+    // entirely so guest first interactions are never delayed.
+    const shouldRecover = !activeSession
+      && _event !== "SIGNED_OUT"
+      && _event !== "INITIAL_SESSION"
+
+    if (shouldRecover) {
       try {
         const { data: recovered } = await withTimeout(
           supabase.auth.getSession(),
