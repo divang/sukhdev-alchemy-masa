@@ -416,6 +416,7 @@ V2 additive migrations for isolated normalized-commerce rollout:
 29. supabase/sql/029_cutover_order_items_read_model.sql
 30. supabase/sql/030_reduce_legacy_order_json_dependencies.sql
 31. supabase/sql/031_fix_order_sync_trigger_order.sql
+32. supabase/sql/032_create_order_v2_rpc.sql
 
 ## Environment Configuration
 
@@ -736,6 +737,7 @@ Applied on linked project `ndjztlhfhupvydozuski`:
 - 20260609221500_cutover_order_items_read_model.sql
 - 20260609223000_reduce_legacy_order_json_dependencies.sql
 - 20260609224500_fix_order_sync_trigger_order.sql
+- 20260609230000_create_order_v2_rpc.sql
 
 Current read model status:
 - Client order reads now prefer `public.order_items` and fall back to `orders.items` only when normalized rows are absent.
@@ -744,6 +746,11 @@ Current read model status:
 - Payment verification, Razorpay webhook shipment creation, admin shipment creation, and order notifications now prefer normalized line items.
 - DB trigger `sync_order_items_from_legacy_order()` keeps `order_items` synchronized for any remaining legacy writes.
 - Trigger ordering now ensures normalized item sync runs before admin new-order notifications.
+
+Current write model status:
+- New order creation now calls `public.create_order_v2(jsonb)` first from the client persistence layer.
+- `create_order_v2` writes both `orders` and `order_items` transactionally.
+- Legacy `orders.items` is still written as a compatibility shadow inside the transactional function.
 
 Remaining legacy footprint:
 - `orders.items` is still present as a compatibility shadow.

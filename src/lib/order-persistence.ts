@@ -17,6 +17,10 @@ type OrdersLoadResult = {
   error?: string
 }
 
+type CreateOrderV2RpcRow = {
+  order_id: string
+}
+
 type OrderRow = {
   id: string
   user_id: string | null
@@ -145,6 +149,34 @@ export async function persistOrderToSupabase(order: Order): Promise<PersistenceR
     return { persisted: false, reason: "not-configured" }
   }
 
+  const payload = {
+    id: order.id,
+    customer: {
+      name: order.customer.name,
+      email: order.customer.email,
+      phone: order.customer.phone,
+      address: order.customer.address,
+      city: order.customer.city,
+      pincode: order.customer.pincode,
+      country: order.customer.country ?? "India",
+    },
+    items: order.items,
+    subtotalAmount: order.subtotalAmount ?? 0,
+    shippingAmount: order.shippingAmount ?? 0,
+    discountAmount: order.discountAmount ?? 0,
+    promoCode: order.promoCode ?? null,
+    totalAmount: order.totalAmount,
+    status: order.status,
+    paymentStatus: order.paymentStatus,
+    createdAt: order.createdAt,
+    updatedAt: order.updatedAt,
+  }
+
+  const rpcResult = await client.rpc("create_order_v2", { p_payload: payload })
+  if (!rpcResult.error) {
+    return { persisted: true, provider: "supabase" }
+  }
+
   const { error } = await client.from("orders").insert({
     id: order.id,
     user_id: order.userId ?? null,
@@ -169,7 +201,8 @@ export async function persistOrderToSupabase(order: Order): Promise<PersistenceR
   })
 
   if (error) {
-    return { persisted: false, reason: "error", error: error.message }
+    const rpcMessage = rpcResult.error?.message ? ` RPC: ${rpcResult.error.message}` : ""
+    return { persisted: false, reason: "error", error: `${error.message}.${rpcMessage}` }
   }
 
   return { persisted: true, provider: "supabase" }
