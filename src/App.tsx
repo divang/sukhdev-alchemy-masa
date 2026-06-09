@@ -216,6 +216,7 @@ function App() {
   const [activeUpiConfig, setActiveUpiConfig] = useState(fallbackUpiConfig)
   const [isProcessingGatewayPayment, setIsProcessingGatewayPayment] = useState(false)
   const [showAuthHandoffNotice, setShowAuthHandoffNotice] = useState(false)
+  const [isAuthInitializing, setIsAuthInitializing] = useState(true)
   const [isPostAuthSyncing, setIsPostAuthSyncing] = useState(false)
   const [isCartHydrating, setIsCartHydrating] = useState(false)
   const searchInputRef = useRef<HTMLInputElement | null>(null)
@@ -226,7 +227,9 @@ function App() {
   const runtimeMode = resolveRuntimeMode(requestedRuntimeMode, profile)
   const devModeRequested = requestedRuntimeMode === "dev"
   const devModeLocked = devModeRequested && runtimeMode !== "dev"
-  const authSyncMessage = isPostAuthSyncing
+  const authSyncMessage = isAuthInitializing
+    ? "Preparing your account session."
+    : isPostAuthSyncing
     ? "Signing you in and restoring your account details."
     : isCartHydrating
       ? "Refreshing your cart and recent account data."
@@ -316,6 +319,7 @@ function App() {
 
     async function initializeAuthState() {
       try {
+        setIsAuthInitializing(true)
         const hasOAuthCallback = typeof window !== "undefined" && hasOAuthParamsInLocation(window.location.href)
         if (hasOAuthCallback) {
           setShowAuthHandoffNotice(true)
@@ -352,6 +356,7 @@ function App() {
           role: state.profile?.role ?? null,
         })
         setProfile(state.profile)
+        setIsAuthInitializing(false)
         if (!state.profile) {
           setIsPostAuthSyncing(false)
           setShowAuthHandoffNotice(false)
@@ -365,6 +370,7 @@ function App() {
         setProfile(null)
         setCurrentOrder(null)
         setCurrentView("store")
+        setIsAuthInitializing(false)
         setIsPostAuthSyncing(false)
         setShowAuthHandoffNotice(false)
 
@@ -384,6 +390,7 @@ function App() {
         role: state.profile?.role ?? null,
       })
       setProfile(state.profile)
+      setIsAuthInitializing(false)
 
       if (!state.user && !state.profile) {
         setIsPostAuthSyncing(false)
@@ -430,10 +437,6 @@ function App() {
         if (isActive) setCloudOrders([])
         return
       }
-
-      // Stagger: wait 600ms after login so cart sync (profile?.id effect) fires first.
-      await new Promise((resolve) => setTimeout(resolve, 600))
-      if (!isActive) return
 
       const result = profile.role === "admin"
         ? await fetchOrdersForAdmin()
@@ -496,17 +499,11 @@ function App() {
       if (!profile || !isSupabaseConfigured) {
         if (isActive) {
           setIsCartHydrating(false)
-          setIsPostAuthSyncing(false)
-          setShowAuthHandoffNotice(false)
         }
         return
       }
 
       setIsCartHydrating(true)
-
-      // Small stagger so this and loadOrders don't slam PostgREST simultaneously.
-      await new Promise((resolve) => setTimeout(resolve, 200))
-      if (!isActive) return
 
       const result = await fetchCartForCurrentUser()
       if (!isActive) {
@@ -516,8 +513,6 @@ function App() {
       if (result.error) {
         console.error("Failed to load cart items", result.error)
         setIsCartHydrating(false)
-        setIsPostAuthSyncing(false)
-        setShowAuthHandoffNotice(false)
         return
       }
 
@@ -1522,11 +1517,11 @@ function App() {
         </div>
       </div>
 
-      {showAuthHandoffNotice && !profile && (
+      {!profile && (showAuthHandoffNotice || Boolean(authSyncMessage)) && (
         <div className="container mx-auto px-3 sm:px-4 -mt-1 mb-2">
           <div className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-700">
             <p className="font-medium">Finishing sign-in</p>
-            <p className="mt-1 text-[11px] text-blue-600">We are restoring your account, cart, and menu options.</p>
+            <p className="mt-1 text-[11px] text-blue-600">{authSyncMessage ?? "We are restoring your account, cart, and menu options."}</p>
           </div>
         </div>
       )}

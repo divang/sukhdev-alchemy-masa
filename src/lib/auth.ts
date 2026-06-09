@@ -398,7 +398,7 @@ async function buildAuthState(session: Session | null): Promise<AuthState> {
   let profile: UserProfile | null = null
 
   try {
-    profile = await withTimeout(fetchProfile(user), 10000, "buildAuthState profile timed out")
+    profile = await withTimeout(fetchProfile(user), 3000, "buildAuthState profile timed out")
   } catch (error) {
     authDebug("buildAuthState profile timed out; using metadata fallback", {
       userId: user.id,
@@ -425,7 +425,7 @@ export async function getCurrentAuthState(): Promise<AuthState> {
   try {
     const { data } = await withTimeout(
       supabase.auth.getSession(),
-      10000,
+      4000,
       "getSession timed out"
     )
     authDebug("getCurrentAuthState getSession completed", {
@@ -443,7 +443,7 @@ export async function getCurrentAuthState(): Promise<AuthState> {
     try {
       const { data: retryData } = await withTimeout(
         supabase.auth.getSession(),
-        10000,
+        2500,
         "getSession retry timed out"
       )
       authDebug("getCurrentAuthState retry completed", {
@@ -490,7 +490,7 @@ export function subscribeToAuthStateChanges(callback: (state: AuthState) => void
       try {
         const { data: recovered } = await withTimeout(
           supabase.auth.getSession(),
-          5000,
+          2000,
           "onAuthStateChange recovery getSession timed out"
         )
 
