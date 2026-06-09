@@ -216,7 +216,7 @@ function App() {
   const [activeUpiConfig, setActiveUpiConfig] = useState(fallbackUpiConfig)
   const [isProcessingGatewayPayment, setIsProcessingGatewayPayment] = useState(false)
   const [showAuthHandoffNotice, setShowAuthHandoffNotice] = useState(false)
-  const [isAuthInitializing, setIsAuthInitializing] = useState(true)
+  const [isAuthInitializing, setIsAuthInitializing] = useState(false)
   const [isPostAuthSyncing, setIsPostAuthSyncing] = useState(false)
   const [isCartHydrating, setIsCartHydrating] = useState(false)
   const searchInputRef = useRef<HTMLInputElement | null>(null)
@@ -319,11 +319,14 @@ function App() {
 
     async function initializeAuthState() {
       try {
-        setIsAuthInitializing(true)
         const hasOAuthCallback = typeof window !== "undefined" && hasOAuthParamsInLocation(window.location.href)
         if (hasOAuthCallback) {
+          setIsAuthInitializing(true)
           setShowAuthHandoffNotice(true)
           setIsPostAuthSyncing(true)
+        } else {
+          // Keep guest interactions responsive while auth bootstrap runs in background.
+          setIsAuthInitializing(false)
         }
 
         const oauthError = await finalizeOAuthRedirect()
