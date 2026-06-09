@@ -4,6 +4,7 @@ import { Separator } from "@/components/ui/separator"
 import { X, Minus, Plus, ShoppingCart } from "@phosphor-icons/react"
 import type { CartItem, Product } from "@/lib/types"
 import { useKV } from "@/hooks/use-kv"
+import { useIsMobile } from "@/hooks/use-mobile"
 import { getProductImage } from "@/lib/product-images"
 import { calculateCartItemTotal, calculateCartSubtotal, getCartItemPackLabel } from "@/lib/pricing"
 
@@ -29,6 +30,7 @@ export function CartDrawer({
   onCheckout
 }: CartDrawerProps) {
   const [productImages] = useKV<Record<string, string>>("product-images", {})
+  const isMobile = useIsMobile()
 
   const getProduct = (productId: string) => products.find(p => p.id === productId)
 
@@ -38,6 +40,133 @@ export function CartDrawer({
 
   const cartSubtotal = calculateCartSubtotal(effectiveItems, products)
   const cartTotal = cartSubtotal
+
+  if (isMobile) {
+    if (!open) {
+      return null
+    }
+
+    return (
+      <div className="fixed inset-0 z-50 sm:hidden">
+        <button
+          type="button"
+          className="absolute inset-0 bg-black/45"
+          aria-label="Close cart"
+          onClick={() => onOpenChange(false)}
+        />
+        <div className="absolute inset-y-0 right-0 flex w-[92vw] max-w-sm flex-col bg-background shadow-xl">
+          <div className="flex items-start justify-between border-b px-4 py-4">
+            <div>
+              <h2 className="flex items-center gap-2 text-lg font-semibold">
+                <ShoppingCart size={20} />
+                Shopping Cart ({cartItems.length})
+              </h2>
+              <p className="mt-1 text-xs text-muted-foreground">Review your saved items and continue to checkout when ready.</p>
+            </div>
+            <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => onOpenChange(false)}>
+              <X size={14} />
+            </Button>
+          </div>
+
+          {isSyncing && (
+            <div className="flex items-center gap-2 border-b bg-blue-50 px-4 py-1.5 text-xs text-blue-600">
+              <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-blue-400" />
+              Syncing your cart...
+            </div>
+          )}
+
+          <div className="flex-1 overflow-y-auto px-4 py-3">
+            {effectiveItems.length === 0 ? (
+              <div className="flex h-full flex-col items-center justify-center text-center">
+                <ShoppingCart size={56} className="mb-3 text-muted-foreground" />
+                <p className="text-muted-foreground">Your cart is empty</p>
+                <Button variant="link" onClick={() => onOpenChange(false)} className="mt-2">
+                  Continue Shopping
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {effectiveItems.map((item) => {
+                  const product = getProduct(item.productId)
+                  if (!product) return null
+                  const imageUrl = getProductImage(product, productImages ?? {})
+
+                  return (
+                    <div key={`${item.productId}-${item.grams}`} className="flex gap-3 rounded-lg border p-3">
+                      <div
+                        className="h-16 w-16 flex-shrink-0 rounded-md bg-cover bg-center"
+                        style={{ backgroundImage: `url(${imageUrl})` }}
+                      />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-start justify-between">
+                          <h4 className="line-clamp-2 text-sm font-semibold">{product.name}</h4>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="-mt-1 h-6 w-6 p-0"
+                            onClick={() => onRemoveItem(item.productId, item.grams)}
+                          >
+                            <X size={14} />
+                          </Button>
+                        </div>
+
+                        <p className="mt-1 text-xs text-muted-foreground">{getCartItemPackLabel(product, item.grams)}</p>
+                        <div className="mt-2 flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-7 w-7 p-0"
+                              onClick={() => onUpdateQuantity(item.productId, item.grams, Math.max(1, item.quantity - 1))}
+                            >
+                              <Minus size={12} />
+                            </Button>
+                            <span className="w-8 text-center text-sm">{item.quantity}</span>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-7 w-7 p-0"
+                              onClick={() => onUpdateQuantity(item.productId, item.grams, item.quantity + 1)}
+                            >
+                              <Plus size={12} />
+                            </Button>
+                          </div>
+                          <span className="font-bold text-primary">₹{calculateCartItemTotal(item, product).toFixed(2)}</span>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+
+          {cartItems.length > 0 && (
+            <>
+              <Separator />
+              <div className="space-y-3 px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-3">
+                <div className="flex items-center justify-between text-sm text-muted-foreground">
+                  <span>Subtotal</span>
+                  <span>₹{cartSubtotal.toFixed(2)}</span>
+                </div>
+                <div className="flex items-center justify-between text-sm text-muted-foreground">
+                  <span>Shipping</span>
+                  <span>Calculated at checkout by pincode</span>
+                </div>
+                <div className="flex items-center justify-between text-base font-bold">
+                  <span>Estimated Total:</span>
+                  <span className="text-primary">₹{cartTotal.toFixed(2)}</span>
+                </div>
+                <Button className="w-full" size="lg" onClick={onCheckout}>
+                  Proceed to Checkout
+                </Button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    )
+  }
   
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>

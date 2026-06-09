@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react"
 import { useKV } from "@/hooks/use-kv"
-import { ShoppingCart, List, Package, CreditCard, Gear, SignOut, UserCircle, InstagramLogo, YoutubeLogo, House, MagnifyingGlass, SquaresFour } from "@phosphor-icons/react"
+import { ShoppingCart, List, Package, CreditCard, Gear, SignOut, UserCircle, InstagramLogo, YoutubeLogo, House, MagnifyingGlass, SquaresFour, X } from "@phosphor-icons/react"
 import { QRCodeSVG as QRCode } from "qrcode.react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -18,6 +18,7 @@ import { AccountDetailsView } from "@/components/AccountDetailsView"
 import type { Category, Product, CartItem, Order, UserProfile } from "@/lib/types"
 import { toast } from "sonner"
 import { useInitialData } from "@/hooks/use-initial-data"
+import { useIsMobile } from "@/hooks/use-mobile"
 import { finalizeOAuthRedirect, getCurrentAuthState, signOutUser, subscribeToAuthStateChanges } from "@/lib/auth"
 import {
   fetchCartForCurrentUser,
@@ -232,6 +233,7 @@ function App() {
   const [isPostAuthSyncing, setIsPostAuthSyncing] = useState(false)
   const [isCartHydrating, setIsCartHydrating] = useState(false)
   const [isAuthServiceDegraded, setIsAuthServiceDegraded] = useState(false)
+  const isMobile = useIsMobile()
   const searchInputRef = useRef<HTMLInputElement | null>(null)
   const socialProfiles = [
     { name: "Instagram", handle: "@sukhdevialchemy", url: "https://instagram.com/sukhdevialchemy" },
@@ -1199,68 +1201,147 @@ function App() {
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-20 border-b border-slate-200 bg-white text-slate-900 shadow-sm sm:border-border sm:bg-card sm:text-foreground">
         <div className="container mx-auto px-3 sm:px-4 py-2 sm:py-4">
-          <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
-            <SheetContent side="left" className="w-[85vw] max-w-xs">
-              <SheetHeader>
-                <SheetTitle>Sukhdevi Alchemy</SheetTitle>
-                <SheetDescription>
-                  Browse categories and jump to your account tools.
-                </SheetDescription>
-              </SheetHeader>
-              <div className="mt-4 space-y-5">
-                <CategorySidebar
-                  categories={visibleCategories}
-                  selectedCategory={selectedCategory}
-                  onSelectCategory={(category) => {
-                    setSelectedCategory(category)
-                    setMobileMenuOpen(false)
-                  }}
-                />
-
-                {profile?.role === "admin" && (
-                  <Button
-                    variant="outline"
-                    className="w-full justify-start"
-                    onClick={() => {
+          {!isMobile && (
+            <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
+              <SheetContent side="left" className="w-[85vw] max-w-xs">
+                <SheetHeader>
+                  <SheetTitle>Sukhdevi Alchemy</SheetTitle>
+                  <SheetDescription>
+                    Browse categories and jump to your account tools.
+                  </SheetDescription>
+                </SheetHeader>
+                <div className="mt-4 space-y-5">
+                  <CategorySidebar
+                    categories={visibleCategories}
+                    selectedCategory={selectedCategory}
+                    onSelectCategory={(category) => {
+                      setSelectedCategory(category)
                       setMobileMenuOpen(false)
-                      handleOpenAdmin()
                     }}
-                  >
-                    <Gear size={16} className="mr-2" />
-                    Admin Panel
-                  </Button>
-                )}
+                  />
 
-                <div className="border-t pt-4">
-                  <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Your Account</p>
-                  <div className="space-y-2">
-                    {profile && (
-                      <Button variant="ghost" className="w-full justify-start" onClick={() => {
+                  {profile?.role === "admin" && (
+                    <Button
+                      variant="outline"
+                      className="w-full justify-start"
+                      onClick={() => {
                         setMobileMenuOpen(false)
-                        handleOpenTracking()
-                      }}>
-                        Your Orders
-                      </Button>
-                    )}
-                    <Button variant="ghost" className="w-full justify-start" onClick={() => {
-                      setMobileMenuOpen(false)
-                      handleOpenAccount()
-                    }}>
-                      {profile ? "Your Account" : "Sign In"}
+                        handleOpenAdmin()
+                      }}
+                    >
+                      <Gear size={16} className="mr-2" />
+                      Admin Panel
                     </Button>
-                    {profile && (
+                  )}
+
+                  <div className="border-t pt-4">
+                    <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Your Account</p>
+                    <div className="space-y-2">
+                      {profile && (
+                        <Button variant="ghost" className="w-full justify-start" onClick={() => {
+                          setMobileMenuOpen(false)
+                          handleOpenTracking()
+                        }}>
+                          Your Orders
+                        </Button>
+                      )}
                       <Button variant="ghost" className="w-full justify-start" onClick={() => {
                         setMobileMenuOpen(false)
-                        handleSignOut()
+                        handleOpenAccount()
                       }}>
-                        Sign Out
+                        {profile ? "Your Account" : "Sign In"}
                       </Button>
-                    )}
+                      {profile && (
+                        <Button variant="ghost" className="w-full justify-start" onClick={() => {
+                          setMobileMenuOpen(false)
+                          handleSignOut()
+                        }}>
+                          Sign Out
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </SheetContent>
+            </Sheet>
+          )}
+
+          {isMobile && mobileMenuOpen && (
+            <div className="fixed inset-0 z-50 sm:hidden">
+              <button
+                type="button"
+                className="absolute inset-0 bg-black/45"
+                aria-label="Close category menu"
+                onClick={() => setMobileMenuOpen(false)}
+              />
+              <div className="absolute inset-y-0 left-0 w-[86vw] max-w-xs overflow-y-auto border-r bg-background shadow-xl">
+                <div className="sticky top-0 z-10 border-b bg-background/95 px-4 py-3 backdrop-blur">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <h2 className="text-base font-semibold">Sukhdevi Alchemy</h2>
+                      <p className="mt-0.5 text-xs text-muted-foreground">Browse categories and jump to your account tools.</p>
+                    </div>
+                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => setMobileMenuOpen(false)}>
+                      <X size={14} />
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="space-y-5 px-4 py-4">
+                  <CategorySidebar
+                    categories={visibleCategories}
+                    selectedCategory={selectedCategory}
+                    onSelectCategory={(category) => {
+                      setSelectedCategory(category)
+                      setMobileMenuOpen(false)
+                    }}
+                  />
+
+                  {profile?.role === "admin" && (
+                    <Button
+                      variant="outline"
+                      className="w-full justify-start"
+                      onClick={() => {
+                        setMobileMenuOpen(false)
+                        handleOpenAdmin()
+                      }}
+                    >
+                      <Gear size={16} className="mr-2" />
+                      Admin Panel
+                    </Button>
+                  )}
+
+                  <div className="border-t pt-4">
+                    <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Your Account</p>
+                    <div className="space-y-2">
+                      {profile && (
+                        <Button variant="ghost" className="w-full justify-start" onClick={() => {
+                          setMobileMenuOpen(false)
+                          handleOpenTracking()
+                        }}>
+                          Your Orders
+                        </Button>
+                      )}
+                      <Button variant="ghost" className="w-full justify-start" onClick={() => {
+                        setMobileMenuOpen(false)
+                        handleOpenAccount()
+                      }}>
+                        {profile ? "Your Account" : "Sign In"}
+                      </Button>
+                      {profile && (
+                        <Button variant="ghost" className="w-full justify-start" onClick={() => {
+                          setMobileMenuOpen(false)
+                          handleSignOut()
+                        }}>
+                          Sign Out
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
-            </SheetContent>
-          </Sheet>
+            </div>
+          )}
 
           <div className="space-y-2 sm:hidden">
             <div className="flex items-center justify-between gap-2 rounded-2xl border border-slate-200 bg-white px-2 py-2 shadow-sm">
