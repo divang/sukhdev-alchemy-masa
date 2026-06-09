@@ -12,8 +12,7 @@ import { ProductDetailDialog } from "@/components/ProductDetailDialog"
 import { CheckoutView } from "@/components/CheckoutView"
 import { OrderTrackingView } from "@/components/OrderTrackingView"
 import { ContactUsSection } from "@/components/ContactUsSection"
-import { AdminPanel } from "@/components/AdminPanel"
-import { AdminFulfillmentPanel } from "@/components/AdminFulfillmentPanel"
+import { AdminSimplifiedPanel } from "@/components/AdminSimplifiedPanel"
 import { AuthView } from "@/components/AuthView"
 import { AccountDetailsView } from "@/components/AccountDetailsView"
 import type { Category, Product, CartItem, Order, UserProfile } from "@/lib/types"
@@ -1059,15 +1058,6 @@ function App() {
                 {runtimeMode === "dev" && <Badge variant="destructive">DEV MODE</Badge>}
               </div>
               <div className="flex items-center gap-2">
-                {currentView === "admin" ? (
-                  <Button variant="secondary" onClick={() => setCurrentView("admin-advanced")}>
-                    Advanced Features
-                  </Button>
-                ) : (
-                  <Button variant="secondary" onClick={() => setCurrentView("admin")}>
-                    Back to Priority Queue
-                  </Button>
-                )}
                 <Button variant="outline" onClick={handleBackToStore}>
                   Back to Store
                 </Button>
@@ -1077,11 +1067,7 @@ function App() {
         </header>
 
         <div className="container mx-auto px-4 py-8">
-          {currentView === "admin" ? (
-            <AdminFulfillmentPanel orders={adminVisibleOrders} />
-          ) : (
-            <AdminPanel orders={adminVisibleOrders} runtimeMode={runtimeMode} />
-          )}
+          <AdminSimplifiedPanel orders={adminVisibleOrders} />
         </div>
       </div>
     )

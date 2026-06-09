@@ -383,6 +383,14 @@ export function AuthView({ mode, onBack, onAuthenticated }: AuthViewProps) {
 
                 <TabsContent value="sign-in" className="mt-6">
                   <div className="space-y-4">
+                    <Button className="w-full" type="button" onClick={handleGoogleSignIn}>
+                      Continue with Google
+                    </Button>
+
+                    <p className="text-center text-xs uppercase tracking-[0.24em] text-muted-foreground">
+                      Or continue with phone OTP
+                    </p>
+
                     <form className="space-y-3" onSubmit={phoneOtpData.otpSent ? handleVerifyPhoneOtp : handleSendPhoneOtp}>
                       <div>
                         <Label htmlFor="phone-otp-number">Phone Number</Label>
@@ -412,10 +420,6 @@ export function AuthView({ mode, onBack, onAuthenticated }: AuthViewProps) {
                           : (isSendingOtp ? "Sending OTP..." : "Continue with Phone OTP")}
                       </Button>
                     </form>
-
-                    <Button className="w-full" type="button" variant="outline" onClick={handleGoogleSignIn}>
-                      Continue with Google
-                    </Button>
 
                     <Button
                       className="w-full"
@@ -505,6 +509,15 @@ export function AuthView({ mode, onBack, onAuthenticated }: AuthViewProps) {
                 </TabsContent>
 
                 <TabsContent value="create-account" className="mt-6">
+                  <div className="space-y-4">
+                    <Button className="w-full" type="button" onClick={handleGoogleSignIn}>
+                      Continue with Google
+                    </Button>
+
+                    <p className="text-center text-xs uppercase tracking-[0.24em] text-muted-foreground">
+                      Or create your account manually
+                    </p>
+
                   <form className="space-y-4" onSubmit={handleSignUp}>
                     <div className="grid gap-4 md:grid-cols-2">
                       <div>
@@ -580,6 +593,7 @@ export function AuthView({ mode, onBack, onAuthenticated }: AuthViewProps) {
                       {isSubmitting ? "Creating account..." : "Create Account"}
                     </Button>
                   </form>
+                  </div>
                 </TabsContent>
               </Tabs>
             )}
