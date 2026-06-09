@@ -518,6 +518,178 @@ order by created_at desc
 limit 50;
 ```
 
+## DB Migration Go-Live Plan (V2 Cutover, Near Zero Downtime)
+
+Last updated: 2026-06-09 UTC
+
+### Objective
+- Deliver normalized commerce schema (order items, pricing history, discount history, billing snapshots) without blank pages or visible errors.
+- Keep availability at or above 99.9% during rollout.
+- Use V2 app + V2 database as a fully isolated canary path before traffic cutover.
+
+### Strategy Summary
+- V1: existing app + existing DB (current production path).
+- V2: new app deployment + new DB project (cloned data + new schema).
+- Route by feature flag/runtime config with instant rollback to V1.
+- Do not do in-place risky schema rewrites on V1 during customer browsing windows.
+
+### Availability Model (What prevents blank pages)
+1. Keep V1 untouched until V2 is validated.
+2. V2 ships with backward-compatible reads and strong fallbacks:
+  - If normalized tables are empty/unavailable, read legacy order JSON path.
+  - Product rendering must always have safe fallback price and no-throw UI guard.
+3. All schema additions are additive first; destructive actions delayed to post-stability window.
+4. Use kill-switch env flags to disable new checkout path instantly.
+5. Keep V1 and V2 deployment artifacts independently rollbackable.
+
+### Preconditions Checklist
+1. Create separate Supabase project for V2.
+2. Copy secrets and auth providers for V2:
+  - Supabase Auth settings
+  - Resend sender/API
+  - Razorpay webhook secret/key mapping for V2 endpoint
+3. Confirm V2 environment variables in GitHub environment and runtime config.
+4. Enable synthetic health checks for V2:
+  - homepage load
+  - product list fetch
+  - checkout pricing compute
+  - payment verify endpoint ping
+5. Freeze non-critical releases during migration window.
+
+### Step-by-Step Migration Plan
+
+#### Phase A: Build V2 DB (No Traffic)
+1. Provision V2 Supabase project.
+2. Apply existing migrations in order through current latest.
+3. Apply new additive migrations only (examples):
+  - order_items
+  - product_prices
+  - product_discounts
+  - billing snapshot columns
+  - refunds tables
+4. Backfill scripts on V2 only:
+  - orders.items JSON -> order_items
+  - products price -> product_prices version 1
+  - current discount state -> product_discounts version 1
+5. Run integrity checks:
+  - row counts per key table
+  - total reconciliation (sum(line totals) vs order totals)
+  - null/constraint violations
+
+#### Phase B: Deploy V2 App (Dark Launch)
+1. Deploy V2 app build against V2 DB using separate environment.
+2. Keep public traffic on V1.
+3. Run manual E2E on V2:
+  - browse -> cart -> checkout -> payment -> order tracking
+  - email snapshot/export
+  - admin panel operations
+4. Run webhook and idempotency tests with V2 payment endpoint.
+
+#### Phase C: Canary Traffic Shift
+1. Start with internal/admin-only traffic (0-1%).
+2. Expand to 5% if stable for 24h.
+3. Expand to 25% if error budget is healthy.
+4. Move to 100% after stable monitoring window.
+
+Canary gates (must pass before next stage):
+- frontend error rate not increased beyond baseline
+- checkout success rate within baseline tolerance
+- payment reconciliation variance = 0 critical cases
+- no spike in support complaints/order mismatches
+
+#### Phase D: Stabilization (Post Cutover)
+1. Keep V1 read-only fallback window for at least 7 days.
+2. Continue dual observability (V1 and V2 dashboards).
+3. Only after stability, schedule legacy cleanup tasks.
+
+### Rollback Plan (If Anything Goes Wrong)
+
+Rollback triggers:
+- checkout failures above threshold
+- webhook failures/reconciliation mismatch
+- blank page or major rendering regression
+- auth/sign-in outage
+
+Immediate rollback steps (target under 5 minutes):
+1. Flip traffic route to V1 (runtime config / CDN rule / deployment alias).
+2. Disable V2 checkout/payment flags.
+3. Pause V2 webhook consumer if duplicate handling risk appears.
+4. Announce incident status and keep V1 serving traffic.
+
+Data safety during rollback:
+1. Keep V2 writes; do not delete data during incident.
+2. Export delta orders from V2 created after cutover start.
+3. Reconcile payment records before any replays.
+4. Decide replay strategy after root cause analysis.
+
+### Recommended Deployment Pattern for This Repo
+1. Maintain two deploy channels:
+  - V1: current Pages channel (stable)
+  - V2: separate preview/custom subdomain channel
+2. Keep two Supabase projects and two secret sets.
+3. Add runtime "db_channel" setting in `runtime.config.json` to force V1/V2.
+4. Route only selected users to V2 (admin email or allow-list) before broad cutover.
+
+### SQL Migration Safety Rules
+1. Expand and contract method:
+  - Expand: add tables/columns/indexes
+  - Migrate: dual write/backfill/validate
+  - Contract: remove old columns only after verification window
+2. Never drop `orders.items` until all readers are switched and validated.
+3. Use idempotent migrations (`if exists` / `if not exists`) when possible.
+4. Run heavy backfills off-peak and in batches.
+
+### Concrete Validation Queries Before Cutover
+
+1. Orders without order_items after backfill:
+
+```sql
+select o.id
+from public.orders o
+left join public.order_items oi on oi.order_id = o.id
+group by o.id
+having count(oi.*) = 0;
+```
+
+2. Amount mismatch check:
+
+```sql
+select
+  o.id,
+  o.total_amount,
+  round(coalesce(sum(oi.final_price), 0), 2) as items_total
+from public.orders o
+left join public.order_items oi on oi.order_id = o.id
+group by o.id, o.total_amount
+having abs(o.total_amount - round(coalesce(sum(oi.final_price), 0), 2)) > 0.01;
+```
+
+3. Active discount determinism check:
+
+```sql
+select product_id, count(*)
+from public.product_discounts
+where active_from <= now()
+  and (expires_at is null or expires_at > now())
+group by product_id
+having count(*) > 5;
+```
+
+### Final Cutover Checklist
+1. V2 E2E passed (manual and scripted smoke checks).
+2. Payment gateway + webhook verified in V2.
+3. Admin CSV/snapshot verified in V2.
+4. Canary stages passed with monitored SLOs.
+5. Rollback command and owner confirmed before 100% cutover.
+6. Post-cutover 24h watch active.
+
+### Cleanup Plan (After Stability)
+1. Freeze V1 writes and take final backup.
+2. Archive V1 DB snapshot.
+3. Remove legacy read paths from app code.
+4. Drop deprecated columns/tables in a separate maintenance release.
+5. Keep rollback artifact for one additional release cycle.
+
 Admins:
 
 ```sql
