@@ -1,4 +1,4 @@
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { X, Minus, Plus, ShoppingCart } from "@phosphor-icons/react"
@@ -12,6 +12,8 @@ type CartDrawerProps = {
   onOpenChange: (open: boolean) => void
   cartItems: CartItem[]
   products: Product[]
+  isLoading?: boolean
+  loadingMessage?: string
   onUpdateQuantity: (productId: string, grams: number, quantity: number) => void
   onRemoveItem: (productId: string, grams: number) => void
   onCheckout: () => void
@@ -22,6 +24,8 @@ export function CartDrawer({
   onOpenChange, 
   cartItems, 
   products,
+  isLoading = false,
+  loadingMessage = "Restoring your cart...",
   onUpdateQuantity,
   onRemoveItem,
   onCheckout
@@ -41,10 +45,19 @@ export function CartDrawer({
             <ShoppingCart size={24} />
             Shopping Cart ({cartItems.length})
           </SheetTitle>
+          <SheetDescription className="px-6 pb-2">
+            Review your saved items and continue to checkout when ready.
+          </SheetDescription>
         </SheetHeader>
         
         <div className="flex-1 overflow-y-auto px-6 py-4">
-          {cartItems.length === 0 ? (
+          {isLoading ? (
+            <div className="flex h-full flex-col items-center justify-center text-center">
+              <ShoppingCart size={64} className="mb-4 text-muted-foreground" />
+              <p className="font-medium text-foreground">Preparing your cart</p>
+              <p className="mt-2 max-w-xs text-sm text-muted-foreground">{loadingMessage}</p>
+            </div>
+          ) : cartItems.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-center">
               <ShoppingCart size={64} className="text-muted-foreground mb-4" />
               <p className="text-muted-foreground">Your cart is empty</p>
@@ -112,7 +125,7 @@ export function CartDrawer({
           )}
         </div>
         
-        {cartItems.length > 0 && (
+        {!isLoading && cartItems.length > 0 && (
           <>
             <Separator />
             <div className="space-y-4 px-6 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">

@@ -4,7 +4,7 @@ import { ShoppingCart, List, Package, CreditCard, Gear, SignOut, UserCircle, Ins
 import { QRCodeSVG as QRCode } from "qrcode.react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { CategorySidebar } from "@/components/CategorySidebar"
 import { ProductCard } from "@/components/ProductCard"
 import { CartDrawer } from "@/components/CartDrawer"
@@ -216,8 +216,9 @@ function App() {
   const [activeUpiConfig, setActiveUpiConfig] = useState(fallbackUpiConfig)
   const [isProcessingGatewayPayment, setIsProcessingGatewayPayment] = useState(false)
   const [showAuthHandoffNotice, setShowAuthHandoffNotice] = useState(false)
+  const [isPostAuthSyncing, setIsPostAuthSyncing] = useState(false)
+  const [isCartHydrating, setIsCartHydrating] = useState(false)
   const searchInputRef = useRef<HTMLInputElement | null>(null)
-  const authHandoffTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const socialProfiles = [
     { name: "Instagram", handle: "@sukhdevialchemy", url: "https://instagram.com/sukhdevialchemy" },
     { name: "YouTube", handle: "@sukhdevialchemy", url: "https://youtube.com/@sukhdevialchemy" },
@@ -225,6 +226,15 @@ function App() {
   const runtimeMode = resolveRuntimeMode(requestedRuntimeMode, profile)
   const devModeRequested = requestedRuntimeMode === "dev"
   const devModeLocked = devModeRequested && runtimeMode !== "dev"
+  const authSyncMessage = isPostAuthSyncing
+    ? "Signing you in and restoring your account details."
+    : isCartHydrating
+      ? "Refreshing your cart and recent account data."
+      : null
+
+  const blurSearchInput = () => {
+    searchInputRef.current?.blur()
+  }
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -238,6 +248,32 @@ function App() {
     syncRequestedModeFromUrl()
     window.addEventListener("popstate", syncRequestedModeFromUrl)
     return () => window.removeEventListener("popstate", syncRequestedModeFromUrl)
+  }, [])
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return
+    }
+
+    let lastScrollY = window.scrollY
+
+    const handleScroll = () => {
+      const input = searchInputRef.current
+      if (!input || document.activeElement !== input) {
+        lastScrollY = window.scrollY
+        return
+      }
+
+      if (Math.abs(window.scrollY - lastScrollY) < 12) {
+        return
+      }
+
+      input.blur()
+      lastScrollY = window.scrollY
+    }
+
+    window.addEventListener("scroll", handleScroll, { passive: true })
+    return () => window.removeEventListener("scroll", handleScroll)
   }, [])
 
   useEffect(() => {
@@ -280,15 +316,10 @@ function App() {
 
     async function initializeAuthState() {
       try {
-        if (typeof window !== "undefined" && hasOAuthParamsInLocation(window.location.href)) {
+        const hasOAuthCallback = typeof window !== "undefined" && hasOAuthParamsInLocation(window.location.href)
+        if (hasOAuthCallback) {
           setShowAuthHandoffNotice(true)
-          if (authHandoffTimeoutRef.current) {
-            clearTimeout(authHandoffTimeoutRef.current)
-          }
-
-          authHandoffTimeoutRef.current = setTimeout(() => {
-            setShowAuthHandoffNotice(false)
-          }, 1500)
+          setIsPostAuthSyncing(true)
         }
 
         const oauthError = await finalizeOAuthRedirect()
@@ -300,6 +331,8 @@ function App() {
           console.error("[app-auth] OAuth callback failed", oauthError)
           setCurrentOrder(null)
           setCurrentView("store")
+          setIsPostAuthSyncing(false)
+          setShowAuthHandoffNotice(false)
 
           if (typeof window !== "undefined") {
             window.history.replaceState({}, document.title, `${window.location.origin}/`)
@@ -319,7 +352,10 @@ function App() {
           role: state.profile?.role ?? null,
         })
         setProfile(state.profile)
-        setShowAuthHandoffNotice(false)
+        if (!state.profile) {
+          setIsPostAuthSyncing(false)
+          setShowAuthHandoffNotice(false)
+        }
       } catch (error) {
         if (!isActive) {
           return
@@ -329,6 +365,7 @@ function App() {
         setProfile(null)
         setCurrentOrder(null)
         setCurrentView("store")
+        setIsPostAuthSyncing(false)
         setShowAuthHandoffNotice(false)
 
         if (typeof window !== "undefined") {
@@ -348,7 +385,8 @@ function App() {
       })
       setProfile(state.profile)
 
-      if (state.user || state.profile) {
+      if (!state.user && !state.profile) {
+        setIsPostAuthSyncing(false)
         setShowAuthHandoffNotice(false)
       }
     })
@@ -356,9 +394,6 @@ function App() {
     return () => {
       isActive = false
       subscription.unsubscribe()
-      if (authHandoffTimeoutRef.current) {
-        clearTimeout(authHandoffTimeoutRef.current)
-      }
     }
   }, [])
 
@@ -459,8 +494,15 @@ function App() {
 
     async function syncPersistedCart() {
       if (!profile || !isSupabaseConfigured) {
+        if (isActive) {
+          setIsCartHydrating(false)
+          setIsPostAuthSyncing(false)
+          setShowAuthHandoffNotice(false)
+        }
         return
       }
+
+      setIsCartHydrating(true)
 
       // Small stagger so this and loadOrders don't slam PostgREST simultaneously.
       await new Promise((resolve) => setTimeout(resolve, 200))
@@ -473,6 +515,9 @@ function App() {
 
       if (result.error) {
         console.error("Failed to load cart items", result.error)
+        setIsCartHydrating(false)
+        setIsPostAuthSyncing(false)
+        setShowAuthHandoffNotice(false)
         return
       }
 
@@ -481,10 +526,18 @@ function App() {
 
       const persistResult = await replaceCartForCurrentUser(mergedCart)
       if (!isActive || persistResult.persisted || !persistResult.error) {
+        if (isActive) {
+          setIsCartHydrating(false)
+          setIsPostAuthSyncing(false)
+          setShowAuthHandoffNotice(false)
+        }
         return
       }
 
       console.error("Failed to sync cart items", persistResult.error)
+      setIsCartHydrating(false)
+      setIsPostAuthSyncing(false)
+      setShowAuthHandoffNotice(false)
     }
 
     syncPersistedCart()
@@ -631,6 +684,8 @@ function App() {
   }
 
   const handleOpenAccount = () => {
+    blurSearchInput()
+
     if (profile) {
       setCurrentView("account-details")
       return
@@ -642,6 +697,7 @@ function App() {
   }
 
   const handleCheckout = () => {
+    blurSearchInput()
     setCartOpen(false)
 
     if (!isSupabaseConfigured) {
@@ -660,6 +716,7 @@ function App() {
   }
 
   const handleOpenTracking = () => {
+    blurSearchInput()
     if (!isSupabaseConfigured) {
       toast.error("Supabase auth is not configured yet.")
       return
@@ -676,6 +733,7 @@ function App() {
   }
 
   const handleOpenAdmin = () => {
+    blurSearchInput()
     if (!isSupabaseConfigured) {
       toast.error("Supabase auth is not configured yet.")
       return
@@ -692,6 +750,7 @@ function App() {
   }
 
   const handleBackToStore = () => {
+    blurSearchInput()
     // Clear admin hash when navigating back so reload doesn't re-trigger admin route.
     if (window.location.hash === "#admin") {
       history.replaceState(null, "", window.location.pathname)
@@ -706,6 +765,7 @@ function App() {
   }
 
   const handleSignOut = async () => {
+    blurSearchInput()
     await signOutUser()
     setProfile(null)
     setCloudOrders([])
@@ -1132,8 +1192,17 @@ function App() {
             <SheetContent side="left" className="w-[85vw] max-w-xs">
               <SheetHeader>
                 <SheetTitle>Sukhdevi Alchemy</SheetTitle>
+                <SheetDescription>
+                  Browse categories and jump to your account tools.
+                </SheetDescription>
               </SheetHeader>
               <div className="mt-4 space-y-5">
+                {authSyncMessage && (
+                  <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-700">
+                    {authSyncMessage} Your menu options will update automatically.
+                  </div>
+                )}
+
                 <CategorySidebar
                   categories={visibleCategories}
                   selectedCategory={selectedCategory}
@@ -1194,7 +1263,10 @@ function App() {
                 <Button
                   variant="outline"
                   size="icon"
-                  onClick={() => setMobileMenuOpen(true)}
+                  onClick={() => {
+                    blurSearchInput()
+                    setMobileMenuOpen(true)
+                  }}
                   className="h-9 w-9 rounded-md border-slate-200 bg-white text-slate-700 shadow-sm"
                   aria-label="Open category menu"
                 >
@@ -1204,6 +1276,7 @@ function App() {
                 <button
                   type="button"
                   onClick={() => {
+                    blurSearchInput()
                     setSelectedCategory(null)
                     window.scrollTo({ top: 0, behavior: "smooth" })
                   }}
@@ -1233,10 +1306,17 @@ function App() {
             <div className="flex items-center gap-2">
               <div className="flex h-10 flex-1 items-center rounded-full border border-slate-200 bg-white px-3 shadow-sm">
                 <input
+                  type="search"
                   ref={searchInputRef}
                   value={searchQuery}
                   onChange={(event) => setSearchQuery(event.target.value)}
                   placeholder="Discover products"
+                  autoComplete="off"
+                  autoCorrect="off"
+                  autoCapitalize="none"
+                  spellCheck={false}
+                  enterKeyHint="search"
+                  inputMode="search"
                   className="w-full bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400"
                   aria-label="Search products"
                 />
@@ -1370,9 +1450,16 @@ function App() {
           <div className="mt-3 hidden sm:flex items-center gap-2">
             <div className="flex h-10 flex-1 items-center rounded-full border bg-background px-3">
               <input
+                type="search"
                 value={searchQuery}
                 onChange={(event) => setSearchQuery(event.target.value)}
                 placeholder="Search products"
+                autoComplete="off"
+                autoCorrect="off"
+                autoCapitalize="none"
+                spellCheck={false}
+                enterKeyHint="search"
+                inputMode="search"
                 className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
                 aria-label="Search products"
               />
@@ -1437,8 +1524,9 @@ function App() {
 
       {showAuthHandoffNotice && !profile && (
         <div className="container mx-auto px-3 sm:px-4 -mt-1 mb-2">
-          <div className="rounded-md border border-blue-200 bg-blue-50 px-3 py-1 text-xs text-blue-700">
-            Signing you in...
+          <div className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-700">
+            <p className="font-medium">Finishing sign-in</p>
+            <p className="mt-1 text-[11px] text-blue-600">We are restoring your account, cart, and menu options.</p>
           </div>
         </div>
       )}
@@ -1448,6 +1536,7 @@ function App() {
           <button
             type="button"
             onClick={() => {
+              blurSearchInput()
               setSelectedCategory(null)
               setSearchQuery("")
               window.scrollTo({ top: 0, behavior: "smooth" })
@@ -1467,7 +1556,10 @@ function App() {
           </button>
           <button
             type="button"
-            onClick={() => setMobileMenuOpen(true)}
+            onClick={() => {
+              blurSearchInput()
+              setMobileMenuOpen(true)
+            }}
             className="flex flex-col items-center gap-1 py-2 text-xs"
           >
             <SquaresFour size={18} />
@@ -1475,7 +1567,10 @@ function App() {
           </button>
           <button
             type="button"
-            onClick={() => setCartOpen(true)}
+            onClick={() => {
+              blurSearchInput()
+              setCartOpen(true)
+            }}
             className="relative flex flex-col items-center gap-1 py-2 text-xs"
           >
             <ShoppingCart size={18} />
@@ -1519,6 +1614,8 @@ function App() {
         onOpenChange={setCartOpen}
         cartItems={cartItems ?? []}
         products={products ?? []}
+        isLoading={Boolean(authSyncMessage)}
+        loadingMessage={authSyncMessage ?? undefined}
         onUpdateQuantity={handleUpdateQuantity}
         onRemoveItem={handleRemoveItem}
         onCheckout={handleCheckout}
