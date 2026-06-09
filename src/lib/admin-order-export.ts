@@ -10,6 +10,10 @@ export type OrderExportOptions = {
   customEndDate?: string
 }
 
+const viteEnv = ((import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env ?? {})
+const supabaseUrl = String(viteEnv.VITE_SUPABASE_URL ?? "").trim().replace(/\/$/, "")
+const supabaseAnonKey = String(viteEnv.VITE_SUPABASE_ANON_KEY ?? "").trim()
+
 type OrderRow = {
   id: string
   user_id: string | null
@@ -100,6 +104,16 @@ function extractAppOrderId(raw: unknown) {
     return undefined
   }
 
+  const extractFromDescription = (value: unknown) => {
+    const text = asString(value)
+    if (!text) {
+      return undefined
+    }
+
+    const match = text.match(/ORD-\d+/i)
+    return match?.[0]?.toUpperCase()
+  }
+
   const directNotes = isRecord(raw.notes) ? raw.notes : undefined
   const direct = asString(directNotes?.app_order_id)
   if (direct) {
@@ -110,7 +124,17 @@ function extractAppOrderId(raw: unknown) {
   const payment = payload && isRecord(payload.payment) ? payload.payment : undefined
   const entity = payment && isRecord(payment.entity) ? payment.entity : undefined
   const entityNotes = entity && isRecord(entity.notes) ? entity.notes : undefined
-  return asString(entityNotes?.app_order_id)
+  const fromEntityNotes = asString(entityNotes?.app_order_id)
+  if (fromEntityNotes) {
+    return fromEntityNotes
+  }
+
+  const fromEntityDescription = extractFromDescription(entity?.description)
+  if (fromEntityDescription) {
+    return fromEntityDescription
+  }
+
+  return extractFromDescription(raw.description)
 }
 
 function normalizePaymentRow(row: PaymentRow): NormalizedPayment {
@@ -543,13 +567,55 @@ export async function sendDailySnapshotEmailNow(options: OrderExportOptions): Pr
     body: options,
   })
 
+  if (!error && data?.ok) {
+    return { success: true }
+  }
+
+  // Fallback to direct HTTP call when functions.invoke transport fails in some browser/network setups.
+  if (supabaseUrl && supabaseAnonKey) {
+    const sessionResult = await supabase.auth.getSession()
+    const accessToken = sessionResult.data.session?.access_token
+
+    if (accessToken) {
+      try {
+        const response = await fetch(`${supabaseUrl}/functions/v1/daily-orders-snapshot`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            apikey: supabaseAnonKey,
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify(options),
+        })
+
+        const payload = await response.json().catch(() => ({})) as { ok?: boolean; error?: string }
+        if (response.ok && payload.ok) {
+          return { success: true }
+        }
+
+        return {
+          success: false,
+          error: String(payload.error ?? `Snapshot email API failed (${response.status}).`),
+        }
+      } catch (fetchError) {
+        return {
+          success: false,
+          error: fetchError instanceof Error ? fetchError.message : "Failed to send request to snapshot API.",
+        }
+      }
+    }
+  }
+
   if (error) {
-    return { success: false, error: error.message }
+    return {
+      success: false,
+      error: error.message || "Failed to send a request to the Edge Function. Please sign out/in and retry.",
+    }
   }
 
   if (!data?.ok) {
     return { success: false, error: String(data?.error ?? "Failed to send snapshot email.") }
   }
 
-  return { success: true }
+  return { success: false, error: "Failed to send snapshot email." }
 }

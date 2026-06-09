@@ -56,7 +56,6 @@ import {
   type OrderExportFormat,
   type OrderExportRange,
 } from "@/lib/admin-order-export"
-import { downloadAdminOrdersCsv } from "@/lib/admin-order-export"
 
 type EditableProduct = {
   id: string
@@ -864,6 +863,83 @@ export function AdminPanel({ orders = [], runtimeMode = "prod" }: AdminPanelProp
     <div className="space-y-6">
       <Card>
         <CardHeader>
+          <CardTitle>Priority Queue: Order Export and Email Snapshot</CardTitle>
+          <CardDescription>
+            Use this first for quick backups and instant snapshot emails.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="rounded-lg border p-3 space-y-3">
+            <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+              <div>
+                <Label>Export Range</Label>
+                <select
+                  className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+                  value={exportRange}
+                  onChange={(event) => setExportRange(event.target.value as OrderExportRange)}
+                >
+                  <option value="today">Today</option>
+                  <option value="week">This Week</option>
+                  <option value="month">This Month</option>
+                  <option value="custom">Custom Date Range</option>
+                  <option value="all">All</option>
+                </select>
+              </div>
+
+              <div>
+                <Label>CSV Layout</Label>
+                <select
+                  className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+                  value={exportFormat}
+                  onChange={(event) => setExportFormat(event.target.value as OrderExportFormat)}
+                >
+                  <option value="order-summary">Order Summary (1 row per order)</option>
+                  <option value="line-item">Line Items (1 row per product)</option>
+                </select>
+              </div>
+
+              <div>
+                <Label>Start Date</Label>
+                <Input
+                  type="date"
+                  value={customExportStartDate}
+                  onChange={(event) => setCustomExportStartDate(event.target.value)}
+                  disabled={exportRange !== "custom"}
+                />
+              </div>
+
+              <div>
+                <Label>End Date</Label>
+                <Input
+                  type="date"
+                  value={customExportEndDate}
+                  onChange={(event) => setCustomExportEndDate(event.target.value)}
+                  disabled={exportRange !== "custom"}
+                />
+              </div>
+            </div>
+
+            <div className="flex flex-wrap justify-end gap-2">
+              <Button
+                variant="outline"
+                onClick={handleDownloadOrdersCsv}
+                disabled={isDownloadingOrdersCsv}
+              >
+                {isDownloadingOrdersCsv ? "Preparing CSV..." : "Download Orders CSV"}
+              </Button>
+              <Button
+                onClick={handleSendSnapshotEmail}
+                disabled={isSendingSnapshotEmail}
+              >
+                {isSendingSnapshotEmail ? "Sending..." : "Email Snapshot Now"}
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
           <CardTitle>Admin Notifications</CardTitle>
           <CardDescription>New user signups and new orders appear here with quick WhatsApp and email actions.</CardDescription>
         </CardHeader>
@@ -1313,73 +1389,6 @@ export function AdminPanel({ orders = [], runtimeMode = "prod" }: AdminPanelProp
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="mb-4 rounded-lg border p-3 space-y-3">
-            <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
-              <div>
-                <Label>Export Range</Label>
-                <select
-                  className="h-9 w-full rounded-md border bg-background px-3 text-sm"
-                  value={exportRange}
-                  onChange={(event) => setExportRange(event.target.value as OrderExportRange)}
-                >
-                  <option value="today">Today</option>
-                  <option value="week">This Week</option>
-                  <option value="month">This Month</option>
-                  <option value="custom">Custom Date Range</option>
-                  <option value="all">All</option>
-                </select>
-              </div>
-
-              <div>
-                <Label>CSV Layout</Label>
-                <select
-                  className="h-9 w-full rounded-md border bg-background px-3 text-sm"
-                  value={exportFormat}
-                  onChange={(event) => setExportFormat(event.target.value as OrderExportFormat)}
-                >
-                  <option value="order-summary">Order Summary (1 row per order)</option>
-                  <option value="line-item">Line Items (1 row per product)</option>
-                </select>
-              </div>
-
-              <div>
-                <Label>Start Date</Label>
-                <Input
-                  type="date"
-                  value={customExportStartDate}
-                  onChange={(event) => setCustomExportStartDate(event.target.value)}
-                  disabled={exportRange !== "custom"}
-                />
-              </div>
-
-              <div>
-                <Label>End Date</Label>
-                <Input
-                  type="date"
-                  value={customExportEndDate}
-                  onChange={(event) => setCustomExportEndDate(event.target.value)}
-                  disabled={exportRange !== "custom"}
-                />
-              </div>
-            </div>
-
-            <div className="flex flex-wrap justify-end gap-2">
-              <Button
-                variant="outline"
-                onClick={handleDownloadOrdersCsv}
-                disabled={isDownloadingOrdersCsv}
-              >
-                {isDownloadingOrdersCsv ? "Preparing CSV..." : "Download Orders CSV"}
-              </Button>
-              <Button
-                onClick={handleSendSnapshotEmail}
-                disabled={isSendingSnapshotEmail}
-              >
-                {isSendingSnapshotEmail ? "Sending..." : "Email Snapshot Now"}
-              </Button>
-            </div>
-          </div>
-
           {orders.length === 0 ? (
             <p className="text-sm text-muted-foreground">No orders available yet.</p>
           ) : (

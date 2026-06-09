@@ -176,6 +176,16 @@ function extractAppOrderId(raw: unknown) {
     return undefined
   }
 
+  const extractFromDescription = (value: unknown) => {
+    const text = asString(value)
+    if (!text) {
+      return undefined
+    }
+
+    const match = text.match(/ORD-\d+/i)
+    return match?.[0]?.toUpperCase()
+  }
+
   const directNotes = isRecord(raw.notes) ? raw.notes : undefined
   const direct = asString(directNotes?.app_order_id)
   if (direct) {
@@ -186,7 +196,17 @@ function extractAppOrderId(raw: unknown) {
   const payment = payload && isRecord(payload.payment) ? payload.payment : undefined
   const entity = payment && isRecord(payment.entity) ? payment.entity : undefined
   const entityNotes = entity && isRecord(entity.notes) ? entity.notes : undefined
-  return asString(entityNotes?.app_order_id)
+  const fromEntityNotes = asString(entityNotes?.app_order_id)
+  if (fromEntityNotes) {
+    return fromEntityNotes
+  }
+
+  const fromEntityDescription = extractFromDescription(entity?.description)
+  if (fromEntityDescription) {
+    return fromEntityDescription
+  }
+
+  return extractFromDescription(raw.description)
 }
 
 function normalizePaymentRow(row: PaymentRow): NormalizedPayment {
