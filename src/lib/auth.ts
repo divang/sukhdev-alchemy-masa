@@ -509,6 +509,15 @@ export function subscribeToAuthStateChanges(callback: (state: AuthState) => void
       }
     }
 
+    // Update the UI immediately from auth metadata so account actions appear
+    // without waiting for the profiles table round-trip.
+    if (activeSession?.user) {
+      callback({
+        user: activeSession.user,
+        profile: buildProfileFromMetadata(activeSession.user),
+      })
+    }
+
     try {
       callback(await buildAuthState(activeSession))
     } catch (error) {

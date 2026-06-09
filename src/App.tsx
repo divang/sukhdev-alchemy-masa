@@ -1319,6 +1319,28 @@ function App() {
               </a>
             ))}
           </div>
+
+          <div className="mt-3 hidden sm:flex items-center gap-2">
+            <div className="flex h-10 flex-1 items-center rounded-full border bg-background px-3">
+              <input
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                placeholder="Search products"
+                className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+                aria-label="Search products"
+              />
+            </div>
+            {searchQuery && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setSearchQuery("")}
+              >
+                Clear
+              </Button>
+            )}
+          </div>
           </div>
         </div>
       </header>
