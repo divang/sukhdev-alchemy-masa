@@ -50,6 +50,7 @@ import {
   triggerShipmentForOrderByAdmin,
   type AdminOrderShipment,
 } from "@/lib/order-shipments"
+import { downloadAdminOrdersCsv } from "@/lib/admin-order-export"
 
 type EditableProduct = {
   id: string
@@ -125,6 +126,7 @@ export function AdminPanel({ orders = [], runtimeMode = "prod" }: AdminPanelProp
   const [isSavingShiprocketFlag, setIsSavingShiprocketFlag] = useState(false)
   const [isSavingRawCategory, setIsSavingRawCategory] = useState(false)
   const [shipmentLogs, setShipmentLogs] = useState<AdminOrderShipment[]>([])
+  const [isDownloadingOrdersCsv, setIsDownloadingOrdersCsv] = useState(false)
   const [triggeringShipmentOrderId, setTriggeringShipmentOrderId] = useState<string | null>(null)
   const [syncingAwbOrderId, setSyncingAwbOrderId] = useState<string | null>(null)
   const [notifications, setNotifications] = useState<AdminNotification[]>([])
@@ -811,6 +813,19 @@ export function AdminPanel({ orders = [], runtimeMode = "prod" }: AdminPanelProp
     toast.success("Product created successfully.")
   }
 
+  const handleDownloadOrdersCsv = async () => {
+    setIsDownloadingOrdersCsv(true)
+    const result = await downloadAdminOrdersCsv()
+    setIsDownloadingOrdersCsv(false)
+
+    if (!result.success) {
+      toast.error(result.error ?? "Failed to export orders CSV.")
+      return
+    }
+
+    toast.success(`Orders CSV downloaded (${result.rowCount ?? 0} rows).`)
+  }
+
   return (
     <div className="space-y-6">
       <Card>
@@ -1264,6 +1279,16 @@ export function AdminPanel({ orders = [], runtimeMode = "prod" }: AdminPanelProp
           </CardDescription>
         </CardHeader>
         <CardContent>
+          <div className="mb-4 flex justify-end">
+            <Button
+              variant="outline"
+              onClick={handleDownloadOrdersCsv}
+              disabled={isDownloadingOrdersCsv}
+            >
+              {isDownloadingOrdersCsv ? "Preparing CSV..." : "Download Orders CSV"}
+            </Button>
+          </div>
+
           {orders.length === 0 ? (
             <p className="text-sm text-muted-foreground">No orders available yet.</p>
           ) : (
