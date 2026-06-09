@@ -817,6 +817,7 @@ function App() {
         mode={authMode}
         onBack={handleBackToStore}
         onAuthenticated={handleAuthenticated}
+        autoStartGoogleOnOpen={authMode === "customer"}
       />
     )
   }
@@ -828,6 +829,7 @@ function App() {
           mode="customer"
           onBack={handleBackToStore}
           onAuthenticated={handleAuthenticated}
+          autoStartGoogleOnOpen={true}
         />
       )
     }
@@ -848,6 +850,7 @@ function App() {
           mode="customer"
           onBack={handleBackToStore}
           onAuthenticated={handleAuthenticated}
+          autoStartGoogleOnOpen={true}
         />
       )
     }
@@ -996,6 +999,7 @@ function App() {
           mode="customer"
           onBack={handleBackToStore}
           onAuthenticated={handleAuthenticated}
+          autoStartGoogleOnOpen={true}
         />
       )
     }
