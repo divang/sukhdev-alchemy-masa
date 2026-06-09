@@ -34,6 +34,32 @@ type ShipmentAttemptResult = {
   trackingUrl?: string
 }
 
+function parsePrefixList(raw: string | undefined) {
+  return String(raw ?? "")
+    .split(",")
+    .map((entry) => entry.trim().replace(/\D/g, ""))
+    .filter(Boolean)
+}
+
+function shouldSkipShiprocketForSelfDelivery(order: PaidOrder) {
+  const enabled = String(Deno.env.get("SHIPROCKET_SKIP_SELF_DELIVERY") ?? "").trim().toLowerCase() === "true"
+  if (!enabled) {
+    return false
+  }
+
+  const prefixes = parsePrefixList(Deno.env.get("SHIPROCKET_SELF_DELIVERY_PIN_PREFIXES"))
+  if (!prefixes.length) {
+    return false
+  }
+
+  const pincodeDigits = String(order.customer.pincode ?? "").replace(/\D/g, "")
+  if (!pincodeDigits) {
+    return false
+  }
+
+  return prefixes.some((prefix) => pincodeDigits.startsWith(prefix))
+}
+
 async function isFeatureEnabled(client: SupabaseClient, key: string) {
   const { data, error } = await client
     .from("feature_flags")
@@ -114,6 +140,22 @@ export async function createShipmentForPaidOrder(client: SupabaseClient, order: 
   const featureEnabled = await isFeatureEnabled(client, "enable_shiprocket_integration")
   if (!featureEnabled) {
     return { attempted: false, created: false, reason: "feature_disabled" }
+  }
+
+  if (shouldSkipShiprocketForSelfDelivery(order)) {
+    await persistShipmentResult(client, {
+      orderId: order.id,
+      provider: "shiprocket",
+      status: "skipped",
+      errorMessage: "self_delivery_zone",
+    })
+
+    return {
+      attempted: false,
+      created: false,
+      provider: "shiprocket",
+      reason: "self_delivery_zone",
+    }
   }
 
   const activeProvider = await getActiveDeliveryPartner(client)

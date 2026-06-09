@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 import { corsHeaders, jsonResponse } from "../_shared/cors.ts"
+import { createShipmentForPaidOrder } from "../_shared/shipping.ts"
 
 type RazorpayWebhookEvent = {
   event?: string
@@ -17,11 +18,65 @@ type RazorpayWebhookEvent = {
   }
 }
 
+type OrderRow = {
+  id: string
+  user_id: string | null
+  customer_name: string
+  customer_email: string
+  customer_phone: string
+  customer_address: string
+  customer_city: string
+  customer_pincode: string
+  items: Array<{
+    productName?: string
+    quantity?: number
+    grams?: number
+    pricePerUnit?: number
+  }> | null
+  total_amount: number
+  payment_status: string
+}
+
 const supabaseUrl = Deno.env.get("SUPABASE_URL")
 const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")
 
 if (!supabaseUrl || !supabaseServiceRoleKey) {
   throw new Error("Missing required environment variables for razorpay-webhook function.")
+}
+
+function normalizeOrderId(rawValue: unknown) {
+  const value = String(rawValue ?? "").trim()
+  return value.startsWith("ORD-") ? value : ""
+}
+
+async function resolveAppOrderIdFromPendingOrder(
+  serviceClient: ReturnType<typeof createClient>,
+  userId: string,
+  amountPaise: number,
+) {
+  const amountRupees = Number((amountPaise / 100).toFixed(2))
+  const { data, error } = await serviceClient
+    .from("orders")
+    .select("id, total_amount, payment_status, created_at")
+    .eq("user_id", userId)
+    .eq("payment_status", "pending")
+    .order("created_at", { ascending: false })
+    .limit(8)
+
+  if (error || !data) {
+    return ""
+  }
+
+  const exactMatches = (data as Array<{ id?: string; total_amount?: number }>).filter((row) => {
+    const total = Number(row.total_amount ?? 0)
+    return Math.abs(total - amountRupees) < 0.01
+  })
+
+  if (exactMatches.length !== 1) {
+    return ""
+  }
+
+  return normalizeOrderId(exactMatches[0].id)
 }
 
 Deno.serve(async (req) => {
@@ -47,6 +102,7 @@ Deno.serve(async (req) => {
 
   const notes = payment.notes ?? {}
   const userId = String(notes.supabase_user_id ?? notes.user_id ?? "").trim()
+  const appOrderIdFromNotes = normalizeOrderId(notes.app_order_id)
   const entitlementKey = String(notes.entitlement_key ?? "one_time_basic_access").trim() || "one_time_basic_access"
 
   if (!userId) {
@@ -88,5 +144,62 @@ Deno.serve(async (req) => {
     return jsonResponse({ error: `access_entitlements upsert failed: ${entitlementError.message}` }, 500)
   }
 
-  return jsonResponse({ ok: true, granted: entitlementKey, userId })
+  let resolvedAppOrderId = appOrderIdFromNotes
+  if (!resolvedAppOrderId && userId) {
+    resolvedAppOrderId = await resolveAppOrderIdFromPendingOrder(serviceClient, userId, Number(payment.amount ?? 0))
+  }
+
+  if (resolvedAppOrderId) {
+    const { data: orderRow, error: orderFetchError } = await serviceClient
+      .from("orders")
+      .select("id, user_id, customer_name, customer_email, customer_phone, customer_address, customer_city, customer_pincode, items, total_amount, payment_status")
+      .eq("id", resolvedAppOrderId)
+      .maybeSingle()
+
+    if (!orderFetchError && orderRow) {
+      if (orderRow.payment_status !== "paid") {
+        await serviceClient
+          .from("orders")
+          .update({
+            payment_status: "paid",
+            status: "processing",
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", resolvedAppOrderId)
+      }
+
+      const shipmentResult = await createShipmentForPaidOrder(serviceClient, {
+        id: orderRow.id,
+        customer: {
+          name: orderRow.customer_name,
+          email: orderRow.customer_email,
+          phone: orderRow.customer_phone,
+          address: orderRow.customer_address,
+          city: orderRow.customer_city,
+          pincode: orderRow.customer_pincode,
+        },
+        items: ((orderRow as OrderRow).items ?? []).map((item) => ({
+          productName: String(item.productName ?? "Item"),
+          quantity: Number(item.quantity ?? 0),
+          grams: Number(item.grams ?? 0),
+          pricePerUnit: Number(item.pricePerUnit ?? 0),
+        })),
+        totalAmount: Number(orderRow.total_amount ?? 0),
+      })
+
+      console.log("[razorpay-webhook] order-reconciled", {
+        appOrderId: resolvedAppOrderId,
+        shipmentAttempted: shipmentResult.attempted,
+        shipmentCreated: shipmentResult.created,
+        shipmentReason: shipmentResult.reason ?? null,
+      })
+    }
+  }
+
+  return jsonResponse({
+    ok: true,
+    granted: entitlementKey,
+    userId,
+    appOrderId: resolvedAppOrderId || null,
+  })
 })

@@ -87,6 +87,10 @@ Deno.serve(async (req) => {
       amount,
       currency,
       receipt,
+      notes: {
+        supabase_user_id: auth.user!.id,
+        app_order_id: String(payload.appOrderId ?? "").trim(),
+      },
     }),
   })
 
