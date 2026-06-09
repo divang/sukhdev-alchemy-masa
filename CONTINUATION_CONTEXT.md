@@ -401,6 +401,18 @@ Apply in this order:
 16. supabase/sql/016_promo_code_assignment_and_bound_redeem.sql
 17. supabase/sql/017_promo_code_assignment_columns_backfill.sql
 18. supabase/sql/018_auth_audit_logging_and_profile_trigger.sql
+19. supabase/sql/019_set_t10_unlimited_no_expiry.sql
+20. supabase/sql/020_delivery_partner_accounts.sql
+21. supabase/sql/021_shiprocket_feature_flag_and_order_shipments.sql
+22. supabase/sql/022_shiprocket_webhook_enrichment.sql
+23. supabase/sql/023_enable_raw_organic_spices_category.sql
+24. supabase/sql/024_seed_raw_organic_spice_products.sql
+25. supabase/sql/025_rename_premium_blended_masala_labels.sql
+26. supabase/sql/026_allow_anon_profile_reads_for_reviews.sql
+
+V2 additive migrations for isolated normalized-commerce rollout:
+27. supabase/sql/027_normalized_commerce_v2.sql
+28. supabase/sql/028_backfill_normalized_commerce_v2.sql
 
 ## Environment Configuration
 
@@ -555,6 +567,27 @@ Last updated: 2026-06-09 UTC
   - checkout pricing compute
   - payment verify endpoint ping
 5. Freeze non-critical releases during migration window.
+
+### V2 Preflight Checklist
+1. Confirm V2 Supabase project is separate from V1 production.
+2. Current local Supabase link observed in this workspace: `ndjztlhfhupvydozuski`.
+3. Treat `ndjztlhfhupvydozuski` as the existing V1/production project unless it is explicitly re-linked.
+4. Do not apply V2 migrations 027/028 to `ndjztlhfhupvydozuski`.
+5. Apply migrations through [supabase/sql/028_backfill_normalized_commerce_v2.sql](supabase/sql/028_backfill_normalized_commerce_v2.sql) on V2 only.
+6. Verify required tables exist in V2:
+  - orders
+  - order_items
+  - product_prices
+  - product_discounts
+  - billing_payments
+  - access_entitlements
+  - order_refunds
+  - order_refund_items
+7. Verify backfill counts:
+  - every legacy order with items has at least one order_items row
+  - every product has version 1 in product_prices
+8. Verify order totals and payment mappings using the validation queries in this file.
+9. Keep V1 traffic and webhook endpoints unchanged until V2 dark-launch testing passes.
 
 ### Step-by-Step Migration Plan
 
