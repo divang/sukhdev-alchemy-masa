@@ -1,4 +1,4 @@
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -102,6 +102,9 @@ export function ProductDetailDialog({ product, currentUser, canReview, open, onO
       <DialogContent className="max-w-[calc(100vw-1rem)] sm:max-w-3xl max-h-[95svh] sm:max-h-[90vh] overflow-x-hidden overflow-y-auto p-4 sm:p-6 pb-[calc(1rem+env(safe-area-inset-bottom))]">
         <DialogHeader>
           <DialogTitle className="text-xl sm:text-2xl pr-8">{product.name}</DialogTitle>
+          <DialogDescription className="text-sm text-muted-foreground pr-8">
+            View ingredients, reviews, and pack details. Close this panel to continue browsing.
+          </DialogDescription>
         </DialogHeader>
         
         <div className="grid md:grid-cols-2 gap-6">
@@ -169,14 +172,24 @@ export function ProductDetailDialog({ product, currentUser, canReview, open, onO
                   </p>
                 )}
                 
-                <Button 
-                  className="w-full" 
-                  size="lg"
-                  onClick={handleAddToCart}
-                >
-                  <ShoppingCart size={20} className="mr-2" />
-                  Add to Cart
-                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    className="flex-1"
+                    size="lg"
+                    onClick={handleAddToCart}
+                  >
+                    <ShoppingCart size={20} className="mr-2" />
+                    Add to Cart
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="lg"
+                    onClick={() => onOpenChange(false)}
+                  >
+                    Close
+                  </Button>
+                </div>
               </div>
             </div>
             
