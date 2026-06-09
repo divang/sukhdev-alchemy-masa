@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 import { corsHeaders, jsonResponse } from "../_shared/cors.ts"
+import { fetchNormalizedOrderItems, preferNormalizedItems } from "../_shared/order-items.ts"
 import { createShipmentForPaidOrder } from "../_shared/shipping.ts"
 
 type CreateShipmentPayload = {
@@ -117,6 +118,8 @@ Deno.serve(async (req) => {
     return jsonResponse({ error: "Shipment can be created only for paid orders." }, 400)
   }
 
+  const normalizedItemsByOrder = await fetchNormalizedOrderItems(serviceClient, [orderRow.id])
+
   const result = await createShipmentForPaidOrder(serviceClient, {
     id: orderRow.id,
     customer: {
@@ -127,12 +130,7 @@ Deno.serve(async (req) => {
       city: orderRow.customer_city,
       pincode: orderRow.customer_pincode,
     },
-    items: ((orderRow as OrderRow).items ?? []).map((item) => ({
-      productName: String(item.productName ?? "Item"),
-      quantity: Number(item.quantity ?? 0),
-      grams: Number(item.grams ?? 0),
-      pricePerUnit: Number(item.pricePerUnit ?? 0),
-    })),
+    items: preferNormalizedItems(orderRow.id, normalizedItemsByOrder, (orderRow as OrderRow).items),
     totalAmount: Number(orderRow.total_amount ?? 0),
   })
 

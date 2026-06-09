@@ -413,6 +413,7 @@ Apply in this order:
 V2 additive migrations for isolated normalized-commerce rollout:
 27. supabase/sql/027_normalized_commerce_v2.sql
 28. supabase/sql/028_backfill_normalized_commerce_v2.sql
+29. supabase/sql/029_cutover_order_items_read_model.sql
 
 ## Environment Configuration
 
@@ -722,6 +723,26 @@ having count(*) > 5;
 3. Remove legacy read paths from app code.
 4. Drop deprecated columns/tables in a separate maintenance release.
 5. Keep rollback artifact for one additional release cycle.
+
+## V2 Cutover Status
+
+Last updated: 2026-06-09 UTC
+
+Applied on linked project `ndjztlhfhupvydozuski`:
+- 20260609211000_normalized_commerce_v2.sql
+- 20260609211100_backfill_normalized_commerce_v2.sql
+- 20260609221500_cutover_order_items_read_model.sql
+
+Current read model status:
+- Client order reads now prefer `public.order_items` and fall back to `orders.items` only when normalized rows are absent.
+- Review purchase verification now checks paid `order_items` instead of legacy `orders.items`.
+- Admin CSV export and daily snapshot now prefer normalized line items.
+- Payment verification, Razorpay webhook shipment creation, admin shipment creation, and order notifications now prefer normalized line items.
+- DB trigger `sync_order_items_from_legacy_order()` keeps `order_items` synchronized for any remaining legacy writes.
+
+Remaining legacy footprint:
+- `orders.items` is still present as a compatibility shadow and should not be dropped yet.
+- Some UI/server code still carries fallback handling for legacy rows; remove only after one stable validation window.
 
 Admins:
 

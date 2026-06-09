@@ -214,8 +214,8 @@ type SubmitReviewResult = {
   error?: string
 }
 
-type PurchasedOrderRow = {
-  items: Array<{ productId?: string }>
+type PurchasedOrderItemRow = {
+  product_id: string | null
 }
 
 async function hasPaidPurchaseForProduct(userId: string, productId: string) {
@@ -223,19 +223,33 @@ async function hasPaidPurchaseForProduct(userId: string, productId: string) {
     return { canReview: false, error: "Supabase is not configured." }
   }
 
-  const { data, error } = await supabase
+  const { data: ordersData, error: ordersError } = await supabase
     .from("orders")
-    .select("items")
+    .select("id")
     .eq("user_id", userId)
     .eq("payment_status", "paid")
+
+  if (ordersError) {
+    return { canReview: false, error: ordersError.message }
+  }
+
+  const orderIds = ((ordersData as Array<{ id: string }> | null) ?? []).map((row) => row.id)
+  if (orderIds.length === 0) {
+    return { canReview: false }
+  }
+
+  const { data, error } = await supabase
+    .from("order_items")
+    .select("product_id")
+    .in("order_id", orderIds)
+    .eq("product_id", productId)
+    .limit(1)
 
   if (error) {
     return { canReview: false, error: error.message }
   }
 
-  const canReview = ((data as PurchasedOrderRow[] | null) ?? []).some((order) =>
-    Array.isArray(order.items) && order.items.some((item) => item.productId === productId)
-  )
+  const canReview = (((data as PurchasedOrderItemRow[] | null) ?? []).length > 0)
 
   return { canReview }
 }

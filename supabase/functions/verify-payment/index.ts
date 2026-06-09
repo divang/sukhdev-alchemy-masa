@@ -1,6 +1,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 import { corsHeaders, jsonResponse } from "../_shared/cors.ts"
 import { sendOrderNotifications } from "../_shared/order-notifications.ts"
+import { fetchNormalizedOrderItems, preferNormalizedItems } from "../_shared/order-items.ts"
 import { createShipmentForPaidOrder } from "../_shared/shipping.ts"
 
 type VerifyPaymentPayload = {
@@ -159,6 +160,7 @@ Deno.serve(async (req) => {
   const currency = String((paymentPayload as { currency?: string }).currency ?? "INR").toUpperCase()
 
   const paymentRecord = {
+    order_id: appOrderId || null,
     user_id: auth.user!.id,
     amount,
     currency,
@@ -196,6 +198,7 @@ Deno.serve(async (req) => {
       .maybeSingle()
 
     if (!orderFetchError && orderRow) {
+      const normalizedItemsByOrder = await fetchNormalizedOrderItems(serviceClient, [orderRow.id])
       const mappedOrder = {
         id: orderRow.id,
         customer: {
@@ -206,12 +209,7 @@ Deno.serve(async (req) => {
           city: orderRow.customer_city,
           pincode: orderRow.customer_pincode,
         },
-        items: ((orderRow as OrderRow).items ?? []).map((item) => ({
-          productName: String(item.productName ?? "Item"),
-          quantity: Number(item.quantity ?? 0),
-          grams: Number(item.grams ?? 0),
-          pricePerUnit: Number(item.pricePerUnit ?? 0),
-        })),
+        items: preferNormalizedItems(orderRow.id, normalizedItemsByOrder, (orderRow as OrderRow).items),
         totalAmount: Number(orderRow.total_amount ?? 0),
         paymentStatus: "paid",
         status: "processing",

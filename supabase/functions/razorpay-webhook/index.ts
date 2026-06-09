@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 import { corsHeaders, jsonResponse } from "../_shared/cors.ts"
+import { fetchNormalizedOrderItems, preferNormalizedItems } from "../_shared/order-items.ts"
 import { createShipmentForPaidOrder } from "../_shared/shipping.ts"
 
 type RazorpayWebhookEvent = {
@@ -111,10 +112,16 @@ Deno.serve(async (req) => {
 
   const serviceClient = createClient(supabaseUrl!, supabaseServiceRoleKey!)
 
+  let resolvedAppOrderId = appOrderIdFromNotes
+  if (!resolvedAppOrderId && userId) {
+    resolvedAppOrderId = await resolveAppOrderIdFromPendingOrder(serviceClient, userId, Number(payment.amount ?? 0))
+  }
+
   const { error: paymentError } = await serviceClient
     .from("billing_payments")
     .upsert(
       {
+        order_id: resolvedAppOrderId || null,
         user_id: userId,
         amount: Number(payment.amount),
         currency: String(payment.currency).toUpperCase(),
@@ -144,11 +151,6 @@ Deno.serve(async (req) => {
     return jsonResponse({ error: `access_entitlements upsert failed: ${entitlementError.message}` }, 500)
   }
 
-  let resolvedAppOrderId = appOrderIdFromNotes
-  if (!resolvedAppOrderId && userId) {
-    resolvedAppOrderId = await resolveAppOrderIdFromPendingOrder(serviceClient, userId, Number(payment.amount ?? 0))
-  }
-
   if (resolvedAppOrderId) {
     const { data: orderRow, error: orderFetchError } = await serviceClient
       .from("orders")
@@ -157,6 +159,7 @@ Deno.serve(async (req) => {
       .maybeSingle()
 
     if (!orderFetchError && orderRow) {
+      const normalizedItemsByOrder = await fetchNormalizedOrderItems(serviceClient, [orderRow.id])
       if (orderRow.payment_status !== "paid") {
         await serviceClient
           .from("orders")
@@ -178,12 +181,7 @@ Deno.serve(async (req) => {
           city: orderRow.customer_city,
           pincode: orderRow.customer_pincode,
         },
-        items: ((orderRow as OrderRow).items ?? []).map((item) => ({
-          productName: String(item.productName ?? "Item"),
-          quantity: Number(item.quantity ?? 0),
-          grams: Number(item.grams ?? 0),
-          pricePerUnit: Number(item.pricePerUnit ?? 0),
-        })),
+        items: preferNormalizedItems(orderRow.id, normalizedItemsByOrder, (orderRow as OrderRow).items),
         totalAmount: Number(orderRow.total_amount ?? 0),
       })
 

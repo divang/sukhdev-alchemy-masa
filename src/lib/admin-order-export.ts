@@ -36,6 +36,16 @@ type OrderRow = {
   updated_at: string
 }
 
+type OrderItemRow = {
+  order_id: string
+  product_id: string | null
+  product_name: string
+  quantity: number
+  pack_grams: number
+  unit_price: number
+  line_total: number | null
+}
+
 type ShipmentRow = {
   order_id: string
   provider_key: string
@@ -79,9 +89,27 @@ type CsvBuildResult = {
 type AdminExportData = {
   error?: string
   orders: OrderRow[]
+  itemsByOrder: Map<string, OrderRow["items"]>
   shipmentByOrder: Map<string, ShipmentRow>
   paymentByOrder: Map<string, NormalizedPayment>
   paymentByUser: Map<string, NormalizedPayment>
+}
+
+function buildItemsByOrder(rows: OrderItemRow[] | null) {
+  const itemsByOrder = new Map<string, OrderRow["items"]>()
+
+  for (const row of rows ?? []) {
+    const items = itemsByOrder.get(row.order_id) ?? []
+    items.push({
+      productName: row.product_name,
+      quantity: Number(row.quantity ?? 0),
+      grams: Number(row.pack_grams ?? 0),
+      pricePerUnit: Number(row.unit_price ?? 0),
+    })
+    itemsByOrder.set(row.order_id, items)
+  }
+
+  return itemsByOrder
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -166,6 +194,19 @@ function csvEscape(value: unknown) {
     return `"${normalized.replace(/"/g, '""')}"`
   }
   return normalized
+}
+
+function formatPaymentAmount(amount: number | undefined, currency: string | undefined) {
+  if (amount == null) {
+    return ""
+  }
+
+  const normalizedCurrency = String(currency ?? "").toUpperCase()
+  if (normalizedCurrency === "INR") {
+    return (Number(amount) / 100).toFixed(2)
+  }
+
+  return Number(amount).toFixed(2)
 }
 
 function formatItems(items: OrderRow["items"]) {
@@ -318,7 +359,7 @@ function buildOrderSummaryCsv(
       payment?.razorpayPaymentId ?? "",
       payment?.razorpayOrderId ?? "",
       payment?.status ?? "",
-      payment?.amount != null ? Number(payment.amount).toFixed(2) : "",
+      formatPaymentAmount(payment?.amount, payment?.currency),
       payment?.currency ?? "",
       payment?.createdAt ?? "",
       shipment?.provider_key ?? "",
@@ -450,18 +491,24 @@ async function fetchAdminExportData() {
     return {
       error: "Supabase is not configured.",
       orders: [],
+      itemsByOrder: new Map<string, OrderRow["items"]>(),
       shipmentByOrder: new Map<string, ShipmentRow>(),
       paymentByOrder: new Map<string, NormalizedPayment>(),
       paymentByUser: new Map<string, NormalizedPayment>(),
     } satisfies AdminExportData
   }
 
-  const [ordersResult, shipmentsResult, paymentsResult] = await Promise.all([
+  const [ordersResult, orderItemsResult, shipmentsResult, paymentsResult] = await Promise.all([
     supabase
       .from("orders")
       .select("id, user_id, customer_name, customer_email, customer_phone, customer_address, customer_city, customer_pincode, items, total_amount, status, payment_status, created_at, updated_at")
       .order("created_at", { ascending: false })
       .limit(5000),
+    supabase
+      .from("order_items")
+      .select("order_id, product_id, product_name, quantity, pack_grams, unit_price, line_total")
+      .order("created_at", { ascending: true })
+      .limit(20000),
     supabase
       .from("order_shipments")
       .select("order_id, provider_key, shipment_status, shipment_id, awb_code, tracking_url, external_status, external_event_at, error_message, created_at")
@@ -478,6 +525,17 @@ async function fetchAdminExportData() {
     return {
       error: ordersResult.error.message,
       orders: [],
+      itemsByOrder: new Map<string, OrderRow["items"]>(),
+      shipmentByOrder: new Map<string, ShipmentRow>(),
+      paymentByOrder: new Map<string, NormalizedPayment>(),
+      paymentByUser: new Map<string, NormalizedPayment>(),
+    } satisfies AdminExportData
+  }
+  if (orderItemsResult.error) {
+    return {
+      error: orderItemsResult.error.message,
+      orders: [],
+      itemsByOrder: new Map<string, OrderRow["items"]>(),
       shipmentByOrder: new Map<string, ShipmentRow>(),
       paymentByOrder: new Map<string, NormalizedPayment>(),
       paymentByUser: new Map<string, NormalizedPayment>(),
@@ -487,6 +545,7 @@ async function fetchAdminExportData() {
     return {
       error: shipmentsResult.error.message,
       orders: [],
+      itemsByOrder: new Map<string, OrderRow["items"]>(),
       shipmentByOrder: new Map<string, ShipmentRow>(),
       paymentByOrder: new Map<string, NormalizedPayment>(),
       paymentByUser: new Map<string, NormalizedPayment>(),
@@ -496,6 +555,7 @@ async function fetchAdminExportData() {
     return {
       error: paymentsResult.error.message,
       orders: [],
+      itemsByOrder: new Map<string, OrderRow["items"]>(),
       shipmentByOrder: new Map<string, ShipmentRow>(),
       paymentByOrder: new Map<string, NormalizedPayment>(),
       paymentByUser: new Map<string, NormalizedPayment>(),
@@ -503,6 +563,7 @@ async function fetchAdminExportData() {
   }
 
   const orders = (ordersResult.data as OrderRow[] | null) ?? []
+  const itemsByOrder = buildItemsByOrder((orderItemsResult.data as OrderItemRow[] | null) ?? [])
   const shipments = (shipmentsResult.data as ShipmentRow[] | null) ?? []
   const payments = ((paymentsResult.data as PaymentRow[] | null) ?? []).map(normalizePaymentRow)
 
@@ -533,6 +594,7 @@ async function fetchAdminExportData() {
 
   return {
     orders,
+    itemsByOrder,
     shipmentByOrder,
     paymentByOrder,
     paymentByUser,
@@ -546,9 +608,14 @@ export async function downloadAdminOrdersCsv(options: OrderExportOptions): Promi
   }
 
   const filteredOrders = filterOrdersByRange(result.orders, options)
+  const normalizedOrders = filteredOrders.map((order) => ({
+    ...order,
+    items: result.itemsByOrder.get(order.id) ?? order.items,
+  }))
+
   const csvResult = options.format === "line-item"
-    ? buildLineItemCsv(filteredOrders, result.shipmentByOrder, result.paymentByOrder, result.paymentByUser)
-    : buildOrderSummaryCsv(filteredOrders, result.shipmentByOrder, result.paymentByOrder, result.paymentByUser)
+    ? buildLineItemCsv(normalizedOrders, result.shipmentByOrder, result.paymentByOrder, result.paymentByUser)
+    : buildOrderSummaryCsv(normalizedOrders, result.shipmentByOrder, result.paymentByOrder, result.paymentByUser)
 
   const prefix = options.format === "line-item"
     ? "sukhdevi-orders-line-items"
@@ -558,7 +625,13 @@ export async function downloadAdminOrdersCsv(options: OrderExportOptions): Promi
   return { success: true, rowCount: csvResult.rowCount }
 }
 
-export async function sendDailySnapshotEmailNow(options: OrderExportOptions): Promise<{ success: boolean; error?: string }> {
+export async function sendDailySnapshotEmailNow(options: OrderExportOptions): Promise<{
+  success: boolean
+  error?: string
+  recipients?: string[]
+  rowCount?: number
+  fileName?: string
+}> {
   if (!supabase || !isSupabaseConfigured) {
     return { success: false, error: "Supabase is not configured." }
   }
@@ -568,7 +641,12 @@ export async function sendDailySnapshotEmailNow(options: OrderExportOptions): Pr
   })
 
   if (!error && data?.ok) {
-    return { success: true }
+    return {
+      success: true,
+      recipients: Array.isArray(data?.recipients) ? data.recipients.map((entry: unknown) => String(entry)) : undefined,
+      rowCount: typeof data?.rowCount === "number" ? data.rowCount : undefined,
+      fileName: typeof data?.fileName === "string" ? data.fileName : undefined,
+    }
   }
 
   // Fallback to direct HTTP call when functions.invoke transport fails in some browser/network setups.
@@ -588,9 +666,20 @@ export async function sendDailySnapshotEmailNow(options: OrderExportOptions): Pr
           body: JSON.stringify(options),
         })
 
-        const payload = await response.json().catch(() => ({})) as { ok?: boolean; error?: string }
+        const payload = await response.json().catch(() => ({})) as {
+          ok?: boolean
+          error?: string
+          recipients?: unknown[]
+          rowCount?: number
+          fileName?: string
+        }
         if (response.ok && payload.ok) {
-          return { success: true }
+          return {
+            success: true,
+            recipients: Array.isArray(payload?.recipients) ? payload.recipients.map((entry: unknown) => String(entry)) : undefined,
+            rowCount: typeof payload?.rowCount === "number" ? payload.rowCount : undefined,
+            fileName: typeof payload?.fileName === "string" ? payload.fileName : undefined,
+          }
         }
 
         return {

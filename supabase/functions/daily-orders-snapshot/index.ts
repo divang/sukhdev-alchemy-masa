@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 import { corsHeaders, jsonResponse } from "../_shared/cors.ts"
+import { fetchNormalizedOrderItems, preferNormalizedItems } from "../_shared/order-items.ts"
 
 type ExportRange = "today" | "week" | "month" | "custom" | "all"
 type ExportFormat = "order-summary" | "line-item"
@@ -32,6 +33,13 @@ type OrderRow = {
   payment_status: string
   created_at: string
   updated_at: string
+}
+
+function hydrateOrdersWithNormalizedItems(orders, normalizedItemsByOrder) {
+  return orders.map((order) => ({
+    ...order,
+    items: preferNormalizedItems(order.id, normalizedItemsByOrder, order.items),
+  }))
 }
 
 type ShipmentRow = {
@@ -240,6 +248,19 @@ function csvEscape(value: unknown) {
   return normalized
 }
 
+function formatPaymentAmount(amount: number | undefined, currency: string | undefined) {
+  if (amount == null) {
+    return ""
+  }
+
+  const normalizedCurrency = String(currency ?? "").toUpperCase()
+  if (normalizedCurrency === "INR") {
+    return (Number(amount) / 100).toFixed(2)
+  }
+
+  return Number(amount).toFixed(2)
+}
+
 function formatItems(items: OrderRow["items"]) {
   if (!items || items.length === 0) {
     return ""
@@ -365,7 +386,7 @@ function buildSummaryCsv(
       payment?.razorpayPaymentId ?? "",
       payment?.razorpayOrderId ?? "",
       payment?.status ?? "",
-      payment?.amount != null ? Number(payment.amount).toFixed(2) : "",
+      formatPaymentAmount(payment?.amount, payment?.currency),
       payment?.currency ?? "",
       payment?.createdAt ?? "",
       shipment?.provider_key ?? "",
@@ -562,6 +583,8 @@ Deno.serve(async (req) => {
   }
 
   const filteredOrders = filterOrdersByRange((ordersResult.data as OrderRow[] | null) ?? [], options)
+  const normalizedItemsByOrder = await fetchNormalizedOrderItems(serviceClient, filteredOrders.map((order) => order.id))
+  const hydratedOrders = hydrateOrdersWithNormalizedItems(filteredOrders, normalizedItemsByOrder)
   const shipments = (shipmentsResult.data as ShipmentRow[] | null) ?? []
   const payments = ((paymentsResult.data as PaymentRow[] | null) ?? []).map(normalizePaymentRow)
 
@@ -591,8 +614,8 @@ Deno.serve(async (req) => {
   }
 
   const csvResult = options.format === "line-item"
-    ? buildLineItemCsv(filteredOrders, shipmentByOrder, paymentByOrder, paymentByUser)
-    : buildSummaryCsv(filteredOrders, shipmentByOrder, paymentByOrder, paymentByUser)
+    ? buildLineItemCsv(hydratedOrders, shipmentByOrder, paymentByOrder, paymentByUser)
+    : buildSummaryCsv(hydratedOrders, shipmentByOrder, paymentByOrder, paymentByUser)
 
   const recipients = splitRecipients(recipientsCsv)
   const fileName = buildFileName(options.format ?? "order-summary")

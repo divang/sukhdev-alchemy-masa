@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { corsHeaders, jsonResponse } from "../_shared/cors.ts";
+import { fetchNormalizedOrderItems, preferNormalizedItems } from "../_shared/order-items.ts";
 import { sendOrderNotifications } from "../_shared/order-notifications.ts";
 function maskUserId(value) {
   const normalized = String(value ?? "");
@@ -45,7 +46,7 @@ async function getAuthenticatedUser(req) {
     user: data.user
   };
 }
-function mapOrderRow(row) {
+function mapOrderRow(row, normalizedItemsByOrder) {
   return {
     id: row.id,
     customer: {
@@ -56,12 +57,7 @@ function mapOrderRow(row) {
       city: row.customer_city,
       pincode: row.customer_pincode
     },
-    items: (row.items ?? []).map((item)=>({
-        productName: String(item.productName ?? "Item"),
-        quantity: Number(item.quantity ?? 0),
-        grams: Number(item.grams ?? 0),
-        pricePerUnit: Number(item.pricePerUnit ?? 0)
-      })),
+    items: preferNormalizedItems(row.id, normalizedItemsByOrder, row.items),
     totalAmount: Number(row.total_amount ?? 0),
     paymentStatus: row.payment_status,
     status: row.status,
@@ -130,6 +126,7 @@ Deno.serve(async (req)=>{
       error: "Order not found for current user."
     }, 404);
   }
+  const normalizedItemsByOrder = await fetchNormalizedOrderItems(serviceClient, [orderRow.id]);
   console.log("[order-notifications] order-found", {
     appOrderId,
     userId: maskUserId(auth.user.id),
@@ -138,7 +135,7 @@ Deno.serve(async (req)=>{
   });
   const result = await sendOrderNotifications({
     eventType,
-    order: mapOrderRow(orderRow),
+    order: mapOrderRow(orderRow, normalizedItemsByOrder),
     paymentDetails: payload.paymentDetails
   });
   console.log("[order-notifications] response-summary", {
