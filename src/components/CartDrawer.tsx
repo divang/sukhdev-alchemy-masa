@@ -31,8 +31,12 @@ export function CartDrawer({
   const [productImages] = useKV<Record<string, string>>("product-images", {})
 
   const getProduct = (productId: string) => products.find(p => p.id === productId)
-  
-  const cartSubtotal = calculateCartSubtotal(cartItems, products)
+
+  // Safety: if all cartItems reference missing products (stale cache), treat as empty
+  const hasAnyRenderable = cartItems.length === 0 || cartItems.some(item => Boolean(getProduct(item.productId)))
+  const effectiveItems = hasAnyRenderable ? cartItems : []
+
+  const cartSubtotal = calculateCartSubtotal(effectiveItems, products)
   const cartTotal = cartSubtotal
   
   return (
@@ -56,7 +60,7 @@ export function CartDrawer({
         )}
 
         <div className="flex-1 overflow-y-auto px-6 py-4">
-          {cartItems.length === 0 ? (
+          {effectiveItems.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-center">
               <ShoppingCart size={64} className="text-muted-foreground mb-4" />
               <p className="text-muted-foreground">Your cart is empty</p>
@@ -66,7 +70,7 @@ export function CartDrawer({
             </div>
           ) : (
             <div className="space-y-4">
-              {cartItems.map((item) => {
+              {effectiveItems.map((item) => {
                 const product = getProduct(item.productId)
                 if (!product) return null
                 const imageUrl = getProductImage(product, productImages ?? {})

@@ -154,17 +154,17 @@ function mergeCartSnapshots(localCart: CartItem[], persistedCart: CartItem[]) {
 }
 
 function normalizeCartItems(cartItems: CartItem[], products: Product[]) {
-  const normalized = cartItems.map((item) => {
-    const product = products.find((entry) => entry.id === item.productId)
-    if (!product) {
-      return item
-    }
-
-    return {
-      ...item,
-      grams: getProductPackGrams(product),
-    }
-  })
+  // Drop items whose product no longer exists — stale localStorage entries
+  // would otherwise render as null rows, making the cart appear blank.
+  const normalized = cartItems
+    .filter((item) => products.some((p) => p.id === item.productId))
+    .map((item) => {
+      const product = products.find((entry) => entry.id === item.productId)!
+      return {
+        ...item,
+        grams: getProductPackGrams(product),
+      }
+    })
 
   return canonicalizeCartItems(normalized)
 }
