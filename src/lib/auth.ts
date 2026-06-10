@@ -1057,89 +1057,32 @@ export async function signInWithGoogle(): Promise<string | undefined> {
 
   const redirectTo = getEmailRedirectTo()
   authDebug("signInWithGoogle started", { redirectTo })
-  const attemptTimeoutsMs = [3500, 10000]
-
-  for (let attempt = 0; attempt < attemptTimeoutsMs.length; attempt += 1) {
-    const attemptNo = attempt + 1
-    const timeoutMs = attemptTimeoutsMs[attempt]
-
-    let data: Awaited<ReturnType<typeof supabase.auth.signInWithOAuth>>["data"] | undefined
-    let error: Awaited<ReturnType<typeof supabase.auth.signInWithOAuth>>["error"] | undefined
-
-    try {
-      const result = await withTimeout(
-        supabase.auth.signInWithOAuth({
-          provider: "google",
-          options: {
-            redirectTo,
-            skipBrowserRedirect: true,
-          },
-        }),
-        timeoutMs,
-        "Google sign-in request timed out"
-      )
-
-      data = result.data
-      error = result.error
-    } catch (exception) {
-      const message = exception instanceof Error ? exception.message : String(exception)
-      const isTransient = classifySupabaseError(message) === "timeout_or_network"
-
-      if (isTransient && attempt < attemptTimeoutsMs.length - 1) {
-        authDebug("signInWithGoogle transient failure; retrying", {
-          attempt: attemptNo,
-          timeoutMs,
-          message,
-        })
-        await new Promise((resolve) => setTimeout(resolve, 1200))
-        continue
-      }
-
-      return mapAuthErrorMessage(message)
-    }
-
-    if (error) {
-      const mapped = mapAuthErrorMessage(error.message)
-      const isTransient = classifySupabaseError(error.message) === "timeout_or_network"
-      if (isTransient && attempt < attemptTimeoutsMs.length - 1) {
-        authDebug("signInWithGoogle transient provider error; retrying", {
-          attempt: attemptNo,
-          timeoutMs,
-          message: error.message,
-        })
-        await new Promise((resolve) => setTimeout(resolve, 1200))
-        continue
-      }
-
-      return mapped
-    }
-
-    if (typeof window === "undefined") {
-      return "Google sign-in can only be started in a browser."
-    }
-
-    if (!data?.url) {
-      if (attempt < attemptTimeoutsMs.length - 1) {
-        authDebug("signInWithGoogle empty provider URL; retrying", {
-          attempt: attemptNo,
-          timeoutMs,
-        })
-        await new Promise((resolve) => setTimeout(resolve, 1200))
-        continue
-      }
-
-      return "Could not start Google sign-in. Please try again."
-    }
-
-    authDebug("signInWithGoogle redirecting to provider", {
-      providerHost: new URL(data.url).host,
-      attempt: attemptNo,
-    })
-    window.location.assign(data.url)
-    return undefined
+  if (typeof window === "undefined") {
+    return "Google sign-in can only be started in a browser."
   }
 
-  return "Could not start Google sign-in. Please try again."
+  try {
+    // Let Supabase handle browser navigation immediately instead of waiting for
+    // a precomputed URL. This avoids first-tap hangs on some mobile browsers.
+    const { error } = await withTimeout(
+      supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo,
+        },
+      }),
+      8000,
+      "Google sign-in request timed out"
+    )
+
+    if (error) {
+      return mapAuthErrorMessage(error.message)
+    }
+
+    return undefined
+  } catch (exception) {
+    return mapAuthErrorMessage(exception instanceof Error ? exception.message : String(exception))
+  }
 }
 
 export async function finalizeOAuthRedirect(): Promise<string | undefined> {
