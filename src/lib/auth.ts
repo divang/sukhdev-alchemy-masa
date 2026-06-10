@@ -1057,46 +1057,89 @@ export async function signInWithGoogle(): Promise<string | undefined> {
 
   const redirectTo = getEmailRedirectTo()
   authDebug("signInWithGoogle started", { redirectTo })
-  let data: Awaited<ReturnType<typeof supabase.auth.signInWithOAuth>>["data"] | undefined
-  let error: Awaited<ReturnType<typeof supabase.auth.signInWithOAuth>>["error"] | undefined
+  const attemptTimeoutsMs = [3500, 10000]
 
-  try {
-    const result = await withTimeout(
-      supabase.auth.signInWithOAuth({
-        provider: "google",
-        options: {
-          redirectTo,
-          skipBrowserRedirect: true,
-        },
-      }),
-      10000,
-      "Google sign-in request timed out"
-    )
+  for (let attempt = 0; attempt < attemptTimeoutsMs.length; attempt += 1) {
+    const attemptNo = attempt + 1
+    const timeoutMs = attemptTimeoutsMs[attempt]
 
-    data = result.data
-    error = result.error
-  } catch (exception) {
-    return mapAuthErrorMessage(exception instanceof Error ? exception.message : String(exception))
+    let data: Awaited<ReturnType<typeof supabase.auth.signInWithOAuth>>["data"] | undefined
+    let error: Awaited<ReturnType<typeof supabase.auth.signInWithOAuth>>["error"] | undefined
+
+    try {
+      const result = await withTimeout(
+        supabase.auth.signInWithOAuth({
+          provider: "google",
+          options: {
+            redirectTo,
+            skipBrowserRedirect: true,
+          },
+        }),
+        timeoutMs,
+        "Google sign-in request timed out"
+      )
+
+      data = result.data
+      error = result.error
+    } catch (exception) {
+      const message = exception instanceof Error ? exception.message : String(exception)
+      const isTransient = classifySupabaseError(message) === "timeout_or_network"
+
+      if (isTransient && attempt < attemptTimeoutsMs.length - 1) {
+        authDebug("signInWithGoogle transient failure; retrying", {
+          attempt: attemptNo,
+          timeoutMs,
+          message,
+        })
+        await new Promise((resolve) => setTimeout(resolve, 1200))
+        continue
+      }
+
+      return mapAuthErrorMessage(message)
+    }
+
+    if (error) {
+      const mapped = mapAuthErrorMessage(error.message)
+      const isTransient = classifySupabaseError(error.message) === "timeout_or_network"
+      if (isTransient && attempt < attemptTimeoutsMs.length - 1) {
+        authDebug("signInWithGoogle transient provider error; retrying", {
+          attempt: attemptNo,
+          timeoutMs,
+          message: error.message,
+        })
+        await new Promise((resolve) => setTimeout(resolve, 1200))
+        continue
+      }
+
+      return mapped
+    }
+
+    if (typeof window === "undefined") {
+      return "Google sign-in can only be started in a browser."
+    }
+
+    if (!data?.url) {
+      if (attempt < attemptTimeoutsMs.length - 1) {
+        authDebug("signInWithGoogle empty provider URL; retrying", {
+          attempt: attemptNo,
+          timeoutMs,
+        })
+        await new Promise((resolve) => setTimeout(resolve, 1200))
+        continue
+      }
+
+      return "Could not start Google sign-in. Please try again."
+    }
+
+    authDebug("signInWithGoogle redirecting to provider", {
+      providerHost: new URL(data.url).host,
+      attempt: attemptNo,
+    })
+    window.location.assign(data.url)
+    return undefined
   }
 
-  if (error) {
-    return mapAuthErrorMessage(error.message)
-  }
-
-  if (typeof window === "undefined") {
-    return "Google sign-in can only be started in a browser."
-  }
-
-  if (!data?.url) {
-    return "Could not start Google sign-in. Please try again."
-  }
-
-  authDebug("signInWithGoogle redirecting to provider", {
-    providerHost: new URL(data.url).host,
-  })
-  window.location.assign(data.url)
-
-  return undefined
+  return "Could not start Google sign-in. Please try again."
 }
 
 export async function finalizeOAuthRedirect(): Promise<string | undefined> {
