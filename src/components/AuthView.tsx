@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react"
+import { useState } from "react"
 import { ArrowLeft } from "@phosphor-icons/react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -27,7 +27,6 @@ type AuthViewProps = {
   mode: "customer" | "admin"
   onBack: () => void
   onAuthenticated: (profile: UserProfile) => void
-  autoStartGoogleOnOpen?: boolean
 }
 
 async function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
@@ -45,7 +44,7 @@ async function withTimeout<T>(promise: Promise<T>, ms: number, message: string):
   }
 }
 
-export function AuthView({ mode, onBack, onAuthenticated, autoStartGoogleOnOpen = false }: AuthViewProps) {
+export function AuthView({ mode, onBack, onAuthenticated }: AuthViewProps) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isResending, setIsResending] = useState(false)
   const [isSendingOtp, setIsSendingOtp] = useState(false)
@@ -71,7 +70,6 @@ export function AuthView({ mode, onBack, onAuthenticated, autoStartGoogleOnOpen 
     reviewOptIn: true,
     marketingOptIn: true,
   })
-  const hasAutoStartedGoogleRef = useRef(false)
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -266,19 +264,6 @@ export function AuthView({ mode, onBack, onAuthenticated, autoStartGoogleOnOpen 
 
     toast.info("Redirecting to Google sign-in...")
   }
-
-  useEffect(() => {
-    if (mode !== "customer" || !autoStartGoogleOnOpen || isRecoveryMode) {
-      return
-    }
-
-    if (hasAutoStartedGoogleRef.current) {
-      return
-    }
-
-    hasAutoStartedGoogleRef.current = true
-    void handleGoogleSignIn()
-  }, [autoStartGoogleOnOpen, isRecoveryMode, mode])
 
   const handleRequestPasswordReset = async () => {
     const email = signInData.email.trim() || resetPasswordData.email.trim()

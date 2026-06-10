@@ -937,7 +937,6 @@ function App() {
         mode={authMode}
         onBack={handleBackToStore}
         onAuthenticated={handleAuthenticated}
-        autoStartGoogleOnOpen={authMode === "customer" && !isAuthServiceDegraded}
       />
     )
   }
@@ -949,7 +948,6 @@ function App() {
           mode="customer"
           onBack={handleBackToStore}
           onAuthenticated={handleAuthenticated}
-          autoStartGoogleOnOpen={!isAuthServiceDegraded}
         />
       )
     }
@@ -970,7 +968,6 @@ function App() {
           mode="customer"
           onBack={handleBackToStore}
           onAuthenticated={handleAuthenticated}
-          autoStartGoogleOnOpen={!isAuthServiceDegraded}
         />
       )
     }
@@ -1119,7 +1116,6 @@ function App() {
           mode="customer"
           onBack={handleBackToStore}
           onAuthenticated={handleAuthenticated}
-          autoStartGoogleOnOpen={!isAuthServiceDegraded}
         />
       )
     }
