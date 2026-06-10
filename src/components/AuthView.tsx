@@ -71,6 +71,7 @@ export function AuthView({ mode, onBack, onAuthenticated }: AuthViewProps) {
     reviewOptIn: true,
     marketingOptIn: true,
   })
+  const disableAuthInputs = isGoogleRedirecting
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -386,13 +387,13 @@ export function AuthView({ mode, onBack, onAuthenticated }: AuthViewProps) {
             ) : (
               <Tabs defaultValue={isRecoveryMode ? "reset-password" : "sign-in"} className="w-full">
                 <TabsList className="grid w-full grid-cols-2">
-                  <TabsTrigger value="sign-in">Sign In</TabsTrigger>
-                  <TabsTrigger value="create-account">Create Account</TabsTrigger>
+                  <TabsTrigger value="sign-in" disabled={disableAuthInputs}>Sign In</TabsTrigger>
+                  <TabsTrigger value="create-account" disabled={disableAuthInputs}>Create Account</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="sign-in" className="mt-6">
                   <div className="space-y-4">
-                    <Button className="w-full" type="button" onClick={handleGoogleSignIn} disabled={isGoogleRedirecting}>
+                    <Button className="w-full" type="button" onClick={handleGoogleSignIn} disabled={disableAuthInputs}>
                       {isGoogleRedirecting ? "Connecting to Google..." : "Continue with Google"}
                     </Button>
 
@@ -408,6 +409,7 @@ export function AuthView({ mode, onBack, onAuthenticated }: AuthViewProps) {
                           value={phoneOtpData.phone}
                           onChange={(e) => setPhoneOtpData((current) => ({ ...current, phone: e.target.value }))}
                           placeholder="+91XXXXXXXXXX"
+                          disabled={disableAuthInputs}
                         />
                       </div>
 
@@ -419,11 +421,12 @@ export function AuthView({ mode, onBack, onAuthenticated }: AuthViewProps) {
                             value={phoneOtpData.otp}
                             onChange={(e) => setPhoneOtpData((current) => ({ ...current, otp: e.target.value }))}
                             placeholder="Enter 6-digit OTP"
+                            disabled={disableAuthInputs}
                           />
                         </div>
                       )}
 
-                      <Button className="w-full" type="submit" disabled={isSendingOtp || isVerifyingOtp}>
+                      <Button className="w-full" type="submit" disabled={disableAuthInputs || isSendingOtp || isVerifyingOtp}>
                         {phoneOtpData.otpSent
                           ? (isVerifyingOtp ? "Verifying OTP..." : "Verify OTP")
                           : (isSendingOtp ? "Sending OTP..." : "Continue with Phone OTP")}
@@ -435,6 +438,7 @@ export function AuthView({ mode, onBack, onAuthenticated }: AuthViewProps) {
                       type="button"
                       variant="ghost"
                       onClick={() => setUsePasswordSignIn((current) => !current)}
+                      disabled={disableAuthInputs}
                     >
                       {usePasswordSignIn ? "Hide email/password" : "Use email/password instead"}
                     </Button>
@@ -449,6 +453,7 @@ export function AuthView({ mode, onBack, onAuthenticated }: AuthViewProps) {
                             value={signInData.email}
                             onChange={(e) => setSignInData((current) => ({ ...current, email: e.target.value }))}
                             placeholder="your@email.com"
+                            disabled={disableAuthInputs}
                           />
                         </div>
                         <div>
@@ -459,16 +464,17 @@ export function AuthView({ mode, onBack, onAuthenticated }: AuthViewProps) {
                             value={signInData.password}
                             onChange={(e) => setSignInData((current) => ({ ...current, password: e.target.value }))}
                             placeholder="Enter your password"
+                            disabled={disableAuthInputs}
                           />
                         </div>
-                        <Button className="w-full" type="submit" disabled={isSubmitting}>
+                        <Button className="w-full" type="submit" disabled={disableAuthInputs || isSubmitting}>
                           {isSubmitting ? "Signing in..." : "Sign In"}
                         </Button>
                         <Button
                           className="w-full"
                           type="button"
                           variant="outline"
-                          disabled={isSubmitting || isResending}
+                          disabled={disableAuthInputs || isSubmitting || isResending}
                           onClick={handleResendConfirmation}
                         >
                           {isResending ? "Resending..." : "Resend Confirmation Email"}
@@ -477,7 +483,7 @@ export function AuthView({ mode, onBack, onAuthenticated }: AuthViewProps) {
                           className="w-full"
                           type="button"
                           variant="outline"
-                          disabled={isRequestingReset}
+                          disabled={disableAuthInputs || isRequestingReset}
                           onClick={handleRequestPasswordReset}
                         >
                           {isRequestingReset ? "Sending reset email..." : "Forgot Password"}
@@ -496,6 +502,7 @@ export function AuthView({ mode, onBack, onAuthenticated }: AuthViewProps) {
                             value={resetPasswordData.newPassword}
                             onChange={(e) => setResetPasswordData((current) => ({ ...current, newPassword: e.target.value }))}
                             placeholder="Enter at least 6 characters"
+                            disabled={disableAuthInputs}
                           />
                           <p className="mt-1 text-xs text-muted-foreground">{getPasswordPolicyMessage()}</p>
                         </div>
@@ -507,9 +514,10 @@ export function AuthView({ mode, onBack, onAuthenticated }: AuthViewProps) {
                             value={resetPasswordData.confirmPassword}
                             onChange={(e) => setResetPasswordData((current) => ({ ...current, confirmPassword: e.target.value }))}
                             placeholder="Re-enter new password"
+                            disabled={disableAuthInputs}
                           />
                         </div>
-                        <Button className="w-full" type="submit" disabled={isUpdatingPassword}>
+                        <Button className="w-full" type="submit" disabled={disableAuthInputs || isUpdatingPassword}>
                           {isUpdatingPassword ? "Updating password..." : "Update Password"}
                         </Button>
                       </form>
@@ -519,7 +527,7 @@ export function AuthView({ mode, onBack, onAuthenticated }: AuthViewProps) {
 
                 <TabsContent value="create-account" className="mt-6">
                   <div className="space-y-4">
-                    <Button className="w-full" type="button" onClick={handleGoogleSignIn} disabled={isGoogleRedirecting}>
+                    <Button className="w-full" type="button" onClick={handleGoogleSignIn} disabled={disableAuthInputs}>
                       {isGoogleRedirecting ? "Connecting to Google..." : "Continue with Google"}
                     </Button>
 
@@ -536,6 +544,7 @@ export function AuthView({ mode, onBack, onAuthenticated }: AuthViewProps) {
                           value={signUpData.fullName}
                           onChange={(e) => setSignUpData((current) => ({ ...current, fullName: e.target.value }))}
                           placeholder="Enter your full name"
+                          disabled={disableAuthInputs}
                         />
                       </div>
                       <div>
@@ -545,6 +554,7 @@ export function AuthView({ mode, onBack, onAuthenticated }: AuthViewProps) {
                           value={signUpData.phone}
                           onChange={(e) => setSignUpData((current) => ({ ...current, phone: e.target.value }))}
                           placeholder="+91 XXXXX XXXXX"
+                          disabled={disableAuthInputs}
                         />
                       </div>
                     </div>
@@ -556,6 +566,7 @@ export function AuthView({ mode, onBack, onAuthenticated }: AuthViewProps) {
                         value={signUpData.email}
                         onChange={(e) => setSignUpData((current) => ({ ...current, email: e.target.value }))}
                         placeholder="your@email.com"
+                        disabled={disableAuthInputs}
                       />
                     </div>
                     <div className="grid gap-4 md:grid-cols-2">
@@ -567,6 +578,7 @@ export function AuthView({ mode, onBack, onAuthenticated }: AuthViewProps) {
                           value={signUpData.password}
                           onChange={(e) => setSignUpData((current) => ({ ...current, password: e.target.value }))}
                           placeholder="Enter at least 6 characters"
+                          disabled={disableAuthInputs}
                         />
                         <p className="mt-1 text-xs text-muted-foreground">{getPasswordPolicyMessage()}</p>
                       </div>
@@ -578,6 +590,7 @@ export function AuthView({ mode, onBack, onAuthenticated }: AuthViewProps) {
                           value={signUpData.confirmPassword}
                           onChange={(e) => setSignUpData((current) => ({ ...current, confirmPassword: e.target.value }))}
                           placeholder="Re-enter your password"
+                          disabled={disableAuthInputs}
                         />
                       </div>
                     </div>
@@ -586,6 +599,7 @@ export function AuthView({ mode, onBack, onAuthenticated }: AuthViewProps) {
                       <Checkbox
                         checked={signUpData.marketingOptIn}
                         onCheckedChange={(checked) => setSignUpData((current) => ({ ...current, marketingOptIn: checked === true }))}
+                        disabled={disableAuthInputs}
                       />
                       <span>Allow order updates and follow-up messages on email or phone.</span>
                     </label>
@@ -594,11 +608,12 @@ export function AuthView({ mode, onBack, onAuthenticated }: AuthViewProps) {
                       <Checkbox
                         checked={signUpData.reviewOptIn}
                         onCheckedChange={(checked) => setSignUpData((current) => ({ ...current, reviewOptIn: checked === true }))}
+                        disabled={disableAuthInputs}
                       />
                       <span>Allow review and rating requests after delivery.</span>
                     </label>
 
-                    <Button className="w-full" type="submit" disabled={isSubmitting}>
+                    <Button className="w-full" type="submit" disabled={disableAuthInputs || isSubmitting}>
                       {isSubmitting ? "Creating account..." : "Create Account"}
                     </Button>
                   </form>
