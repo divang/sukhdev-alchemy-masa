@@ -8,6 +8,8 @@ const PROD_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJ
 const supabaseUrl = String(import.meta.env.VITE_SUPABASE_URL ?? PROD_SUPABASE_URL).trim()
 const supabaseAnonKey = String(import.meta.env.VITE_SUPABASE_ANON_KEY ?? PROD_SUPABASE_ANON_KEY).trim()
 
+export const supabaseProjectUrl = supabaseUrl.replace(/\/$/, "")
+
 export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey)
 
 console.log("[auth] supabase module initialized", {
