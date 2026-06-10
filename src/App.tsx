@@ -48,6 +48,7 @@ type View = "store" | "account" | "checkout" | "payment" | "tracking" | "admin" 
 const ENABLE_AMAZON_STYLE_MOBILE_PRODUCT_CARDS = true
 const TRACKING_VISIBLE_ORDER_ID = "ORD-1780827393392"
 const TRACKING_OWNER_EMAIL = "divang.s@gmail.com"
+const AUTH_CONFIG_RELOAD_GUARD_KEY = "sukhdevi-auth-config-reload-once"
 const HIDDEN_CATEGORY_IDS = new Set(["combo-pack-masala"])
 const HIDDEN_PRODUCT_IDS = new Set(["sukhdevi-combo-pack"])
 const PRODUCT_SEARCH_SYNONYM_GROUPS = [
@@ -253,6 +254,30 @@ function App() {
   const blurSearchInput = () => {
     searchInputRef.current?.blur()
   }
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return
+    }
+
+    if (isSupabaseConfigured) {
+      window.sessionStorage.removeItem(AUTH_CONFIG_RELOAD_GUARD_KEY)
+      return
+    }
+
+    const hostname = window.location.hostname.toLowerCase()
+    const isLocalHost = hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1"
+    if (isLocalHost) {
+      return
+    }
+
+    // Mobile browsers may boot with a stale cached JS chunk; one reload usually fetches the latest bundle.
+    const hasRetried = window.sessionStorage.getItem(AUTH_CONFIG_RELOAD_GUARD_KEY) === "1"
+    if (!hasRetried) {
+      window.sessionStorage.setItem(AUTH_CONFIG_RELOAD_GUARD_KEY, "1")
+      window.location.reload()
+    }
+  }, [])
 
   useEffect(() => {
     if (typeof window === "undefined") {
