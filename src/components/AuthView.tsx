@@ -46,6 +46,7 @@ async function withTimeout<T>(promise: Promise<T>, ms: number, message: string):
 
 export function AuthView({ mode, onBack, onAuthenticated }: AuthViewProps) {
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isGoogleRedirecting, setIsGoogleRedirecting] = useState(false)
   const [isResending, setIsResending] = useState(false)
   const [isSendingOtp, setIsSendingOtp] = useState(false)
   const [isVerifyingOtp, setIsVerifyingOtp] = useState(false)
@@ -256,8 +257,16 @@ export function AuthView({ mode, onBack, onAuthenticated }: AuthViewProps) {
   }
 
   const handleGoogleSignIn = async () => {
+    if (isGoogleRedirecting) {
+      return
+    }
+
+    setIsGoogleRedirecting(true)
+    toast.info("Connecting to Google sign-in...")
+
     const error = await signInWithGoogle()
     if (error) {
+      setIsGoogleRedirecting(false)
       toast.error(error)
       return
     }
@@ -383,8 +392,8 @@ export function AuthView({ mode, onBack, onAuthenticated }: AuthViewProps) {
 
                 <TabsContent value="sign-in" className="mt-6">
                   <div className="space-y-4">
-                    <Button className="w-full" type="button" onClick={handleGoogleSignIn}>
-                      Continue with Google
+                    <Button className="w-full" type="button" onClick={handleGoogleSignIn} disabled={isGoogleRedirecting}>
+                      {isGoogleRedirecting ? "Connecting to Google..." : "Continue with Google"}
                     </Button>
 
                     <p className="text-center text-xs uppercase tracking-[0.24em] text-muted-foreground">
@@ -510,8 +519,8 @@ export function AuthView({ mode, onBack, onAuthenticated }: AuthViewProps) {
 
                 <TabsContent value="create-account" className="mt-6">
                   <div className="space-y-4">
-                    <Button className="w-full" type="button" onClick={handleGoogleSignIn}>
-                      Continue with Google
+                    <Button className="w-full" type="button" onClick={handleGoogleSignIn} disabled={isGoogleRedirecting}>
+                      {isGoogleRedirecting ? "Connecting to Google..." : "Continue with Google"}
                     </Button>
 
                     <p className="text-center text-xs uppercase tracking-[0.24em] text-muted-foreground">
