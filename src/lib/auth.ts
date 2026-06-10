@@ -187,10 +187,27 @@ function isAllowedAuthRedirect(urlValue: string) {
   try {
     const parsed = new URL(urlValue)
     const hostname = parsed.hostname.toLowerCase()
-    return hostname === "sukhdevialchemy.com" || hostname === "www.sukhdevialchemy.com"
+    return (
+      hostname === "sukhdevialchemy.com"
+      || hostname === "www.sukhdevialchemy.com"
+      || hostname === "localhost"
+      || hostname === "127.0.0.1"
+      || hostname === "::1"
+    )
   } catch {
     return false
   }
+}
+
+function getFallbackAuthRedirect() {
+  if (typeof window !== "undefined") {
+    const hostname = window.location.hostname.toLowerCase()
+    if (hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1") {
+      return `${window.location.origin}/`
+    }
+  }
+
+  return `${PRODUCTION_ORIGIN}/`
 }
 
 function parseHashParams(hash: string) {
@@ -227,14 +244,11 @@ function getEmailRedirectTo() {
 
     authDebug("Ignoring non-production VITE_AUTH_REDIRECT_URL; using production origin", {
       configured: trimmed,
-      fallback: `${PRODUCTION_ORIGIN}/`,
+      fallback: getFallbackAuthRedirect(),
     })
   }
 
-  // Never derive the redirect from window.location — in dev/preview environments
-  // (Codespaces, GitHub Pages preview URLs) this would embed a non-production URL
-  // in confirmation emails. Always fall back to the canonical production origin.
-  return `${PRODUCTION_ORIGIN}/`
+  return getFallbackAuthRedirect()
 }
 
 function buildProfileFromMetadata(user: User): UserProfile {

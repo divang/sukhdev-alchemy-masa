@@ -11,7 +11,6 @@ import { StarRating } from "./StarRating"
 import type { Product, UserProfile } from "@/lib/types"
 import { useEffect, useState } from "react"
 import { useKV } from "@/hooks/use-kv"
-import { useIsMobile } from "@/hooks/use-mobile"
 import type { Review } from "@/lib/types"
 import { getProductImage } from "@/lib/product-images"
 import { submitProductReview } from "@/lib/catalog"
@@ -30,7 +29,6 @@ type ProductDetailDialogProps = {
 export function ProductDetailDialog({ product, currentUser, canReview, open, onOpenChange, onAddToCart }: ProductDetailDialogProps) {
   const [reviews, setReviews] = useKV<Review[]>("reviews", [])
   const [productImages] = useKV<Record<string, string>>("product-images", {})
-  const isMobile = useIsMobile()
   const [reviewRating, setReviewRating] = useState<string>("5")
   const [reviewComment, setReviewComment] = useState("")
   const [isSubmittingReview, setIsSubmittingReview] = useState(false)
@@ -104,7 +102,7 @@ export function ProductDetailDialog({ product, currentUser, canReview, open, onO
       <div className="pr-8">
         <h2 className="text-xl font-semibold sm:text-2xl">{product.name}</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          View ingredients, reviews, and pack details. On mobile, tap the dimmed background to close this panel.
+          View ingredients, reviews, and pack details.
         </p>
       </div>
 
@@ -316,26 +314,6 @@ export function ProductDetailDialog({ product, currentUser, canReview, open, onO
         </Tabs>
     </>
   )
-
-  if (isMobile) {
-    if (!open) {
-      return null
-    }
-
-    return (
-      <div className="fixed inset-0 z-50 sm:hidden">
-        <button
-          type="button"
-          className="absolute inset-0 bg-black/45"
-          aria-label="Close product details"
-          onClick={() => onOpenChange(false)}
-        />
-        <div className="absolute inset-x-2 top-4 bottom-4 overflow-y-auto rounded-xl border bg-background p-4 shadow-xl">
-          {detailContent}
-        </div>
-      </div>
-    )
-  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
