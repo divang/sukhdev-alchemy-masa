@@ -1057,32 +1057,32 @@ export async function signInWithGoogle(): Promise<string | undefined> {
 
   const redirectTo = getEmailRedirectTo()
   authDebug("signInWithGoogle started", { redirectTo })
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: "google",
+    options: {
+      redirectTo,
+      skipBrowserRedirect: true,
+    },
+  })
+
+  if (error) {
+    return mapAuthErrorMessage(error.message)
+  }
+
   if (typeof window === "undefined") {
     return "Google sign-in can only be started in a browser."
   }
 
-  try {
-    // Let Supabase handle browser navigation immediately instead of waiting for
-    // a precomputed URL. This avoids first-tap hangs on some mobile browsers.
-    const { error } = await withTimeout(
-      supabase.auth.signInWithOAuth({
-        provider: "google",
-        options: {
-          redirectTo,
-        },
-      }),
-      8000,
-      "Google sign-in request timed out"
-    )
-
-    if (error) {
-      return mapAuthErrorMessage(error.message)
-    }
-
-    return undefined
-  } catch (exception) {
-    return mapAuthErrorMessage(exception instanceof Error ? exception.message : String(exception))
+  if (!data?.url) {
+    return "Could not start Google sign-in. Please try again."
   }
+
+  authDebug("signInWithGoogle redirecting to provider", {
+    providerHost: new URL(data.url).host,
+  })
+  window.location.assign(data.url)
+
+  return undefined
 }
 
 export async function finalizeOAuthRedirect(): Promise<string | undefined> {
