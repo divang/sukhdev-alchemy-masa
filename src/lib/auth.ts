@@ -1062,57 +1062,22 @@ export async function signInWithGoogle(): Promise<string | undefined> {
   const redirectTo = getEmailRedirectTo()
   authDebug("signInWithGoogle started", { redirectTo })
   try {
-    const { data, error } = await withTimeout(
-      supabase.auth.signInWithOAuth({
-        provider: "google",
-        options: {
-          redirectTo,
-          skipBrowserRedirect: true,
-          queryParams: {
-            prompt: "select_account",
-          },
-        },
-      }),
-      5000,
-      "Google auth URL generation timed out"
-    )
+    // Deterministic mobile path: navigate immediately to Supabase authorize
+    // endpoint without awaiting an SDK pre-flight URL generation call.
+    const authorizeUrl = new URL("/auth/v1/authorize", `${supabaseProjectUrl}/`)
+    authorizeUrl.searchParams.set("provider", "google")
+    authorizeUrl.searchParams.set("redirect_to", redirectTo)
+    authorizeUrl.searchParams.set("prompt", "select_account")
+    authorizeUrl.searchParams.set("state", `${Date.now()}`)
 
-    if (error) {
-      authDebug("signInWithGoogle sdk-url path failed", {
-        message: error.message,
-      })
-      throw new Error(error.message)
-    }
-
-    if (!data?.url) {
-      authDebug("signInWithGoogle sdk-url path returned empty URL")
-      throw new Error("Google auth URL missing")
-    }
-
-    authDebug("signInWithGoogle redirecting via sdk-url path", {
-      providerHost: new URL(data.url).host,
+    authDebug("signInWithGoogle redirecting via direct authorize URL", {
+      providerHost: authorizeUrl.host,
     })
-    window.location.assign(data.url)
+
+    window.location.assign(authorizeUrl.toString())
     return undefined
-  } catch (sdkPathError) {
-    authDebug("signInWithGoogle falling back to manual authorize URL", {
-      message: sdkPathError instanceof Error ? sdkPathError.message : String(sdkPathError),
-    })
-
-    try {
-      const authorizeUrl = new URL("/auth/v1/authorize", `${supabaseProjectUrl}/`)
-      authorizeUrl.searchParams.set("provider", "google")
-      authorizeUrl.searchParams.set("redirect_to", redirectTo)
-      authorizeUrl.searchParams.set("prompt", "select_account")
-
-      authDebug("signInWithGoogle redirecting via manual authorize path", {
-        providerHost: authorizeUrl.host,
-      })
-      window.location.assign(authorizeUrl.toString())
-      return undefined
-    } catch (fallbackError) {
-      return mapAuthErrorMessage(fallbackError instanceof Error ? fallbackError.message : String(fallbackError))
-    }
+  } catch (error) {
+    return mapAuthErrorMessage(error instanceof Error ? error.message : String(error))
   }
 }
 
