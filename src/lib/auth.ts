@@ -1081,6 +1081,20 @@ export async function signInWithGoogle(): Promise<string | undefined> {
   }
 }
 
+export function getDirectGoogleAuthorizeUrl(): string | undefined {
+  if (!isSupabaseConfigured) {
+    return undefined
+  }
+
+  const redirectTo = getEmailRedirectTo()
+  const authorizeUrl = new URL("/auth/v1/authorize", `${supabaseProjectUrl}/`)
+  authorizeUrl.searchParams.set("provider", "google")
+  authorizeUrl.searchParams.set("redirect_to", redirectTo)
+  authorizeUrl.searchParams.set("prompt", "select_account")
+  authorizeUrl.searchParams.set("state", `${Date.now()}`)
+  return authorizeUrl.toString()
+}
+
 export async function finalizeOAuthRedirect(): Promise<string | undefined> {
   if (!supabase || !isSupabaseConfigured || typeof window === "undefined") {
     return undefined

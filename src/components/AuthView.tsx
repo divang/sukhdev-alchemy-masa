@@ -10,6 +10,7 @@ import { toast } from "sonner"
 import type { UserProfile } from "@/lib/types"
 import { BRAND_LOGO_PATH } from "@/lib/brand"
 import {
+  getDirectGoogleAuthorizeUrl,
   hasRecoveryParamsInUrl,
   requestPasswordReset,
   resendSignupConfirmation,
@@ -69,6 +70,15 @@ export function AuthView({ mode, onBack, onAuthenticated }: AuthViewProps) {
     confirmPassword: "",
     reviewOptIn: true,
     marketingOptIn: true,
+  })
+  const [isCopyingGoogleUrl, setIsCopyingGoogleUrl] = useState(false)
+  const [isLikelyInAppBrowser] = useState(() => {
+    if (typeof navigator === "undefined") {
+      return false
+    }
+
+    const ua = navigator.userAgent || ""
+    return /(FBAN|FBAV|Instagram|Line|MicroMessenger|wv\)|; wv\b|WebView)/i.test(ua)
   })
 
   const handleSignIn = async (e: React.FormEvent) => {
@@ -256,6 +266,10 @@ export function AuthView({ mode, onBack, onAuthenticated }: AuthViewProps) {
   }
 
   const handleGoogleSignIn = async () => {
+    if (isLikelyInAppBrowser) {
+      toast.warning("This appears to be an in-app browser. If Google sign-in hangs, open this site in Safari/Chrome.")
+    }
+
     const error = await signInWithGoogle()
     if (error) {
       toast.error(error)
@@ -263,6 +277,39 @@ export function AuthView({ mode, onBack, onAuthenticated }: AuthViewProps) {
     }
 
     toast.info("Redirecting to Google sign-in...")
+  }
+
+  const handleOpenGoogleAuthLink = () => {
+    const url = getDirectGoogleAuthorizeUrl()
+    if (!url) {
+      toast.error("Google auth URL is not available right now.")
+      return
+    }
+
+    window.location.assign(url)
+  }
+
+  const handleCopyGoogleAuthLink = async () => {
+    const url = getDirectGoogleAuthorizeUrl()
+    if (!url) {
+      toast.error("Google auth URL is not available right now.")
+      return
+    }
+
+    if (typeof navigator === "undefined" || !navigator.clipboard?.writeText) {
+      toast.error("Clipboard is unavailable in this browser.")
+      return
+    }
+
+    setIsCopyingGoogleUrl(true)
+    try {
+      await navigator.clipboard.writeText(url)
+      toast.success("Google auth link copied. Open it in Safari/Chrome if needed.")
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to copy link.")
+    } finally {
+      setIsCopyingGoogleUrl(false)
+    }
   }
 
   const handleRequestPasswordReset = async () => {
@@ -383,9 +430,26 @@ export function AuthView({ mode, onBack, onAuthenticated }: AuthViewProps) {
 
                 <TabsContent value="sign-in" className="mt-6">
                   <div className="space-y-4">
+                    {isLikelyInAppBrowser && (
+                      <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                        In-app browser detected. If Google sign-in hangs, use Safari/Chrome.
+                      </div>
+                    )}
+
                     <Button className="w-full" type="button" onClick={handleGoogleSignIn}>
                       Continue with Google
                     </Button>
+
+                    {isLikelyInAppBrowser && (
+                      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                        <Button type="button" variant="outline" onClick={handleOpenGoogleAuthLink}>
+                          Open Google Auth Link
+                        </Button>
+                        <Button type="button" variant="outline" onClick={handleCopyGoogleAuthLink} disabled={isCopyingGoogleUrl}>
+                          {isCopyingGoogleUrl ? "Copying..." : "Copy Link"}
+                        </Button>
+                      </div>
+                    )}
 
                     <p className="text-center text-xs uppercase tracking-[0.24em] text-muted-foreground">
                       Or continue with phone OTP
@@ -510,9 +574,26 @@ export function AuthView({ mode, onBack, onAuthenticated }: AuthViewProps) {
 
                 <TabsContent value="create-account" className="mt-6">
                   <div className="space-y-4">
+                    {isLikelyInAppBrowser && (
+                      <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                        In-app browser detected. If Google sign-in hangs, use Safari/Chrome.
+                      </div>
+                    )}
+
                     <Button className="w-full" type="button" onClick={handleGoogleSignIn}>
                       Continue with Google
                     </Button>
+
+                    {isLikelyInAppBrowser && (
+                      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                        <Button type="button" variant="outline" onClick={handleOpenGoogleAuthLink}>
+                          Open Google Auth Link
+                        </Button>
+                        <Button type="button" variant="outline" onClick={handleCopyGoogleAuthLink} disabled={isCopyingGoogleUrl}>
+                          {isCopyingGoogleUrl ? "Copying..." : "Copy Link"}
+                        </Button>
+                      </div>
+                    )}
 
                     <p className="text-center text-xs uppercase tracking-[0.24em] text-muted-foreground">
                       Or create your account manually
