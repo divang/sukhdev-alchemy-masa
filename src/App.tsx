@@ -389,7 +389,27 @@ function App() {
         }
 
         console.log("[app-auth] getCurrentAuthState requested")
-        const state = await getCurrentAuthState()
+        let state = await getCurrentAuthState()
+
+        if (hasOAuthCallback && !state.profile) {
+          // Some mobile browsers persist OAuth session a moment after redirect.
+          // Retry briefly before falling back to guest UI.
+          for (let attempt = 1; attempt <= 3; attempt += 1) {
+            if (!isActive || state.profile) {
+              break
+            }
+
+            await new Promise((resolve) => setTimeout(resolve, 1000))
+            state = await getCurrentAuthState()
+
+            console.log("[app-auth] post-oauth recovery attempt", {
+              attempt,
+              hasUser: Boolean(state.user),
+              hasProfile: Boolean(state.profile),
+            })
+          }
+        }
+
         if (!isActive) {
           return
         }
