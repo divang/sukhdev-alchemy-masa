@@ -442,11 +442,6 @@ export async function getCurrentAuthState(): Promise<AuthState> {
     return { user: null, profile: null }
   }
 
-  if (typeof navigator !== "undefined" && navigator.onLine === false) {
-    authDebug("getCurrentAuthState skipped: browser is offline")
-    return { user: null, profile: null }
-  }
-
   const start = Date.now()
   authDebug("getCurrentAuthState started", networkDiagnostics())
 
@@ -464,26 +459,20 @@ export async function getCurrentAuthState(): Promise<AuthState> {
     return buildAuthState(data.session)
   } catch (error) {
     const primaryMessage = error instanceof Error ? error.message : String(error)
-    const primaryCategory = error instanceof Error ? classifySupabaseError(error.message) : "unknown"
-
-    if (primaryCategory === "timeout_or_network") {
-      authDebug("getCurrentAuthState skipping retry due to network/timeout failure", {
-        error: primaryMessage,
-        durationMs: Date.now() - start,
-        ...networkDiagnostics(),
-      })
-      return { user: null, profile: null }
-    }
 
     authDebug("getCurrentAuthState primary getSession failed; retrying once", {
       error: primaryMessage,
       ...networkDiagnostics(),
     })
 
+    // Mobile browsers can briefly report offline or stall storage/network right
+    // after OAuth return; a short backoff avoids dropping an otherwise valid session.
+    await new Promise((resolve) => setTimeout(resolve, 1200))
+
     try {
       const { data: retryData } = await withTimeout(
         supabase.auth.getSession(),
-        2500,
+        5000,
         "getSession retry timed out"
       )
       authDebug("getCurrentAuthState retry completed", {
