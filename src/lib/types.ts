@@ -7,6 +7,7 @@ export type Category = {
 
 export type Product = {
   id: string
+  slug?: string
   sku?: string
   name: string
   category: string
@@ -22,6 +23,19 @@ export type Product = {
   youtubeUrl?: string
   inStock: boolean
   tags: string[]
+  brandName?: string
+  shortDescription?: string
+  highlights?: string[]
+  modelNumber?: string
+  mpn?: string
+  gtin?: string
+  variantData?: string[]
+  netQuantityValue?: number
+  netQuantityUnit?: string
+  materialInfo?: string
+  complianceInfo?: string[]
+  additionalImages?: string[]
+  categoryBreadcrumb?: string[]
 }
 
 export type Review = {

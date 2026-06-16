@@ -64,13 +64,14 @@ async function getSignedInUserId() {
     return { userId: null as string | null, error: "Supabase is not configured." }
   }
 
-  const {
-    data: { user },
-    error,
-  } = await client.auth.getUser()
+  const { data: sessionData } = await client.auth.getSession()
+  if (sessionData.session?.user?.id) {
+    return { userId: sessionData.session.user.id, error: undefined }
+  }
 
+  const { data: userData, error } = await client.auth.getUser()
   return {
-    userId: user?.id ?? null,
+    userId: userData.user?.id ?? null,
     error: error?.message,
   }
 }

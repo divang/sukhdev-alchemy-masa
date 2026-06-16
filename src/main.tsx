@@ -1,17 +1,36 @@
 import { createRoot } from 'react-dom/client'
+import { useEffect, useState } from "react"
 import { ErrorBoundary } from "react-error-boundary";
 import { Toaster } from "sonner"
 
 import App from './App.tsx'
+import { AmazonProductListingPage } from "@/components/AmazonProductListingPage"
 import { ErrorFallback } from './ErrorFallback.tsx'
+import { getSlugFromProductPath, isProductPath } from "@/lib/product-url"
 
 import "./main.css"
 import "./styles/theme.css"
 import "./index.css"
 
+function RootRouter() {
+  const [pathname, setPathname] = useState(() => window.location.pathname)
+
+  useEffect(() => {
+    const handleNavigation = () => setPathname(window.location.pathname)
+    window.addEventListener("popstate", handleNavigation)
+    return () => window.removeEventListener("popstate", handleNavigation)
+  }, [])
+
+  if (isProductPath(pathname)) {
+    return <AmazonProductListingPage slug={getSlugFromProductPath(pathname)} />
+  }
+
+  return <App />
+}
+
 createRoot(document.getElementById('root')!).render(
   <ErrorBoundary FallbackComponent={ErrorFallback}>
-    <App />
+    <RootRouter />
     <Toaster
       richColors
       position="bottom-center"

@@ -19,7 +19,7 @@ import type { Category, Product, CartItem, Order, UserProfile } from "@/lib/type
 import { toast } from "sonner"
 import { useInitialData } from "@/hooks/use-initial-data"
 import { useIsMobile } from "@/hooks/use-mobile"
-import { finalizeOAuthRedirect, getCurrentAuthState, signOutUser, subscribeToAuthStateChanges } from "@/lib/auth"
+import { buildProfileFromMetadata, finalizeOAuthRedirect, getCurrentAuthState, signOutUser, subscribeToAuthStateChanges } from "@/lib/auth"
 import {
   fetchCartForCurrentUser,
   removeCartItemForCurrentUser,
@@ -39,15 +39,13 @@ import { fallbackUpiConfig, fetchActiveUpiConfig } from "@/lib/payment-upi"
 import { BRAND_LOGO_PATH } from "@/lib/brand"
 import { CATALOG_SEED_CATEGORIES, CATALOG_SEED_PRODUCTS } from "@/lib/catalog-seed"
 import { isPaymentGatewayEnabled, startRazorpayCheckout } from "@/lib/payment-gateway"
-import { getRequestedRuntimeModeFromSearch, resolveRuntimeMode } from "@/lib/runtime-mode"
+import { getRequestedBrandingVersionFromSearch, getRequestedRuntimeModeFromSearch, resolveRuntimeMode } from "@/lib/runtime-mode"
 import { triggerOrderCreatedNotification, triggerOrderNotification } from "@/lib/order-notifications"
 
 type View = "store" | "account" | "checkout" | "payment" | "tracking" | "admin" | "admin-advanced" | "account-details"
 
 // Flip this to false to instantly revert mobile cards back to the original layout.
 const ENABLE_AMAZON_STYLE_MOBILE_PRODUCT_CARDS = true
-const TRACKING_VISIBLE_ORDER_ID = "ORD-1780827393392"
-const TRACKING_OWNER_EMAIL = "divang.s@gmail.com"
 const AUTH_CONFIG_RELOAD_GUARD_KEY = "sukhdevi-auth-config-reload-once"
 const HIDDEN_CATEGORY_IDS = new Set(["combo-pack-masala"])
 const HIDDEN_PRODUCT_IDS = new Set(["sukhdevi-combo-pack"])
@@ -95,25 +93,6 @@ function buildProductSearchText(product: Product, categoryName?: string) {
     .flat()
 
   return `${normalizedBase} ${synonyms.join(" ")}`.trim()
-}
-
-function parseOrderIdTimestamp(orderId: string) {
-  const match = orderId.match(/ORD-(\d{8,})$/)
-  if (!match) {
-    return 0
-  }
-
-  const value = Number(match[1])
-  return Number.isFinite(value) ? value : 0
-}
-
-function getOrderTimestamp(order: Order) {
-  const createdAtValue = new Date(order.createdAt).getTime()
-  if (Number.isFinite(createdAtValue) && createdAtValue > 0) {
-    return createdAtValue
-  }
-
-  return parseOrderIdTimestamp(order.id)
 }
 
 function mergeOrders(primary: Order[], secondary: Order[]) {
@@ -222,6 +201,9 @@ function App() {
   const [requestedRuntimeMode, setRequestedRuntimeMode] = useState(() =>
     typeof window === "undefined" ? "prod" : getRequestedRuntimeModeFromSearch(window.location.search)
   )
+  const [requestedBrandingVersion, setRequestedBrandingVersion] = useState(() =>
+    typeof window === "undefined" ? "v1" : getRequestedBrandingVersionFromSearch(window.location.search)
+  )
   const [hasShownModeLockNotice, setHasShownModeLockNotice] = useState(false)
   const [authMode, setAuthMode] = useState<"customer" | "admin">("customer")
   const [postAuthView, setPostAuthView] = useState<View>("store")
@@ -286,6 +268,7 @@ function App() {
 
     function syncRequestedModeFromUrl() {
       setRequestedRuntimeMode(getRequestedRuntimeModeFromSearch(window.location.search))
+      setRequestedBrandingVersion(getRequestedBrandingVersionFromSearch(window.location.search))
     }
 
     syncRequestedModeFromUrl()
@@ -391,21 +374,28 @@ function App() {
         console.log("[app-auth] getCurrentAuthState requested")
         let state = await getCurrentAuthState()
 
-        if (hasOAuthCallback && !state.profile) {
-          // Some mobile browsers persist OAuth session a moment after redirect.
-          // Retry briefly before falling back to guest UI.
-          for (let attempt = 1; attempt <= 3; attempt += 1) {
-            if (!isActive || state.profile) {
+        const hasActiveProfile = Boolean(state.profile ?? (state.user ? buildProfileFromMetadata(state.user) : null))
+
+        if (hasOAuthCallback && !hasActiveProfile) {
+          // OAuth redirect completed but profile might not be available yet due to:
+          // 1. First-time Google OAuth - profile backfill to DB takes time
+          // 2. Mobile browser session persistence delay
+          // 3. Database replication lag
+          // Retry with increasing delays to allow profile backfill to complete.
+          const retryAttempts = [1500, 2000, 2500, 3000]
+          for (const delayMs of retryAttempts) {
+            if (!isActive || Boolean(state.profile ?? (state.user ? buildProfileFromMetadata(state.user) : null))) {
               break
             }
 
-            await new Promise((resolve) => setTimeout(resolve, 1000))
+            await new Promise((resolve) => setTimeout(resolve, delayMs))
             state = await getCurrentAuthState()
 
             console.log("[app-auth] post-oauth recovery attempt", {
-              attempt,
+              delayMs,
               hasUser: Boolean(state.user),
               hasProfile: Boolean(state.profile),
+              userId: state.user?.id ?? null,
             })
           }
         }
@@ -419,10 +409,11 @@ function App() {
           hasProfile: Boolean(state.profile),
           role: state.profile?.role ?? null,
         })
+        const resolvedProfile = state.profile ?? (state.user ? buildProfileFromMetadata(state.user) : null)
         setIsAuthServiceDegraded(false)
-        setProfile(state.profile)
+        setProfile(resolvedProfile)
         setIsAuthInitializing(false)
-        if (!state.profile) {
+        if (!resolvedProfile) {
           setIsPostAuthSyncing(false)
           setShowAuthHandoffNotice(false)
         }
@@ -451,11 +442,12 @@ function App() {
         hasProfile: Boolean(state.profile),
         role: state.profile?.role ?? null,
       })
+      const resolvedProfile = state.profile ?? (state.user ? buildProfileFromMetadata(state.user) : null)
       setIsAuthServiceDegraded(false)
-      setProfile(state.profile)
+      setProfile(resolvedProfile)
       setIsAuthInitializing(false)
 
-      if (!state.user && !state.profile) {
+      if (!resolvedProfile) {
         setIsPostAuthSyncing(false)
         setShowAuthHandoffNotice(false)
       }
@@ -631,16 +623,7 @@ function App() {
     : localOrders
   const customerOrders = profile ? mergeOrders(cloudOrders, localOrdersForProfile) : localOrders
   const adminOrders = mergeOrders(cloudOrders, localOrders)
-  const trackingOwnerEmail = profile?.email?.trim().toLowerCase() ?? ""
-  const trackingOwnerAllowed = trackingOwnerEmail === TRACKING_OWNER_EMAIL
-
-  const anchorOrder = adminOrders.find((entry) => entry.id === TRACKING_VISIBLE_ORDER_ID)
-  const adminCutoffTimestamp = anchorOrder
-    ? getOrderTimestamp(anchorOrder)
-    : parseOrderIdTimestamp(TRACKING_VISIBLE_ORDER_ID)
-  const adminVisibleOrders = adminOrders.filter((entry) =>
-    entry.id === TRACKING_VISIBLE_ORDER_ID || getOrderTimestamp(entry) >= adminCutoffTimestamp
-  )
+  const adminVisibleOrders = adminOrders
   const cartItemCount = (cartItems || []).reduce((sum, item) => sum + item.quantity, 0)
 
   const persistCartItem = async (item: CartItem) => {
@@ -976,6 +959,9 @@ function App() {
     setCurrentView("payment")
   }
 
+  const brandingVersion = requestedBrandingVersion
+  const isV2BrandingPreview = brandingVersion === "v2"
+
   if (currentView === "account") {
     return (
       <AuthView
@@ -1166,19 +1152,14 @@ function App() {
     }
 
     const allVisibleOrders = profile.role === "admin" ? adminVisibleOrders : customerOrders
-    const trackingOrders = profile.role === "admin"
-      ? allVisibleOrders.filter((entry) => entry.id === TRACKING_VISIBLE_ORDER_ID && trackingOwnerAllowed)
-      : allVisibleOrders.filter(
-        (entry) => entry.paymentStatus === "pending" || (entry.id === TRACKING_VISIBLE_ORDER_ID && trackingOwnerAllowed)
-      )
-    const trackingOrder = currentOrder?.id === TRACKING_VISIBLE_ORDER_ID
-      ? currentOrder
-      : (trackingOrders[0] ?? null)
+    const trackingOrders = allVisibleOrders
+    const trackingOrder = currentOrder ?? (trackingOrders[0] ?? null)
 
     return (
       <OrderTrackingView
         order={trackingOrder}
         orders={trackingOrders}
+        useV2Branding={isV2BrandingPreview}
         onBack={handleBackToStore}
         onSelectOrder={handleViewTracking}
         onResumePayment={handleResumePayment}
@@ -1241,6 +1222,11 @@ function App() {
   return (
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-20 border-b border-slate-200 bg-white text-slate-900 shadow-sm sm:border-border sm:bg-card sm:text-foreground">
+        {isV2BrandingPreview && (
+          <div className="border-b border-amber-200 bg-amber-50 text-center text-xs font-medium text-amber-900">
+            V2 branding preview is active via ?version=v2. Current storefront stays unchanged until the final design is approved.
+          </div>
+        )}
         <div className="container mx-auto px-3 sm:px-4 py-2 sm:py-4">
           {!isMobile && (
             <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>

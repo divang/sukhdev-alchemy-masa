@@ -252,16 +252,25 @@ function getEmailRedirectTo() {
 }
 
 function buildProfileFromMetadata(user: User): UserProfile {
+  const metadataRole =
+    typeof user.app_metadata?.role === "string"
+      ? user.app_metadata.role
+      : typeof user.user_metadata?.role === "string"
+        ? user.user_metadata.role
+        : undefined
+
   return {
     id: user.id,
     email: user.email ?? "",
-    fullName: typeof user.user_metadata.full_name === "string" ? user.user_metadata.full_name : "",
-    phone: typeof user.user_metadata.phone === "string" ? user.user_metadata.phone : (user.phone ?? ""),
-    role: user.user_metadata.role === "admin" ? "admin" : "customer",
-    reviewOptIn: user.user_metadata.review_opt_in === true,
-    marketingOptIn: user.user_metadata.marketing_opt_in === true,
+    fullName: typeof user.user_metadata?.full_name === "string" ? user.user_metadata.full_name : "",
+    phone: typeof user.user_metadata?.phone === "string" ? user.user_metadata.phone : (user.phone ?? ""),
+    role: metadataRole === "admin" ? "admin" : "customer",
+    reviewOptIn: user.user_metadata?.review_opt_in === true,
+    marketingOptIn: user.user_metadata?.marketing_opt_in === true,
   }
 }
+
+export { buildProfileFromMetadata }
 
 function mapProfileRow(row: Record<string, unknown>, fallbackUser?: User): UserProfile {
   return {
@@ -404,12 +413,34 @@ export async function fetchProfile(user: User): Promise<UserProfile | null> {
     return fallback
   }
 
+  const profile = mapProfileRow(data, user)
+
+  if (profile.role === "admin" && user.user_metadata?.role !== "admin") {
+    try {
+      await supabase.auth.updateUser({
+        data: {
+          role: "admin",
+          full_name: profile.fullName,
+          phone: profile.phone,
+          review_opt_in: profile.reviewOptIn,
+          marketing_opt_in: profile.marketingOptIn,
+        },
+      })
+      authDebug("fetchProfile synced admin role into auth metadata", { userId: user.id })
+    } catch (metadataError) {
+      authDebug("fetchProfile metadata sync failed", {
+        userId: user.id,
+        error: metadataError instanceof Error ? metadataError.message : String(metadataError),
+      })
+    }
+  }
+
   authDebug("fetchProfile row loaded", {
     userId: user.id,
     role: data.role,
     durationMs: Date.now() - fetchStart,
   })
-  return mapProfileRow(data, user)
+  return profile
 }
 
 async function buildAuthState(session: Session | null): Promise<AuthState> {
@@ -421,9 +452,11 @@ async function buildAuthState(session: Session | null): Promise<AuthState> {
   let profile: UserProfile | null = null
 
   try {
-    profile = await withTimeout(fetchProfile(user), 3000, "buildAuthState profile timed out")
+    // For new OAuth users, profile might not exist in DB yet and needs backfilling.
+    // Increase timeout from 3s to 5s to account for the backfill operation.
+    profile = await withTimeout(fetchProfile(user), 5000, "buildAuthState profile timed out")
   } catch (error) {
-    authDebug("buildAuthState profile timed out; using metadata fallback", {
+    authDebug("buildAuthState profile fetch/backfill timed out; using metadata fallback", {
       userId: user.id,
       error: error instanceof Error ? error.message : String(error),
     })
@@ -504,7 +537,8 @@ export function subscribeToAuthStateChanges(callback: (state: AuthState) => void
     return { unsubscribe() {} }
   }
 
-  const { data } = supabase.auth.onAuthStateChange(async (_event, session) => {
+  const authClient = supabase
+  const { data } = authClient.auth.onAuthStateChange(async (_event, session) => {
     authDebug("onAuthStateChange fired", {
       event: _event,
       hasSession: Boolean(session),
@@ -524,7 +558,7 @@ export function subscribeToAuthStateChanges(callback: (state: AuthState) => void
     if (shouldRecover) {
       try {
         const { data: recovered } = await withTimeout(
-          supabase.auth.getSession(),
+          authClient.auth.getSession(),
           2000,
           "onAuthStateChange recovery getSession timed out"
         )
@@ -542,15 +576,6 @@ export function subscribeToAuthStateChanges(callback: (state: AuthState) => void
           error: recoveryError instanceof Error ? recoveryError.message : String(recoveryError),
         })
       }
-    }
-
-    // Update the UI immediately from auth metadata so account actions appear
-    // without waiting for the profiles table round-trip.
-    if (activeSession?.user) {
-      callback({
-        user: activeSession.user,
-        profile: buildProfileFromMetadata(activeSession.user),
-      })
     }
 
     try {
@@ -751,6 +776,8 @@ export async function signInCustomer(input: SignInInput): Promise<AuthResult> {
     return { user: null, profile: null, error: "Supabase auth is not configured." }
   }
 
+  const authClient = supabase
+
   authDebug("signInCustomer started", {
     email: maskEmail(input.email),
   })
@@ -761,7 +788,7 @@ export async function signInCustomer(input: SignInInput): Promise<AuthResult> {
     // client may spend extra time persisting the session, which delays Promise resolution
     // even after onAuthStateChange fires.  30 s catches most mobile/slow networks.
     const { data, error } = await withTimeout(
-      supabase.auth.signInWithPassword(input),
+      authClient.auth.signInWithPassword(input),
       30000,
       "Sign in request timed out"
     )
@@ -859,7 +886,7 @@ export async function signInCustomer(input: SignInInput): Promise<AuthResult> {
 
       try {
         const { data: sessionData } = await withTimeout(
-          supabase.auth.getSession(),
+          authClient.auth.getSession(),
           5000,
           "getSession recovery timed out"
         )
@@ -1050,20 +1077,39 @@ export async function signInWithGoogle(): Promise<string | undefined> {
 
   const redirectTo = getEmailRedirectTo()
   authDebug("signInWithGoogle started", { redirectTo })
-  try {
-    // Deterministic mobile path: navigate immediately to Supabase authorize
-    // endpoint without awaiting an SDK pre-flight URL generation call.
-    const authorizeUrl = new URL("/auth/v1/authorize", `${supabaseProjectUrl}/`)
-    authorizeUrl.searchParams.set("provider", "google")
-    authorizeUrl.searchParams.set("redirect_to", redirectTo)
-    authorizeUrl.searchParams.set("prompt", "select_account")
-    authorizeUrl.searchParams.set("state", `${Date.now()}`)
 
-    authDebug("signInWithGoogle redirecting via direct authorize URL", {
-      providerHost: authorizeUrl.host,
+  try {
+    const { data, error } = await withTimeout(
+      supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo,
+          skipBrowserRedirect: true,
+          prompt: "select_account",
+        },
+      }),
+      15000,
+      "Google sign-in request timed out"
+    )
+
+    if (error) {
+      const mappedError = mapAuthErrorMessage(error.message)
+      authDebug("signInWithGoogle request failed", {
+        error: mappedError,
+      })
+      return mappedError
+    }
+
+    if (!data?.url) {
+      return "Could not start Google sign-in. Please try again."
+    }
+
+    authDebug("signInWithGoogle redirecting via SDK OAuth URL", {
+      providerHost: new URL(data.url).host,
+      redirectTo,
     })
 
-    window.location.assign(authorizeUrl.toString())
+    window.location.assign(data.url)
     return undefined
   } catch (error) {
     return mapAuthErrorMessage(error instanceof Error ? error.message : String(error))
@@ -1105,7 +1151,7 @@ export async function finalizeOAuthRedirect(): Promise<string | undefined> {
 
   if (error || hashError) {
     clearOAuthParams()
-    return mapAuthErrorMessage(errorDescription || hashErrorDescription || error || hashError)
+    return mapAuthErrorMessage(errorDescription ?? hashErrorDescription ?? error ?? hashError ?? "")
   }
 
   if (!code && !(accessToken && refreshToken)) {
@@ -1126,6 +1172,34 @@ export async function finalizeOAuthRedirect(): Promise<string | undefined> {
       if (exchangeError) {
         clearOAuthParams()
         return mapAuthErrorMessage(exchangeError.message)
+      }
+
+      // After exchanging code, explicitly fetch session to ensure it's persisted and available.
+      // This fixes mobile browser issues where Supabase SDK doesn't hydrate the session state immediately.
+      try {
+        const { data: sessionCheckData, error: sessionCheckError } = await withTimeout(
+          supabase.auth.getSession(),
+          3000,
+          "OAuth session verification timed out"
+        )
+
+        authDebug("finalizeOAuthRedirect post-exchange session check", {
+          hasSession: Boolean(sessionCheckData?.session),
+          userId: sessionCheckData?.session?.user?.id ?? null,
+          sessionCheckError: sessionCheckError?.message ?? null,
+        })
+
+        if (sessionCheckError) {
+          authDebug("finalizeOAuthRedirect session check failed but continuing", {
+            error: sessionCheckError.message,
+          })
+          // Continue anyway - the session might be valid even if check fails
+        }
+      } catch (sessionCheckException) {
+        authDebug("finalizeOAuthRedirect session verification exception", {
+          error: sessionCheckException instanceof Error ? sessionCheckException.message : String(sessionCheckException),
+        })
+        // Continue - exception during verification doesn't mean exchange failed
       }
     } else if (accessToken && refreshToken) {
       authDebug("finalizeOAuthRedirect restoring session from hash tokens", {

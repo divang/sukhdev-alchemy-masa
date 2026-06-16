@@ -11,8 +11,22 @@ type CategoryRow = {
 type ProductRow = {
   id: string
   category_id: string
+  public_slug: string | null
   name: string
   sku: string
+  brand_name: string | null
+  short_description: string | null
+  bullet_highlights: string[] | null
+  model_number: string | null
+  mpn: string | null
+  gtin: string | null
+  variant_data: string[] | null
+  net_quantity_value: number | null
+  net_quantity_unit: string | null
+  material_info: string | null
+  compliance_info: string[] | null
+  additional_image_paths: string[] | null
+  category_breadcrumb: string[] | null
   price_per_100g: number
   image_path: string
   rating_avg: number
@@ -87,6 +101,16 @@ function inferPackGrams(row: Pick<ProductRow, "id" | "tags" | "sku">) {
   return 50
 }
 
+function buildFallbackSlug(row: Pick<ProductRow, "id" | "name" | "public_slug">) {
+  const candidate = row.public_slug?.trim() || row.name || row.id
+  const normalized = candidate
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+
+  return normalized || row.id
+}
+
 export async function loadCatalogFromSupabase(): Promise<CatalogSnapshot> {
   if (!supabase || !isSupabaseConfigured) {
     return { categories: [], products: [], reviews: [], testimonials: [], source: "fallback" }
@@ -104,7 +128,7 @@ export async function loadCatalogFromSupabase(): Promise<CatalogSnapshot> {
 
   const { data: productsData, error: productsError } = await supabase
     .from("products")
-    .select("id, category_id, name, sku, price_per_100g, image_path, rating_avg, review_count, description, ingredients, youtube_url, in_stock, tags")
+    .select("id, category_id, public_slug, name, sku, brand_name, short_description, bullet_highlights, model_number, mpn, gtin, variant_data, net_quantity_value, net_quantity_unit, material_info, compliance_info, additional_image_paths, category_breadcrumb, price_per_100g, image_path, rating_avg, review_count, description, ingredients, youtube_url, in_stock, tags")
     .eq("is_active", true)
     .order("name", { ascending: true })
 
@@ -157,6 +181,7 @@ export async function loadCatalogFromSupabase(): Promise<CatalogSnapshot> {
 
   const products = ((productsData as ProductRow[] | null) ?? []).map((row) => ({
     id: row.id,
+    slug: buildFallbackSlug(row),
     category: row.id === "sukhdevi-combo-pack" || row.sku === "PM-COMBO-001"
       ? "combo-pack-masala"
       : row.category_id,
@@ -172,6 +197,19 @@ export async function loadCatalogFromSupabase(): Promise<CatalogSnapshot> {
     inStock: row.in_stock,
     tags: Array.isArray(row.tags) ? row.tags : [],
     sku: row.sku,
+    brandName: row.brand_name ?? undefined,
+    shortDescription: row.short_description ?? undefined,
+    highlights: Array.isArray(row.bullet_highlights) ? row.bullet_highlights : [],
+    modelNumber: row.model_number ?? undefined,
+    mpn: row.mpn ?? undefined,
+    gtin: row.gtin ?? undefined,
+    variantData: Array.isArray(row.variant_data) ? row.variant_data : [],
+    netQuantityValue: row.net_quantity_value ?? undefined,
+    netQuantityUnit: row.net_quantity_unit ?? undefined,
+    materialInfo: row.material_info ?? undefined,
+    complianceInfo: Array.isArray(row.compliance_info) ? row.compliance_info : [],
+    additionalImages: Array.isArray(row.additional_image_paths) ? row.additional_image_paths : [],
+    categoryBreadcrumb: Array.isArray(row.category_breadcrumb) ? row.category_breadcrumb : [],
   }))
 
   const reviews = ((reviewsData as ReviewRow[] | null) ?? []).map((row) => ({
@@ -324,9 +362,23 @@ export async function submitProductReview(input: SubmitReviewInput): Promise<Sub
 export type AdminProductInput = {
   id: string
   categoryId: string
+  publicSlug?: string
   sku: string
   name: string
   description: string
+  brandName?: string
+  shortDescription?: string
+  highlights?: string[]
+  modelNumber?: string
+  mpn?: string
+  gtin?: string
+  variantData?: string[]
+  netQuantityValue?: number
+  netQuantityUnit?: string
+  materialInfo?: string
+  complianceInfo?: string[]
+  additionalImages?: string[]
+  categoryBreadcrumb?: string[]
   pricePer100g: number
   imagePath: string
   ingredients: string[]
@@ -344,6 +396,7 @@ type AdminProductResult = {
 function mapProductRowToProduct(row: ProductRow): Product {
   return {
     id: row.id,
+    slug: buildFallbackSlug(row),
     category: row.category_id,
     name: normalizeProductName(row.id, row.name),
     price: Number(row.price_per_100g),
@@ -357,6 +410,19 @@ function mapProductRowToProduct(row: ProductRow): Product {
     inStock: row.in_stock,
     tags: Array.isArray(row.tags) ? row.tags : [],
     sku: row.sku,
+    brandName: row.brand_name ?? undefined,
+    shortDescription: row.short_description ?? undefined,
+    highlights: Array.isArray(row.bullet_highlights) ? row.bullet_highlights : [],
+    modelNumber: row.model_number ?? undefined,
+    mpn: row.mpn ?? undefined,
+    gtin: row.gtin ?? undefined,
+    variantData: Array.isArray(row.variant_data) ? row.variant_data : [],
+    netQuantityValue: row.net_quantity_value ?? undefined,
+    netQuantityUnit: row.net_quantity_unit ?? undefined,
+    materialInfo: row.material_info ?? undefined,
+    complianceInfo: Array.isArray(row.compliance_info) ? row.compliance_info : [],
+    additionalImages: Array.isArray(row.additional_image_paths) ? row.additional_image_paths : [],
+    categoryBreadcrumb: Array.isArray(row.category_breadcrumb) ? row.category_breadcrumb : [],
   }
 }
 
@@ -369,9 +435,23 @@ export async function updateProductByAdmin(input: AdminProductInput): Promise<Ad
     .from("products")
     .update({
       category_id: input.categoryId,
+      public_slug: input.publicSlug?.trim() || null,
       sku: input.sku,
       name: input.name,
       description: input.description,
+      brand_name: input.brandName?.trim() || null,
+      short_description: input.shortDescription?.trim() || null,
+      bullet_highlights: input.highlights ?? [],
+      model_number: input.modelNumber?.trim() || null,
+      mpn: input.mpn?.trim() || null,
+      gtin: input.gtin?.trim() || null,
+      variant_data: input.variantData ?? [],
+      net_quantity_value: input.netQuantityValue ?? null,
+      net_quantity_unit: input.netQuantityUnit?.trim() || null,
+      material_info: input.materialInfo?.trim() || null,
+      compliance_info: input.complianceInfo ?? [],
+      additional_image_paths: input.additionalImages ?? [],
+      category_breadcrumb: input.categoryBreadcrumb ?? [],
       price_per_100g: input.pricePer100g,
       image_path: input.imagePath,
       ingredients: input.ingredients,
@@ -382,7 +462,7 @@ export async function updateProductByAdmin(input: AdminProductInput): Promise<Ad
       updated_at: new Date().toISOString(),
     })
     .eq("id", input.id)
-    .select("id, category_id, name, sku, price_per_100g, image_path, rating_avg, review_count, description, ingredients, youtube_url, in_stock, tags")
+    .select("id, category_id, public_slug, name, sku, brand_name, short_description, bullet_highlights, model_number, mpn, gtin, variant_data, net_quantity_value, net_quantity_unit, material_info, compliance_info, additional_image_paths, category_breadcrumb, price_per_100g, image_path, rating_avg, review_count, description, ingredients, youtube_url, in_stock, tags")
     .single()
 
   if (error || !data) {
@@ -402,9 +482,23 @@ export async function createProductByAdmin(input: AdminProductInput): Promise<Ad
     .insert({
       id: input.id,
       category_id: input.categoryId,
+      public_slug: input.publicSlug?.trim() || null,
       sku: input.sku,
       name: input.name,
       description: input.description,
+      brand_name: input.brandName?.trim() || null,
+      short_description: input.shortDescription?.trim() || null,
+      bullet_highlights: input.highlights ?? [],
+      model_number: input.modelNumber?.trim() || null,
+      mpn: input.mpn?.trim() || null,
+      gtin: input.gtin?.trim() || null,
+      variant_data: input.variantData ?? [],
+      net_quantity_value: input.netQuantityValue ?? null,
+      net_quantity_unit: input.netQuantityUnit?.trim() || null,
+      material_info: input.materialInfo?.trim() || null,
+      compliance_info: input.complianceInfo ?? [],
+      additional_image_paths: input.additionalImages ?? [],
+      category_breadcrumb: input.categoryBreadcrumb ?? [],
       price_per_100g: input.pricePer100g,
       image_path: input.imagePath,
       ingredients: input.ingredients,
@@ -413,7 +507,7 @@ export async function createProductByAdmin(input: AdminProductInput): Promise<Ad
       in_stock: input.inStock,
       is_active: input.isActive ?? true,
     })
-    .select("id, category_id, name, sku, price_per_100g, image_path, rating_avg, review_count, description, ingredients, youtube_url, in_stock, tags")
+    .select("id, category_id, public_slug, name, sku, brand_name, short_description, bullet_highlights, model_number, mpn, gtin, variant_data, net_quantity_value, net_quantity_unit, material_info, compliance_info, additional_image_paths, category_breadcrumb, price_per_100g, image_path, rating_avg, review_count, description, ingredients, youtube_url, in_stock, tags")
     .single()
 
   if (error || !data) {

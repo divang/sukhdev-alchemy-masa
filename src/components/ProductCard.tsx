@@ -88,15 +88,17 @@ export function ProductCard({ product, onViewDetails, onAddToCart, mobileDenseLa
               >
                 View details
               </button>
-              <Button
-                type="button"
-                size="icon"
-                className="h-8 w-8 rounded-full bg-yellow-400 text-slate-900 hover:bg-yellow-500"
-                onClick={() => onAddToCart(product)}
-                aria-label={`Add ${product.name} to cart`}
-              >
-                <Plus size={16} weight="bold" />
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  size="icon"
+                  className="h-8 w-8 rounded-full bg-yellow-400 text-slate-900 hover:bg-yellow-500"
+                  onClick={() => onAddToCart(product)}
+                  aria-label={`Add ${product.name} to cart`}
+                >
+                  <Plus size={16} weight="bold" />
+                </Button>
+              </div>
             </CardFooter>
           </Card>
         </motion.div>

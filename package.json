@@ -11,6 +11,9 @@
         "lint": "eslint .",
         "test:email-confirmation": "node scripts/test-email-confirmation.mjs",
         "test:signin-latency": "node scripts/test-signin-latency.mjs",
+        "test:auth:integration": "node scripts/test-auth-integration.mjs",
+        "test:e2e": "playwright test",
+        "test:auth": "npm run test:auth:integration && npm run test:e2e",
         "optimize": "vite optimize",
         "preview": "vite preview"
     },
@@ -81,6 +84,7 @@
     },
     "devDependencies": {
         "@eslint/js": "^9.21.0",
+        "@playwright/test": "^1.60.0",
         "@tailwindcss/postcss": "^4.1.8",
         "@types/react": "^19.0.10",
         "@types/react-dom": "^19.0.4",

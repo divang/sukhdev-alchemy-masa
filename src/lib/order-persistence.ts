@@ -50,11 +50,48 @@ type OrderItemRow = {
   unit_price: number
 }
 
+type GoogleSheetsSyncPayload = {
+  action: "create_order" | "update_payment" | "update_status"
+  order?: Order
+  orderId?: string
+  paymentStatus?: Order["paymentStatus"]
+  status?: Order["status"]
+  updatedAt?: string
+}
+
 function assertClient() {
   if (!supabase || !isSupabaseConfigured) {
     return null
   }
   return supabase
+}
+
+function syncToGoogleSheetsInBackground(action: GoogleSheetsSyncPayload["action"], payload: Omit<GoogleSheetsSyncPayload, "action">) {
+  if (!isGoogleSheetsConfigured) {
+    return
+  }
+
+  void postToGoogleSheets({ action, ...payload }).catch((error) => {
+    console.warn(`[order-sync] Google Sheets ${action} sync failed`, error)
+  })
+}
+
+async function getSignedInUserId() {
+  const client = assertClient()
+  if (!client) {
+    return { userId: null as string | null, error: "Supabase is not configured." }
+  }
+
+  const { data: sessionData } = await client.auth.getSession()
+  if (sessionData.session?.user?.id) {
+    return { userId: sessionData.session.user.id, error: undefined }
+  }
+
+  const { data: userData, error: userError } = await client.auth.getUser()
+  return {
+    userId: userData.user?.id ?? null,
+    error: userError?.message,
+  }
 }
 
 function mapOrderRow(row: OrderRow): Order {
@@ -129,22 +166,22 @@ export async function persistOrderToSupabase(order: Order): Promise<PersistenceR
     }
   }
 
-  if (isGoogleSheetsConfigured) {
-    try {
-      await postToGoogleSheets({ action: "create_order", order })
-      return { persisted: true, provider: "google-sheets" }
-    } catch (error) {
-      return {
-        persisted: false,
-        reason: "error",
-        provider: "google-sheets",
-        error: error instanceof Error ? error.message : "Google Sheets order sync failed",
-      }
-    }
-  }
-
   const client = assertClient()
   if (!client) {
+    if (isGoogleSheetsConfigured) {
+      try {
+        await postToGoogleSheets({ action: "create_order", order })
+        return { persisted: true, provider: "google-sheets" }
+      } catch (error) {
+        return {
+          persisted: false,
+          reason: "error",
+          provider: "google-sheets",
+          error: error instanceof Error ? error.message : "Google Sheets order sync failed",
+        }
+      }
+    }
+
     return { persisted: false, reason: "not-configured" }
   }
 
@@ -173,8 +210,26 @@ export async function persistOrderToSupabase(order: Order): Promise<PersistenceR
 
   const rpcResult = await client.rpc("create_order_v2", { p_payload: payload })
   if (!rpcResult.error) {
+    if (isGoogleSheetsConfigured) {
+      syncToGoogleSheetsInBackground("create_order", { order })
+    }
     return { persisted: true, provider: "supabase" }
   }
+
+  if (isGoogleSheetsConfigured) {
+    try {
+      await postToGoogleSheets({ action: "create_order", order })
+      return { persisted: true, provider: "google-sheets" }
+    } catch (error) {
+      return {
+        persisted: false,
+        reason: "error",
+        provider: "google-sheets",
+        error: error instanceof Error ? error.message : "Google Sheets order sync failed",
+      }
+    }
+  }
+
   return {
     persisted: false,
     reason: "error",
@@ -188,20 +243,16 @@ export async function fetchOrdersForCurrentUser(): Promise<OrdersLoadResult> {
     return { orders: [], error: "Supabase is not configured." }
   }
 
-  const {
-    data: { user },
-    error: userError,
-  } = await client.auth.getUser()
-
-  if (userError || !user) {
-    return { orders: [], error: userError?.message ?? "No signed-in user found." }
+  const { userId, error: userError } = await getSignedInUserId()
+  if (!userId) {
+    return { orders: [], error: userError ?? "No signed-in user found." }
   }
 
   const [ordersResult, itemsResult] = await Promise.all([
     client
       .from("orders")
       .select("id, user_id, customer_name, customer_email, customer_phone, customer_address, customer_city, customer_pincode, subtotal_amount, shipping_amount, discount_amount, promo_code, total_amount, status, payment_status, created_at, updated_at")
-      .eq("user_id", user.id)
+      .eq("user_id", userId)
       .order("created_at", { ascending: false }),
     client
       .from("order_items")
@@ -256,11 +307,48 @@ export async function fetchOrdersForAdmin(): Promise<OrdersLoadResult> {
     }
   }
 
+  const userOrderIds = new Set(((ordersResult.data as OrderRow[] | null) ?? []).map((row) => row.id))
+  const normalizedRows = ((itemsResult.data as OrderItemRow[] | null) ?? []).filter((row) => userOrderIds.has(row.order_id))
+
   return {
-    orders: hydrateOrdersWithNormalizedItems(
-      ordersResult.data as OrderRow[] | null,
-      itemsResult.data as OrderItemRow[] | null,
-    ),
+    orders: hydrateOrdersWithNormalizedItems(ordersResult.data as OrderRow[] | null, normalizedRows),
+  }
+}
+
+export async function fetchOrdersForUser(userId: string): Promise<OrdersLoadResult> {
+  const client = assertClient()
+  if (!client) {
+    return { orders: [], error: "Supabase is not configured." }
+  }
+
+  const [ordersResult, itemsResult] = await Promise.all([
+    client
+      .from("orders")
+      .select("id, user_id, customer_name, customer_email, customer_phone, customer_address, customer_city, customer_pincode, subtotal_amount, shipping_amount, discount_amount, promo_code, total_amount, status, payment_status, created_at, updated_at")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false }),
+    client
+      .from("order_items")
+      .select("order_id, product_id, product_name, quantity, pack_grams, unit_price")
+      .order("created_at", { ascending: true }),
+  ])
+
+  if (ordersResult.error) {
+    return { orders: [], error: ordersResult.error.message }
+  }
+
+  if (itemsResult.error) {
+    return {
+      orders: ((ordersResult.data as OrderRow[] | null) ?? []).map(mapOrderRow),
+      error: itemsResult.error.message,
+    }
+  }
+
+  const userOrderIds = new Set(((ordersResult.data as OrderRow[] | null) ?? []).map((row) => row.id))
+  const normalizedRows = ((itemsResult.data as OrderItemRow[] | null) ?? []).filter((row) => userOrderIds.has(row.order_id))
+
+  return {
+    orders: hydrateOrdersWithNormalizedItems(ordersResult.data as OrderRow[] | null, normalizedRows),
   }
 }
 
@@ -269,10 +357,6 @@ export async function updateSupabaseOrderPayment(
   paymentStatus: Order["paymentStatus"],
   status?: Order["status"]
 ): Promise<PersistenceResult> {
-  if (!allowClientOrderUpdates) {
-    return { persisted: false, reason: "not-configured" }
-  }
-
   if (isGoogleSheetsConfigured) {
     try {
       await postToGoogleSheets({
@@ -282,15 +366,15 @@ export async function updateSupabaseOrderPayment(
         status,
         updatedAt: new Date().toISOString(),
       })
-      return { persisted: true, provider: "google-sheets" }
     } catch (error) {
-      return {
-        persisted: false,
-        reason: "error",
-        provider: "google-sheets",
-        error: error instanceof Error ? error.message : "Google Sheets payment sync failed",
-      }
+      console.warn("Google Sheets payment sync failed", error)
     }
+  }
+
+  if (!allowClientOrderUpdates) {
+    return isGoogleSheetsConfigured
+      ? { persisted: true, provider: "google-sheets" }
+      : { persisted: false, reason: "not-configured" }
   }
 
   const client = assertClient()
@@ -318,10 +402,6 @@ export async function updateSupabaseOrderStatus(
   orderId: string,
   status: Order["status"]
 ): Promise<PersistenceResult> {
-  if (!allowClientOrderUpdates) {
-    return { persisted: false, reason: "not-configured" }
-  }
-
   if (isGoogleSheetsConfigured) {
     try {
       await postToGoogleSheets({
@@ -330,15 +410,15 @@ export async function updateSupabaseOrderStatus(
         status,
         updatedAt: new Date().toISOString(),
       })
-      return { persisted: true, provider: "google-sheets" }
     } catch (error) {
-      return {
-        persisted: false,
-        reason: "error",
-        provider: "google-sheets",
-        error: error instanceof Error ? error.message : "Google Sheets status sync failed",
-      }
+      console.warn("Google Sheets status sync failed", error)
     }
+  }
+
+  if (!allowClientOrderUpdates) {
+    return isGoogleSheetsConfigured
+      ? { persisted: true, provider: "google-sheets" }
+      : { persisted: false, reason: "not-configured" }
   }
 
   const client = assertClient()

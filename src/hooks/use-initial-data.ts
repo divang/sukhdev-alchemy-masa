@@ -250,8 +250,11 @@ export function useInitialData() {
       setIsHydrated(true)
     }
     
-    initializeData()
-  }, [categories, products, dataVersion, catalogCacheMeta, setCatalogCacheMeta, setCategories, setDataVersion, setProducts, setReviews, setTestimonials, testimonials, reviews])
+    void initializeData()
+    // This initializer is intended to run once per app mount.
+    // Including hydrated catalog values in deps can cause recursive updates.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   return { categories, products, isHydrated }
 }

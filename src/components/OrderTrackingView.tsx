@@ -13,6 +13,7 @@ type OrderTrackingViewProps = {
   onSelectOrder: (orderId: string) => void
   onResumePayment?: (orderId: string) => void
   onAddToCart?: (productId: string) => void
+  useV2Branding?: boolean
 }
 
 function getOrderTimestamp(order: Order) {
@@ -20,7 +21,7 @@ function getOrderTimestamp(order: Order) {
   return Number.isFinite(value) ? value : 0
 }
 
-export function OrderTrackingView({ order, orders, onBack, onSelectOrder, onResumePayment, onAddToCart }: OrderTrackingViewProps) {
+export function OrderTrackingView({ order, orders, onBack, onSelectOrder, onResumePayment, onAddToCart, useV2Branding = false }: OrderTrackingViewProps) {
   const [shipment, setShipment] = useState<LatestOrderShipment | null>(null)
   const [isLoadingShipment, setIsLoadingShipment] = useState(false)
   const [isSyncingShipment, setIsSyncingShipment] = useState(false)
@@ -122,6 +123,164 @@ export function OrderTrackingView({ order, orders, onBack, onSelectOrder, onResu
     }
   }, [currentOrder?.id])
   
+  if (useV2Branding) {
+    return (
+      <div className="min-h-screen bg-[#efefef]">
+        <header className="sticky top-0 z-10 border-b border-slate-200 bg-white no-print">
+          <div className="container mx-auto flex items-center justify-between px-4 py-4">
+            <Button variant="ghost" onClick={onBack}>
+              <ArrowLeft size={20} className="mr-2" />
+              Back to Store
+            </Button>
+            <p className="text-sm font-medium text-slate-600">My Account</p>
+          </div>
+        </header>
+
+        <div className="container mx-auto max-w-6xl px-4 py-8">
+          <div className="grid gap-4 md:grid-cols-[280px,1fr]">
+            <Card className="border-slate-200 bg-white">
+              <CardHeader className="space-y-3">
+                <CardTitle className="text-lg">Hey, Customer</CardTitle>
+                <CardDescription>
+                  {orders.length} total orders
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <button
+                  type="button"
+                  className="w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-left text-sm font-medium"
+                >
+                  Overview
+                </button>
+                <button
+                  type="button"
+                  className="w-full rounded-md border border-slate-200 px-3 py-2 text-left text-sm"
+                >
+                  My Orders
+                </button>
+                <button
+                  type="button"
+                  className="w-full rounded-md border border-slate-200 px-3 py-2 text-left text-sm"
+                >
+                  Saved Addresses
+                </button>
+              </CardContent>
+            </Card>
+
+            <Card className="border-slate-200 bg-white">
+              <CardHeader>
+                <CardTitle>Overview</CardTitle>
+                <CardDescription>Track active, pending, and delivered orders from one place.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <section>
+                  <h3 className="mb-2 text-sm font-semibold text-slate-700">My Orders</h3>
+                  {sortedOrders.length === 0 ? (
+                    <div className="rounded-md border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+                      No past orders yet. Start shopping to see orders here.
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {sortedOrders.slice(0, 5).map((entry) => (
+                        <button
+                          key={`v2-overview-${entry.id}`}
+                          type="button"
+                          onClick={() => onSelectOrder(entry.id)}
+                          className={`w-full rounded-md border p-3 text-left ${currentOrder?.id === entry.id ? "border-slate-800 bg-slate-50" : "border-slate-200 bg-white"}`}
+                        >
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <p className="text-sm font-medium">{entry.id}</p>
+                            <Badge variant={entry.paymentStatus === "paid" ? "secondary" : "outline"}>
+                              {entry.paymentStatus === "paid" ? "Paid" : "Pending Payment"}
+                            </Badge>
+                          </div>
+                          <p className="mt-1 text-xs text-slate-600">
+                            {new Date(entry.createdAt).toLocaleDateString()} | Rs{entry.totalAmount.toFixed(2)}
+                          </p>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </section>
+
+                <section>
+                  <h3 className="mb-2 text-sm font-semibold text-slate-700">Active Shipment</h3>
+                  {currentOrder && currentOrder.paymentStatus === "paid" && currentOrder.status !== "delivered" ? (
+                    <div className="rounded-md border border-slate-200 p-4 text-sm">
+                      <div className="mb-1 flex items-center justify-between gap-2">
+                        <p className="font-medium">{currentOrder.id}</p>
+                        <Badge variant="secondary" className="capitalize">{currentOrder.status}</Badge>
+                      </div>
+                      {shipment?.trackingUrl ? (
+                        <a className="inline-flex items-center text-primary underline" href={shipment.trackingUrl} target="_blank" rel="noreferrer">
+                          <LinkIcon size={14} className="mr-1" />
+                          Tracking Link
+                        </a>
+                      ) : (
+                        <p className="text-slate-600">Tracking will appear after shipment is assigned.</p>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="rounded-md border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+                      No active shipment right now.
+                    </div>
+                  )}
+                </section>
+
+                <section>
+                  <h3 className="mb-2 text-sm font-semibold text-slate-700">Pending Payments</h3>
+                  {pendingPaymentOrders.length === 0 ? (
+                    <div className="rounded-md border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+                      No unpaid orders.
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {pendingPaymentOrders.map((entry) => (
+                        <div key={`v2-pending-${entry.id}`} className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-slate-200 p-3 text-sm">
+                          <span>{entry.id} | Rs{entry.totalAmount.toFixed(2)}</span>
+                          <Button size="sm" onClick={() => onResumePayment?.(entry.id)}>Pay Now</Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </section>
+
+                <section>
+                  <h3 className="mb-2 text-sm font-semibold text-slate-700">Delivered Orders</h3>
+                  {deliveredOrders.length === 0 ? (
+                    <div className="rounded-md border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+                      No delivered orders yet.
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {deliveredOrders.slice(0, 6).map((entry) => (
+                        <div key={`v2-delivered-${entry.id}`} className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-slate-200 p-3 text-sm">
+                          <span>{entry.id} | Rs{entry.totalAmount.toFixed(2)}</span>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              const firstItem = entry.items[0]
+                              if (firstItem) {
+                                onAddToCart?.(firstItem.productId)
+                              }
+                            }}
+                          >
+                            Order Again
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </section>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b bg-card sticky top-0 z-10 no-print">

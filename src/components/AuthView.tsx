@@ -52,6 +52,7 @@ export function AuthView({ mode, onBack, onAuthenticated }: AuthViewProps) {
   const [isVerifyingOtp, setIsVerifyingOtp] = useState(false)
   const [isRequestingReset, setIsRequestingReset] = useState(false)
   const [isUpdatingPassword, setIsUpdatingPassword] = useState(false)
+  const [isGoogleRedirecting, setIsGoogleRedirecting] = useState(false)
   const [authNotice, setAuthNotice] = useState<string | null>(null)
   const [usePasswordSignIn, setUsePasswordSignIn] = useState(false)
   const [isRecoveryMode] = useState(() => hasRecoveryParamsInUrl())
@@ -80,6 +81,14 @@ export function AuthView({ mode, onBack, onAuthenticated }: AuthViewProps) {
     const ua = navigator.userAgent || ""
     return /(FBAN|FBAV|Instagram|Line|MicroMessenger|wv\)|; wv\b|WebView)/i.test(ua)
   })
+  const isAuthBusy = isSubmitting
+    || isResending
+    || isSendingOtp
+    || isVerifyingOtp
+    || isRequestingReset
+    || isUpdatingPassword
+    || isCopyingGoogleUrl
+    || isGoogleRedirecting
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -266,12 +275,19 @@ export function AuthView({ mode, onBack, onAuthenticated }: AuthViewProps) {
   }
 
   const handleGoogleSignIn = async () => {
+    if (isAuthBusy) {
+      return
+    }
+
+    setIsGoogleRedirecting(true)
+
     if (isLikelyInAppBrowser) {
       toast.warning("This appears to be an in-app browser. If Google sign-in hangs, open this site in Safari/Chrome.")
     }
 
     const error = await signInWithGoogle()
     if (error) {
+      setIsGoogleRedirecting(false)
       toast.error(error)
       return
     }
@@ -362,7 +378,7 @@ export function AuthView({ mode, onBack, onAuthenticated }: AuthViewProps) {
     <div className="min-h-screen bg-background">
       <header className="border-b bg-card sticky top-0 z-10">
         <div className="container mx-auto px-4 py-4">
-          <Button variant="ghost" onClick={onBack}>
+          <Button variant="ghost" onClick={onBack} disabled={isAuthBusy}>
             <ArrowLeft size={20} className="mr-2" />
             Back to Store
           </Button>
@@ -436,16 +452,16 @@ export function AuthView({ mode, onBack, onAuthenticated }: AuthViewProps) {
                       </div>
                     )}
 
-                    <Button className="w-full" type="button" onClick={handleGoogleSignIn}>
-                      Continue with Google
+                    <Button className="w-full" type="button" onClick={handleGoogleSignIn} disabled={isAuthBusy}>
+                      {isGoogleRedirecting ? "Redirecting to Google..." : "Continue with Google"}
                     </Button>
 
                     {isLikelyInAppBrowser && (
                       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                        <Button type="button" variant="outline" onClick={handleOpenGoogleAuthLink}>
+                        <Button type="button" variant="outline" onClick={handleOpenGoogleAuthLink} disabled={isAuthBusy}>
                           Open Google Auth Link
                         </Button>
-                        <Button type="button" variant="outline" onClick={handleCopyGoogleAuthLink} disabled={isCopyingGoogleUrl}>
+                        <Button type="button" variant="outline" onClick={handleCopyGoogleAuthLink} disabled={isAuthBusy}>
                           {isCopyingGoogleUrl ? "Copying..." : "Copy Link"}
                         </Button>
                       </div>
@@ -478,7 +494,7 @@ export function AuthView({ mode, onBack, onAuthenticated }: AuthViewProps) {
                         </div>
                       )}
 
-                      <Button className="w-full" type="submit" disabled={isSendingOtp || isVerifyingOtp}>
+                      <Button className="w-full" type="submit" disabled={isAuthBusy}>
                         {phoneOtpData.otpSent
                           ? (isVerifyingOtp ? "Verifying OTP..." : "Verify OTP")
                           : (isSendingOtp ? "Sending OTP..." : "Continue with Phone OTP")}
@@ -488,6 +504,7 @@ export function AuthView({ mode, onBack, onAuthenticated }: AuthViewProps) {
                     <Button
                       className="w-full"
                       type="button"
+                      disabled={isAuthBusy}
                       variant="ghost"
                       onClick={() => setUsePasswordSignIn((current) => !current)}
                     >
@@ -516,14 +533,14 @@ export function AuthView({ mode, onBack, onAuthenticated }: AuthViewProps) {
                             placeholder="Enter your password"
                           />
                         </div>
-                        <Button className="w-full" type="submit" disabled={isSubmitting}>
+                        <Button className="w-full" type="submit" disabled={isAuthBusy}>
                           {isSubmitting ? "Signing in..." : "Sign In"}
                         </Button>
                         <Button
                           className="w-full"
                           type="button"
                           variant="outline"
-                          disabled={isSubmitting || isResending}
+                          disabled={isAuthBusy}
                           onClick={handleResendConfirmation}
                         >
                           {isResending ? "Resending..." : "Resend Confirmation Email"}
@@ -532,7 +549,7 @@ export function AuthView({ mode, onBack, onAuthenticated }: AuthViewProps) {
                           className="w-full"
                           type="button"
                           variant="outline"
-                          disabled={isRequestingReset}
+                          disabled={isAuthBusy}
                           onClick={handleRequestPasswordReset}
                         >
                           {isRequestingReset ? "Sending reset email..." : "Forgot Password"}
@@ -564,7 +581,7 @@ export function AuthView({ mode, onBack, onAuthenticated }: AuthViewProps) {
                             placeholder="Re-enter new password"
                           />
                         </div>
-                        <Button className="w-full" type="submit" disabled={isUpdatingPassword}>
+                        <Button className="w-full" type="submit" disabled={isAuthBusy}>
                           {isUpdatingPassword ? "Updating password..." : "Update Password"}
                         </Button>
                       </form>
@@ -580,16 +597,16 @@ export function AuthView({ mode, onBack, onAuthenticated }: AuthViewProps) {
                       </div>
                     )}
 
-                    <Button className="w-full" type="button" onClick={handleGoogleSignIn}>
-                      Continue with Google
+                    <Button className="w-full" type="button" onClick={handleGoogleSignIn} disabled={isAuthBusy}>
+                      {isGoogleRedirecting ? "Redirecting to Google..." : "Continue with Google"}
                     </Button>
 
                     {isLikelyInAppBrowser && (
                       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                        <Button type="button" variant="outline" onClick={handleOpenGoogleAuthLink}>
+                        <Button type="button" variant="outline" onClick={handleOpenGoogleAuthLink} disabled={isAuthBusy}>
                           Open Google Auth Link
                         </Button>
-                        <Button type="button" variant="outline" onClick={handleCopyGoogleAuthLink} disabled={isCopyingGoogleUrl}>
+                        <Button type="button" variant="outline" onClick={handleCopyGoogleAuthLink} disabled={isAuthBusy}>
                           {isCopyingGoogleUrl ? "Copying..." : "Copy Link"}
                         </Button>
                       </div>
@@ -670,7 +687,7 @@ export function AuthView({ mode, onBack, onAuthenticated }: AuthViewProps) {
                       <span>Allow review and rating requests after delivery.</span>
                     </label>
 
-                    <Button className="w-full" type="submit" disabled={isSubmitting}>
+                    <Button className="w-full" type="submit" disabled={isAuthBusy}>
                       {isSubmitting ? "Creating account..." : "Create Account"}
                     </Button>
                   </form>

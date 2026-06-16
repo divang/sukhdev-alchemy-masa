@@ -1,6 +1,7 @@
 import type { UserProfile } from "@/lib/types"
 
 export type RuntimeMode = "prod" | "dev"
+export type BrandingVersion = "v1" | "v2"
 
 const DEFAULT_DEV_ADMIN_EMAIL = "divang.s@gmail.com"
 
@@ -17,6 +18,12 @@ export function getRequestedRuntimeModeFromSearch(search: string): RuntimeMode {
   const params = new URLSearchParams(search)
   const mode = params.get("mode")?.trim().toLowerCase()
   return mode === "dev" ? "dev" : "prod"
+}
+
+export function getRequestedBrandingVersionFromSearch(search: string): BrandingVersion {
+  const params = new URLSearchParams(search)
+  const version = params.get("version")?.trim().toLowerCase()
+  return version === "v2" ? "v2" : "v1"
 }
 
 export function isDevModeAllowed(profile: UserProfile | null) {
