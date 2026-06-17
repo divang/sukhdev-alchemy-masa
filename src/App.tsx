@@ -821,22 +821,24 @@ function App() {
       userId: profile?.id ?? null,
     }
 
-    setOrders((current = []) => [...current, nextOrder])
-    setCloudOrders((current) => mergeOrders([nextOrder], current))
-    setCurrentOrder(nextOrder)
-    setCartItems([])
-    void replaceCartForCurrentUser([])
-    setCurrentView("payment")
-
     const result = await persistOrderToSupabase(nextOrder)
     if (!result.persisted) {
+      // Never proceed to payment when cloud order creation failed, otherwise payments can orphan from orders.
       if (result.reason === "error") {
         toast.error(`Database Error: ${result.error || "Failed to save order to cloud."}\n[Order ID: ${nextOrder.id}]`)
         console.error("Order persistence failed:", result)
       } else {
         toast.info("Cloud storage not configured. Order saved locally.")
       }
+      return
     } else {
+      setOrders((current = []) => [...current, nextOrder])
+      setCloudOrders((current) => mergeOrders([nextOrder], current))
+      setCurrentOrder(nextOrder)
+      setCartItems([])
+      void replaceCartForCurrentUser([])
+      setCurrentView("payment")
+
       toast.success(`Order saved to ${result.provider}!`)
 
       if (result.provider === "supabase") {

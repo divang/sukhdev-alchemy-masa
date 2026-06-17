@@ -45,7 +45,7 @@ async function getAuthenticatedUser(req: Request) {
     return { error: error?.message ?? "Authentication failed." }
   }
 
-  return { user: data.user }
+  return { user: data.user, client: authClient }
 }
 
 Deno.serve(async (req) => {
@@ -65,11 +65,40 @@ Deno.serve(async (req) => {
   const payload = (await req.json().catch(() => ({}))) as CreateOrderPayload
   const amount = Number(payload.amount)
   const currency = String(payload.currency ?? "INR").trim().toUpperCase()
-  const receipt = String(payload.receipt ?? payload.appOrderId ?? "").trim() || `rcpt_${Date.now()}`
+  const appOrderId = String(payload.appOrderId ?? "").trim()
+  const receipt = String(payload.receipt ?? appOrderId ?? "").trim() || `rcpt_${Date.now()}`
   const entitlementKey = String(payload.entitlementKey ?? "one_time_basic_access").trim() || "one_time_basic_access"
+
+  if (!appOrderId) {
+    return jsonResponse({ error: "appOrderId is required." }, 400)
+  }
 
   if (!Number.isFinite(amount) || amount < 100) {
     return jsonResponse({ error: "Amount must be at least 100 paise." }, 400)
+  }
+
+  const { data: orderRow, error: orderError } = await auth.client
+    .from("orders")
+    .select("id, total_amount, payment_status")
+    .eq("id", appOrderId)
+    .eq("user_id", auth.user!.id)
+    .maybeSingle()
+
+  if (orderError) {
+    return jsonResponse({ error: `Unable to validate order before payment: ${orderError.message}` }, 500)
+  }
+
+  if (!orderRow) {
+    return jsonResponse({ error: "Order not found for the signed-in user." }, 404)
+  }
+
+  if (String(orderRow.payment_status ?? "").toLowerCase() === "paid") {
+    return jsonResponse({ error: "Order is already paid." }, 409)
+  }
+
+  const expectedAmountPaise = Math.round(Number(orderRow.total_amount ?? 0) * 100)
+  if (!Number.isFinite(expectedAmountPaise) || expectedAmountPaise < 100 || expectedAmountPaise !== Math.round(amount)) {
+    return jsonResponse({ error: "Amount mismatch for this order." }, 400)
   }
 
   const gatewayResponse = await fetch("https://api.razorpay.com/v1/orders", {
@@ -85,7 +114,7 @@ Deno.serve(async (req) => {
       notes: {
         supabase_user_id: auth.user!.id,
         entitlement_key: entitlementKey,
-        app_order_id: String(payload.appOrderId ?? "").trim(),
+        app_order_id: appOrderId,
       },
     }),
   })

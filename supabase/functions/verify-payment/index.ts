@@ -134,6 +134,10 @@ Deno.serve(async (req) => {
   const razorpayPaymentId = String(payload.razorpay_payment_id ?? "").trim()
   const razorpaySignature = String(payload.razorpay_signature ?? "").trim()
 
+  if (!appOrderId) {
+    return jsonResponse({ error: "appOrderId is required for payment verification." }, 400)
+  }
+
   if (!razorpayOrderId || !razorpayPaymentId || !razorpaySignature) {
     return jsonResponse({ error: "Missing required payment verification fields." }, 400)
   }
@@ -155,12 +159,32 @@ Deno.serve(async (req) => {
   }
 
   const serviceClient = createClient(supabaseUrl!, supabaseServiceRoleKey!)
+  const { data: existingOrder, error: existingOrderError } = await serviceClient
+    .from("orders")
+    .select("id, user_id, total_amount, payment_status")
+    .eq("id", appOrderId)
+    .eq("user_id", auth.user!.id)
+    .maybeSingle()
+
+  if (existingOrderError) {
+    return jsonResponse({ error: `Unable to validate order before payment verification: ${existingOrderError.message}` }, 500)
+  }
+
+  if (!existingOrder) {
+    return jsonResponse({ error: "Order not found for the signed-in user." }, 404)
+  }
+
   const gatewayStatus = mapGatewayStatus(String((paymentPayload as { status?: string }).status ?? ""))
   const amount = Number((paymentPayload as { amount?: number }).amount ?? 0)
   const currency = String((paymentPayload as { currency?: string }).currency ?? "INR").toUpperCase()
 
+  const expectedAmountPaise = Math.round(Number(existingOrder.total_amount ?? 0) * 100)
+  if (!Number.isFinite(expectedAmountPaise) || expectedAmountPaise < 100 || expectedAmountPaise !== Math.round(amount)) {
+    return jsonResponse({ error: "Payment amount does not match order total." }, 400)
+  }
+
   const paymentRecord = {
-    order_id: appOrderId || null,
+    order_id: appOrderId,
     user_id: auth.user!.id,
     amount,
     currency,
@@ -180,7 +204,7 @@ Deno.serve(async (req) => {
 
   const isPaid = gatewayStatus === "paid"
   if (isPaid && appOrderId) {
-    await serviceClient
+    const { error: orderUpdateError } = await serviceClient
       .from("orders")
       .update({
         payment_status: "paid",
@@ -190,6 +214,10 @@ Deno.serve(async (req) => {
       .eq("id", appOrderId)
       .eq("user_id", auth.user!.id)
 
+    if (orderUpdateError) {
+      return jsonResponse({ error: `Unable to update paid order status: ${orderUpdateError.message}` }, 500)
+    }
+
     const { data: orderRow, error: orderFetchError } = await serviceClient
       .from("orders")
       .select("id, customer_name, customer_email, customer_phone, customer_address, customer_city, customer_pincode, total_amount, payment_status, status, created_at")
@@ -197,7 +225,11 @@ Deno.serve(async (req) => {
       .eq("user_id", auth.user!.id)
       .maybeSingle()
 
-    if (!orderFetchError && orderRow) {
+    if (orderFetchError) {
+      return jsonResponse({ error: `Unable to fetch order after payment: ${orderFetchError.message}` }, 500)
+    }
+
+    if (orderRow) {
       const normalizedItemsByOrder = await fetchNormalizedOrderItems(serviceClient, [orderRow.id])
       const mappedOrder = {
         id: orderRow.id,
