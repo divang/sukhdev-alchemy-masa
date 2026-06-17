@@ -1158,6 +1158,29 @@ export async function finalizeOAuthRedirect(): Promise<string | undefined> {
     return undefined
   }
 
+  async function recoverSessionAfterPkceError() {
+    try {
+      const { data } = await withTimeout(
+        supabase.auth.getSession(),
+        3000,
+        "OAuth session recovery timed out"
+      )
+
+      if (data.session?.user) {
+        authDebug("finalizeOAuthRedirect recovered session after PKCE verifier issue", {
+          userId: data.session.user.id,
+        })
+        return true
+      }
+    } catch (recoveryError) {
+      authDebug("finalizeOAuthRedirect PKCE recovery failed", {
+        error: recoveryError instanceof Error ? recoveryError.message : String(recoveryError),
+      })
+    }
+
+    return false
+  }
+
   try {
     if (code) {
       authDebug("finalizeOAuthRedirect exchanging code for session", {
@@ -1170,6 +1193,17 @@ export async function finalizeOAuthRedirect(): Promise<string | undefined> {
         "OAuth code exchange timed out"
       )
       if (exchangeError) {
+        const normalized = exchangeError.message.toLowerCase()
+        const isPkceVerifierMissing = normalized.includes("code verifier") && normalized.includes("not found")
+
+        if (isPkceVerifierMissing) {
+          const recovered = await recoverSessionAfterPkceError()
+          if (recovered) {
+            clearOAuthParams()
+            return undefined
+          }
+        }
+
         clearOAuthParams()
         return mapAuthErrorMessage(exchangeError.message)
       }
@@ -1221,6 +1255,17 @@ export async function finalizeOAuthRedirect(): Promise<string | undefined> {
       }
     }
   } catch (exchangeError) {
+    const normalized = String(exchangeError instanceof Error ? exchangeError.message : exchangeError).toLowerCase()
+    const isPkceVerifierMissing = normalized.includes("code verifier") && normalized.includes("not found")
+
+    if (isPkceVerifierMissing) {
+      const recovered = await recoverSessionAfterPkceError()
+      if (recovered) {
+        clearOAuthParams()
+        return undefined
+      }
+    }
+
     clearOAuthParams()
     return mapAuthErrorMessage(exchangeError instanceof Error ? exchangeError.message : String(exchangeError))
   }
