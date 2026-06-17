@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { ArrowLeft, Link as LinkIcon } from "@phosphor-icons/react"
+import { ArrowLeft, Link as LinkIcon, MagnifyingGlass } from "@phosphor-icons/react"
 import { Badge } from "@/components/ui/badge"
 import type { Order } from "@/lib/types"
 import { fetchLatestShipmentForOrder, syncShiprocketAwbForOrder, type LatestOrderShipment } from "@/lib/order-shipments"
@@ -21,11 +21,52 @@ function getOrderTimestamp(order: Order) {
   return Number.isFinite(value) ? value : 0
 }
 
+function formatInr(value: number) {
+  return new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+    maximumFractionDigits: 2,
+  }).format(value)
+}
+
+function getOrderHeadline(order: Order) {
+  if (order.paymentStatus === "pending") {
+    return "Awaiting payment"
+  }
+
+  if (order.status === "delivered") {
+    return `Delivered ${new Date(order.updatedAt || order.createdAt).toLocaleDateString()}`
+  }
+
+  if (order.status === "shipped") {
+    return "Shipped and on the way"
+  }
+
+  return "Order confirmed"
+}
+
+function getOrderSubheadline(order: Order) {
+  if (order.paymentStatus === "pending") {
+    return "Complete payment to start shipment processing."
+  }
+  if (order.status === "delivered") {
+    return "Package was delivered successfully."
+  }
+  if (order.status === "shipped") {
+    return "Your package is in transit."
+  }
+  return "Your order is being prepared for shipment."
+}
+
+type OrdersTab = "orders" | "buy-again" | "not-yet-shipped"
+
 export function OrderTrackingView({ order, orders, onBack, onSelectOrder, onResumePayment, onAddToCart, useV2Branding = false }: OrderTrackingViewProps) {
   const [shipment, setShipment] = useState<LatestOrderShipment | null>(null)
   const [isLoadingShipment, setIsLoadingShipment] = useState(false)
   const [isSyncingShipment, setIsSyncingShipment] = useState(false)
   const [shipmentError, setShipmentError] = useState<string | null>(null)
+  const [activeTab, setActiveTab] = useState<OrdersTab>("orders")
+  const [searchQuery, setSearchQuery] = useState("")
 
   const sortedOrders = useMemo(() => [...orders].sort((a, b) => getOrderTimestamp(b) - getOrderTimestamp(a)), [orders])
   const currentOrder = order ?? sortedOrders[0] ?? null
@@ -41,6 +82,33 @@ export function OrderTrackingView({ order, orders, onBack, onSelectOrder, onResu
   const deliveredOrders = useMemo(() => {
     return sortedOrders.filter((entry) => entry.status === "delivered")
   }, [sortedOrders])
+
+  const notYetShippedOrders = useMemo(() => {
+    return sortedOrders.filter((entry) => entry.status !== "delivered")
+  }, [sortedOrders])
+
+  const searchedOrders = useMemo(() => {
+    const normalized = searchQuery.trim().toLowerCase()
+    const base = activeTab === "buy-again"
+      ? deliveredOrders
+      : activeTab === "not-yet-shipped"
+        ? notYetShippedOrders
+        : sortedOrders
+
+    if (!normalized) {
+      return base
+    }
+
+    return base.filter((entry) => {
+      const haystack = [
+        entry.id,
+        entry.customer.name,
+        entry.customer.email,
+        entry.items.map((item) => item.productName).join(" "),
+      ].join(" ").toLowerCase()
+      return haystack.includes(normalized)
+    })
+  }, [activeTab, deliveredOrders, notYetShippedOrders, searchQuery, sortedOrders])
 
   useEffect(() => {
     let isActive = true
@@ -125,158 +193,194 @@ export function OrderTrackingView({ order, orders, onBack, onSelectOrder, onResu
   
   if (useV2Branding) {
     return (
-      <div className="min-h-screen bg-[#efefef]">
+      <div className="min-h-screen bg-[#eef1f4]">
         <header className="sticky top-0 z-10 border-b border-slate-200 bg-white no-print">
-          <div className="container mx-auto flex items-center justify-between px-4 py-4">
+          <div className="container mx-auto flex items-center justify-between gap-3 px-4 py-3">
             <Button variant="ghost" onClick={onBack}>
-              <ArrowLeft size={20} className="mr-2" />
+              <ArrowLeft size={18} className="mr-2" />
               Back to Store
             </Button>
-            <p className="text-sm font-medium text-slate-600">My Account</p>
+            <p className="text-sm font-medium text-slate-700">Your Account | Your Orders</p>
           </div>
         </header>
 
-        <div className="container mx-auto max-w-6xl px-4 py-8">
-          <div className="grid gap-4 md:grid-cols-[280px,1fr]">
-            <Card className="border-slate-200 bg-white">
-              <CardHeader className="space-y-3">
-                <CardTitle className="text-lg">Hey, Customer</CardTitle>
-                <CardDescription>
-                  {orders.length} total orders
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                <button
-                  type="button"
-                  className="w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-left text-sm font-medium"
-                >
-                  Overview
-                </button>
-                <button
-                  type="button"
-                  className="w-full rounded-md border border-slate-200 px-3 py-2 text-left text-sm"
-                >
-                  My Orders
-                </button>
-                <button
-                  type="button"
-                  className="w-full rounded-md border border-slate-200 px-3 py-2 text-left text-sm"
-                >
-                  Saved Addresses
-                </button>
-              </CardContent>
+        <main className="container mx-auto max-w-6xl px-4 py-6">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <h1 className="text-3xl font-semibold tracking-tight text-slate-900">Your Orders</h1>
+            <div className="flex w-full max-w-xl items-center gap-2 sm:w-auto sm:min-w-[420px]">
+              <div className="relative flex-1">
+                <MagnifyingGlass size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                <input
+                  value={searchQuery}
+                  onChange={(event) => setSearchQuery(event.target.value)}
+                  placeholder="Search all orders"
+                  className="h-10 w-full rounded-md border border-slate-300 bg-white pl-9 pr-3 text-sm outline-none ring-offset-2 transition focus:border-slate-400 focus:ring-2 focus:ring-slate-300"
+                />
+              </div>
+              <Button className="h-10 bg-slate-900 px-4 text-white hover:bg-slate-800">Search Orders</Button>
+            </div>
+          </div>
+
+          <div className="mb-4 flex flex-wrap items-center gap-2 border-b border-slate-200">
+            <button
+              type="button"
+              onClick={() => setActiveTab("orders")}
+              className={`-mb-px border-b-2 px-3 py-2 text-sm font-medium ${activeTab === "orders" ? "border-amber-500 text-slate-900" : "border-transparent text-slate-600 hover:text-slate-900"}`}
+            >
+              Orders
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("buy-again")}
+              className={`-mb-px border-b-2 px-3 py-2 text-sm font-medium ${activeTab === "buy-again" ? "border-amber-500 text-slate-900" : "border-transparent text-slate-600 hover:text-slate-900"}`}
+            >
+              Buy Again
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("not-yet-shipped")}
+              className={`-mb-px border-b-2 px-3 py-2 text-sm font-medium ${activeTab === "not-yet-shipped" ? "border-amber-500 text-slate-900" : "border-transparent text-slate-600 hover:text-slate-900"}`}
+            >
+              Not Yet Shipped
+            </button>
+          </div>
+
+          <p className="mb-4 text-sm text-slate-600">{searchedOrders.length} order{searchedOrders.length === 1 ? "" : "s"}</p>
+
+          {searchedOrders.length === 0 ? (
+            <Card className="border-slate-200">
+              <CardContent className="p-8 text-center text-sm text-slate-600">No orders match your current filter.</CardContent>
             </Card>
+          ) : (
+            <div className="space-y-4">
+              {searchedOrders.map((entry) => {
+                const isSelected = currentOrder?.id === entry.id
+                const primaryItem = entry.items[0]
 
-            <Card className="border-slate-200 bg-white">
-              <CardHeader>
-                <CardTitle>Overview</CardTitle>
-                <CardDescription>Track active, pending, and delivered orders from one place.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <section>
-                  <h3 className="mb-2 text-sm font-semibold text-slate-700">My Orders</h3>
-                  {sortedOrders.length === 0 ? (
-                    <div className="rounded-md border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-                      No past orders yet. Start shopping to see orders here.
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      {sortedOrders.slice(0, 5).map((entry) => (
-                        <button
-                          key={`v2-overview-${entry.id}`}
-                          type="button"
-                          onClick={() => onSelectOrder(entry.id)}
-                          className={`w-full rounded-md border p-3 text-left ${currentOrder?.id === entry.id ? "border-slate-800 bg-slate-50" : "border-slate-200 bg-white"}`}
-                        >
-                          <div className="flex flex-wrap items-center justify-between gap-2">
-                            <p className="text-sm font-medium">{entry.id}</p>
-                            <Badge variant={entry.paymentStatus === "paid" ? "secondary" : "outline"}>
-                              {entry.paymentStatus === "paid" ? "Paid" : "Pending Payment"}
-                            </Badge>
-                          </div>
-                          <p className="mt-1 text-xs text-slate-600">
-                            {new Date(entry.createdAt).toLocaleDateString()} | Rs{entry.totalAmount.toFixed(2)}
-                          </p>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </section>
-
-                <section>
-                  <h3 className="mb-2 text-sm font-semibold text-slate-700">Active Shipment</h3>
-                  {currentOrder && currentOrder.paymentStatus === "paid" && currentOrder.status !== "delivered" ? (
-                    <div className="rounded-md border border-slate-200 p-4 text-sm">
-                      <div className="mb-1 flex items-center justify-between gap-2">
-                        <p className="font-medium">{currentOrder.id}</p>
-                        <Badge variant="secondary" className="capitalize">{currentOrder.status}</Badge>
-                      </div>
-                      {shipment?.trackingUrl ? (
-                        <a className="inline-flex items-center text-primary underline" href={shipment.trackingUrl} target="_blank" rel="noreferrer">
-                          <LinkIcon size={14} className="mr-1" />
-                          Tracking Link
-                        </a>
-                      ) : (
-                        <p className="text-slate-600">Tracking will appear after shipment is assigned.</p>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="rounded-md border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-                      No active shipment right now.
-                    </div>
-                  )}
-                </section>
-
-                <section>
-                  <h3 className="mb-2 text-sm font-semibold text-slate-700">Pending Payments</h3>
-                  {pendingPaymentOrders.length === 0 ? (
-                    <div className="rounded-md border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-                      No unpaid orders.
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      {pendingPaymentOrders.map((entry) => (
-                        <div key={`v2-pending-${entry.id}`} className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-slate-200 p-3 text-sm">
-                          <span>{entry.id} | Rs{entry.totalAmount.toFixed(2)}</span>
-                          <Button size="sm" onClick={() => onResumePayment?.(entry.id)}>Pay Now</Button>
+                return (
+                  <Card key={`amazon-order-${entry.id}`} className={`overflow-hidden border-slate-300 ${isSelected ? "ring-2 ring-amber-300" : ""}`}>
+                    <CardHeader className="bg-slate-100/90 py-3">
+                      <div className="grid gap-3 text-xs text-slate-600 sm:grid-cols-4">
+                        <div>
+                          <p className="font-semibold text-slate-700">ORDER PLACED</p>
+                          <p>{new Date(entry.createdAt).toLocaleDateString()}</p>
                         </div>
-                      ))}
-                    </div>
-                  )}
-                </section>
+                        <div>
+                          <p className="font-semibold text-slate-700">TOTAL</p>
+                          <p>{formatInr(entry.totalAmount)}</p>
+                        </div>
+                        <div>
+                          <p className="font-semibold text-slate-700">SHIP TO</p>
+                          <p className="truncate">{entry.customer.name}</p>
+                        </div>
+                        <div className="sm:text-right">
+                          <p className="font-semibold text-slate-700">ORDER # {entry.id}</p>
+                          <button
+                            type="button"
+                            onClick={() => onSelectOrder(entry.id)}
+                            className="text-[11px] font-semibold text-blue-700 underline-offset-2 hover:underline"
+                          >
+                            View order details
+                          </button>
+                        </div>
+                      </div>
+                    </CardHeader>
 
-                <section>
-                  <h3 className="mb-2 text-sm font-semibold text-slate-700">Delivered Orders</h3>
-                  {deliveredOrders.length === 0 ? (
-                    <div className="rounded-md border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-                      No delivered orders yet.
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      {deliveredOrders.slice(0, 6).map((entry) => (
-                        <div key={`v2-delivered-${entry.id}`} className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-slate-200 p-3 text-sm">
-                          <span>{entry.id} | Rs{entry.totalAmount.toFixed(2)}</span>
+                    <CardContent className="grid gap-4 p-4 md:grid-cols-[1fr,240px]">
+                      <div>
+                        <h3 className="text-lg font-semibold text-slate-900">{getOrderHeadline(entry)}</h3>
+                        <p className="text-sm text-slate-600">{getOrderSubheadline(entry)}</p>
+
+                        <div className="mt-4 flex gap-3">
+                          <div className="flex h-14 w-14 items-center justify-center rounded-full border border-slate-200 bg-slate-50 text-xs font-semibold text-slate-500">
+                            {primaryItem ? primaryItem.productName.slice(0, 2).toUpperCase() : "OR"}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-medium text-slate-800">
+                              {primaryItem ? primaryItem.productName : "Order items"}
+                            </p>
+                            <p className="text-xs text-slate-600">
+                              {entry.items.length} item{entry.items.length === 1 ? "" : "s"} | Payment: {entry.paymentStatus}
+                            </p>
+                            {entry.items.length > 1 && (
+                              <p className="mt-1 text-xs text-slate-500">+{entry.items.length - 1} more item(s)</p>
+                            )}
+                          </div>
+                        </div>
+
+                        {isSelected && (
+                          <div className="mt-4 rounded-md border border-slate-200 bg-slate-50 p-3 text-sm">
+                            {isLoadingShipment && <p className="text-slate-600">Loading shipment details...</p>}
+                            {!isLoadingShipment && isSyncingShipment && <p className="text-slate-600">Refreshing shipment details...</p>}
+                            {shipmentError && <p className="text-red-700">{shipmentError}</p>}
+                            {!isLoadingShipment && !shipmentError && entry.paymentStatus === "paid" && !shipment && (
+                              <p className="text-slate-600">Shipment not assigned yet.</p>
+                            )}
+                            {shipment && (
+                              <p className="text-slate-600">
+                                {shipment.providerKey} | {shipment.shipmentStatus}
+                                {shipment.awbCode ? ` | AWB: ${shipment.awbCode}` : ""}
+                              </p>
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="space-y-2">
+                        {entry.paymentStatus === "pending" ? (
+                          <Button className="h-9 w-full" onClick={() => onResumePayment?.(entry.id)}>Continue payment</Button>
+                        ) : (
                           <Button
-                            size="sm"
                             variant="outline"
+                            className="h-9 w-full"
                             onClick={() => {
-                              const firstItem = entry.items[0]
-                              if (firstItem) {
-                                onAddToCart?.(firstItem.productId)
+                              if (isSelected && shipment?.trackingUrl) {
+                                window.open(shipment.trackingUrl, "_blank", "noopener,noreferrer")
+                              } else {
+                                onSelectOrder(entry.id)
                               }
                             }}
                           >
-                            Order Again
+                            Track package
                           </Button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </section>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
+                        )}
+
+                        <Button variant="outline" className="h-9 w-full" onClick={() => onSelectOrder(entry.id)}>
+                          View order details
+                        </Button>
+
+                        <Button
+                          variant="outline"
+                          className="h-9 w-full"
+                          disabled={!primaryItem || entry.status !== "delivered"}
+                          onClick={() => {
+                            if (primaryItem) {
+                              onAddToCart?.(primaryItem.productId)
+                            }
+                          }}
+                        >
+                          Buy it again
+                        </Button>
+
+                        {isSelected && shipment?.trackingUrl && (
+                          <a
+                            className="inline-flex h-9 w-full items-center justify-center rounded-md border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                            href={shipment.trackingUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            <LinkIcon size={14} className="mr-2" />
+                            Open tracking link
+                          </a>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )
+              })}
+            </div>
+          )}
+        </main>
       </div>
     )
   }

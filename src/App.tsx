@@ -1161,7 +1161,7 @@ function App() {
       <OrderTrackingView
         order={trackingOrder}
         orders={trackingOrders}
-        useV2Branding={isV2BrandingPreview}
+        useV2Branding={true}
         onBack={handleBackToStore}
         onSelectOrder={handleViewTracking}
         onResumePayment={handleResumePayment}
