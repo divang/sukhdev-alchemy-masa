@@ -210,6 +210,19 @@ function getFallbackAuthRedirect() {
   return `${PRODUCTION_ORIGIN}/`
 }
 
+function getLocalhostAuthRedirect() {
+  if (typeof window === "undefined") {
+    return undefined
+  }
+
+  const hostname = window.location.hostname.toLowerCase()
+  if (hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1") {
+    return `${window.location.origin}/`
+  }
+
+  return undefined
+}
+
 function parseHashParams(hash: string) {
   const raw = hash.startsWith("#") ? hash.slice(1) : hash
   return new URLSearchParams(raw)
@@ -235,6 +248,11 @@ function getCleanLocationForOAuth(url: URL) {
 }
 
 function getEmailRedirectTo() {
+  const localhostRedirect = getLocalhostAuthRedirect()
+  if (localhostRedirect) {
+    return localhostRedirect
+  }
+
   const configured = import.meta.env.VITE_AUTH_REDIRECT_URL as string | undefined
   if (configured && configured.trim()) {
     const trimmed = configured.trim()
@@ -1079,12 +1097,11 @@ export async function signInWithGoogle(): Promise<string | undefined> {
   authDebug("signInWithGoogle started", { redirectTo })
 
   try {
-    const { data, error } = await withTimeout(
+    const { error } = await withTimeout(
       supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
           redirectTo,
-          skipBrowserRedirect: true,
           prompt: "select_account",
         },
       }),
@@ -1100,16 +1117,9 @@ export async function signInWithGoogle(): Promise<string | undefined> {
       return mappedError
     }
 
-    if (!data?.url) {
-      return "Could not start Google sign-in. Please try again."
-    }
-
-    authDebug("signInWithGoogle redirecting via SDK OAuth URL", {
-      providerHost: new URL(data.url).host,
-      redirectTo,
-    })
-
-    window.location.assign(data.url)
+    // Let Supabase SDK perform the redirect after storing PKCE verifier.
+    // This is more reliable on mobile browsers than manual location.assign.
+    authDebug("signInWithGoogle redirect initiated by SDK", { redirectTo })
     return undefined
   } catch (error) {
     return mapAuthErrorMessage(error instanceof Error ? error.message : String(error))
