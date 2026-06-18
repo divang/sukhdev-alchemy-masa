@@ -1,0 +1,91 @@
+name: Order Flow E2E
+
+on:
+  workflow_dispatch:
+    inputs:
+      cleanup_test_data:
+        description: "Cleanup test-tagged DB records after test run"
+        type: boolean
+        default: false
+      cleanup_cutoff_hours:
+        description: "Cleanup retention cutoff in hours"
+        type: string
+        default: "24"
+  pull_request:
+  push:
+    branches:
+      - develop
+
+permissions:
+  contents: read
+
+concurrency:
+  group: order-flow-e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  order-flow-e2e:
+    runs-on: ubuntu-latest
+    environment: development
+    timeout-minutes: 35
+    env:
+      VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+      VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+      VITE_AUTH_REDIRECT_URL: ${{ secrets.VITE_AUTH_REDIRECT_URL }}
+      VITE_E2E_MOCK_PAYMENT: "true"
+      PLAYWRIGHT_BASE_URL: http://127.0.0.1:4173
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Validate required E2E secrets
+        run: |
+          if [ -z "$VITE_SUPABASE_URL" ] || [ -z "$VITE_SUPABASE_ANON_KEY" ]; then
+            echo "Missing required secrets: VITE_SUPABASE_URL and/or VITE_SUPABASE_ANON_KEY"
+            exit 1
+          fi
+
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Run order flow E2E suite
+        run: node scripts/e2e/run-order-flow-e2e.mjs
+
+      - name: Upload Playwright artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: order-flow-e2e-artifacts-${{ github.run_id }}
+          path: |
+            test-results
+            playwright-report
+          if-no-files-found: warn
+
+      - name: Cleanup tagged test data
+        if: ${{ always() && github.event_name == 'workflow_dispatch' && inputs.cleanup_test_data }}
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          CLEANUP_CUTOFF_HOURS: ${{ inputs.cleanup_cutoff_hours }}
+        run: |
+          if [ -z "$SUPABASE_DB_URL" ]; then
+            echo "SUPABASE_DB_URL not configured; skipping DB cleanup"
+            exit 0
+          fi
+
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+          {
+            echo "set app.e2e_test_run_id = '';"
+            echo "set app.e2e_cutoff_hours = '${CLEANUP_CUTOFF_HOURS}';"
+            cat scripts/e2e/cleanup-test-data.sql
+          } | psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1

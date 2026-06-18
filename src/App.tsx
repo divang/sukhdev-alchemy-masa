@@ -182,6 +182,56 @@ function isTransientAuthConnectivityIssue(message: string | undefined) {
   )
 }
 
+function isLocalhostHost(hostname: string) {
+  const normalized = hostname.toLowerCase()
+  return normalized === "localhost" || normalized === "127.0.0.1" || normalized === "::1"
+}
+
+function getRequestedDevAuthRoleFromSearch(search: string): "admin" | "customer" | null {
+  const params = new URLSearchParams(search)
+  const role = params.get("devAuth")?.trim().toLowerCase()
+  if (role === "admin" || role === "customer") {
+    return role
+  }
+
+  return null
+}
+
+function getRequestedDevViewFromSearch(search: string): View | null {
+  const params = new URLSearchParams(search)
+  const view = params.get("devView")?.trim().toLowerCase()
+  if (view === "tracking") return "tracking"
+  if (view === "admin") return "admin"
+  if (view === "account-details") return "account-details"
+  if (view === "checkout") return "checkout"
+  if (view === "store") return "store"
+  return null
+}
+
+function buildDevProfile(role: "admin" | "customer"): UserProfile {
+  if (role === "admin") {
+    return {
+      id: "dev-admin-user",
+      email: "divang.s@gmail.com",
+      fullName: "Dev Admin",
+      phone: "+919999999999",
+      role: "admin",
+      reviewOptIn: true,
+      marketingOptIn: false,
+    }
+  }
+
+  return {
+    id: "dev-customer-user",
+    email: "dev-customer@sukhdevialchemy.local",
+    fullName: "Dev Customer",
+    phone: "+918888888888",
+    role: "customer",
+    reviewOptIn: true,
+    marketingOptIn: false,
+  }
+}
+
 function App() {
   useInitialData()
 
@@ -200,6 +250,12 @@ function App() {
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [requestedRuntimeMode, setRequestedRuntimeMode] = useState(() =>
     typeof window === "undefined" ? "prod" : getRequestedRuntimeModeFromSearch(window.location.search)
+  )
+  const [requestedDevAuthRole, setRequestedDevAuthRole] = useState<"admin" | "customer" | null>(() =>
+    typeof window === "undefined" ? null : getRequestedDevAuthRoleFromSearch(window.location.search)
+  )
+  const [requestedDevView, setRequestedDevView] = useState<View | null>(() =>
+    typeof window === "undefined" ? null : getRequestedDevViewFromSearch(window.location.search)
   )
   const [requestedBrandingVersion, setRequestedBrandingVersion] = useState(() =>
     typeof window === "undefined" ? "v1" : getRequestedBrandingVersionFromSearch(window.location.search)
@@ -223,8 +279,10 @@ function App() {
     { name: "YouTube", handle: "@sukhdevialchemy", url: "https://youtube.com/@sukhdevialchemy" },
   ]
   const runtimeMode = resolveRuntimeMode(requestedRuntimeMode, profile)
+  const isLocalDevBypassAllowed = typeof window !== "undefined" && import.meta.env.DEV && isLocalhostHost(window.location.hostname)
+  const shouldUseDevAuthBypass = requestedRuntimeMode === "dev" && isLocalDevBypassAllowed && Boolean(requestedDevAuthRole)
   const devModeRequested = requestedRuntimeMode === "dev"
-  const devModeLocked = devModeRequested && runtimeMode !== "dev"
+  const devModeLocked = devModeRequested && runtimeMode !== "dev" && !shouldUseDevAuthBypass
   const authSyncMessage = isAuthInitializing
     ? "Preparing your account session."
     : isPostAuthSyncing
@@ -268,6 +326,8 @@ function App() {
 
     function syncRequestedModeFromUrl() {
       setRequestedRuntimeMode(getRequestedRuntimeModeFromSearch(window.location.search))
+      setRequestedDevAuthRole(getRequestedDevAuthRoleFromSearch(window.location.search))
+      setRequestedDevView(getRequestedDevViewFromSearch(window.location.search))
       setRequestedBrandingVersion(getRequestedBrandingVersionFromSearch(window.location.search))
     }
 
@@ -338,9 +398,36 @@ function App() {
   }, [profile])
 
   useEffect(() => {
+    if (!shouldUseDevAuthBypass || !requestedDevAuthRole) {
+      return
+    }
+
+    const profileFromBypass = buildDevProfile(requestedDevAuthRole)
+    setProfile(profileFromBypass)
+    setIsAuthServiceDegraded(false)
+    setIsAuthInitializing(false)
+    setIsPostAuthSyncing(false)
+    setShowAuthHandoffNotice(false)
+
+    if (requestedDevView) {
+      setCurrentView(requestedDevView)
+      return
+    }
+
+    setCurrentView(requestedDevAuthRole === "admin" ? "admin" : "tracking")
+  }, [shouldUseDevAuthBypass, requestedDevAuthRole, requestedDevView])
+
+  useEffect(() => {
     let isActive = true
 
     async function initializeAuthState() {
+      if (shouldUseDevAuthBypass) {
+        setIsAuthInitializing(false)
+        setIsPostAuthSyncing(false)
+        setShowAuthHandoffNotice(false)
+        return
+      }
+
       try {
         const hasOAuthCallback = typeof window !== "undefined" && hasOAuthParamsInLocation(window.location.href)
         if (hasOAuthCallback) {
@@ -435,6 +522,12 @@ function App() {
 
     void initializeAuthState()
 
+    if (shouldUseDevAuthBypass) {
+      return () => {
+        isActive = false
+      }
+    }
+
     const subscription = subscribeToAuthStateChanges((state) => {
       if (!isActive) return
       console.log("[app-auth] onAuthStateChange", {
@@ -457,7 +550,61 @@ function App() {
       isActive = false
       subscription.unsubscribe()
     }
-  }, [])
+  }, [shouldUseDevAuthBypass])
+
+  useEffect(() => {
+    if (!isSupabaseConfigured || typeof window === "undefined" || typeof document === "undefined") {
+      return
+    }
+
+    let isActive = true
+
+    const reconcileAuthState = async () => {
+      if (profile) {
+        return
+      }
+
+      const state = await getCurrentAuthState()
+      if (!isActive) {
+        return
+      }
+
+      const resolvedProfile = state.profile ?? (state.user ? buildProfileFromMetadata(state.user) : null)
+      if (!resolvedProfile) {
+        return
+      }
+
+      setProfile(resolvedProfile)
+      setIsAuthServiceDegraded(false)
+      setIsAuthInitializing(false)
+      setIsPostAuthSyncing(false)
+      setShowAuthHandoffNotice(false)
+    }
+
+    const onWindowFocus = () => {
+      void reconcileAuthState()
+    }
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        void reconcileAuthState()
+      }
+    }
+
+    window.addEventListener("focus", onWindowFocus)
+    document.addEventListener("visibilitychange", onVisibilityChange)
+
+    const intervalId = window.setInterval(() => {
+      void reconcileAuthState()
+    }, 5000)
+
+    return () => {
+      isActive = false
+      window.removeEventListener("focus", onWindowFocus)
+      document.removeEventListener("visibilitychange", onVisibilityChange)
+      window.clearInterval(intervalId)
+    }
+  }, [profile])
 
   useEffect(() => {
     let isActive = true
@@ -488,7 +635,7 @@ function App() {
     let isActive = true
 
     async function loadOrders() {
-      if (!profile || !isSupabaseConfigured) {
+      if (!profile || !isSupabaseConfigured || shouldUseDevAuthBypass) {
         if (isActive) setCloudOrders([])
         return
       }
@@ -512,7 +659,7 @@ function App() {
     return () => {
       isActive = false
     }
-  }, [profile])
+  }, [profile, shouldUseDevAuthBypass])
 
   useEffect(() => {
     let isActive = true
@@ -551,7 +698,7 @@ function App() {
     let isActive = true
 
     async function syncPersistedCart() {
-      if (!profile || !isSupabaseConfigured) {
+      if (!profile || !isSupabaseConfigured || shouldUseDevAuthBypass) {
         if (isActive) {
           setIsCartHydrating(false)
         }
@@ -595,7 +742,7 @@ function App() {
     return () => {
       isActive = false
     }
-  }, [profile?.id])
+  }, [profile?.id, shouldUseDevAuthBypass])
 
   const visibleCategories = (categories || []).filter((category) => !HIDDEN_CATEGORY_IDS.has(category.id))
   const visibleProducts = (products || []).filter((product) => !HIDDEN_PRODUCT_IDS.has(product.id) && !HIDDEN_CATEGORY_IDS.has(product.category))
@@ -627,7 +774,7 @@ function App() {
   const cartItemCount = (cartItems || []).reduce((sum, item) => sum + item.quantity, 0)
 
   const persistCartItem = async (item: CartItem) => {
-    if (!profile || !isSupabaseConfigured) {
+    if (!profile || !isSupabaseConfigured || shouldUseDevAuthBypass) {
       return
     }
 
@@ -638,7 +785,7 @@ function App() {
   }
 
   const persistCartRemoval = async (productId: string, grams: number) => {
-    if (!profile || !isSupabaseConfigured) {
+    if (!profile || !isSupabaseConfigured || shouldUseDevAuthBypass) {
       return
     }
 
@@ -910,6 +1057,28 @@ function App() {
 
     if (!gatewayResult.verified) {
       toast.error("Payment signature verification failed. Please try again.")
+      return
+    }
+
+    if (gatewayResult.paymentStatus !== "paid") {
+      const pendingOrder: Order = {
+        ...currentOrder,
+        paymentDetails: {
+          gateway: "razorpay",
+          razorpayPaymentId: gatewayResult.razorpayPaymentId,
+          razorpayOrderId: gatewayResult.razorpayOrderId,
+          status: "pending",
+        },
+        paymentStatus: "pending",
+        status: "pending",
+        updatedAt: new Date().toISOString(),
+      }
+
+      setCurrentOrder(pendingOrder)
+      setOrders((current = []) => current.map((entry) => (entry.id === pendingOrder.id ? pendingOrder : entry)))
+      setCloudOrders((current) => current.map((entry) => (entry.id === pendingOrder.id ? pendingOrder : entry)))
+      setCurrentView("tracking")
+      toast.info("Payment is still pending. You can retry from Your Orders.")
       return
     }
 

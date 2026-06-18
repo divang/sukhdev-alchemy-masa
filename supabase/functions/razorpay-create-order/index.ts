@@ -13,8 +13,9 @@ const supabaseUrl = Deno.env.get("SUPABASE_URL")
 const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")
 const razorpayKeyId = Deno.env.get("RAZORPAY_KEY_ID")
 const razorpayKeySecret = Deno.env.get("RAZORPAY_KEY_SECRET")
+const e2eMockPaymentEnabled = String(Deno.env.get("E2E_MOCK_PAYMENT") ?? "").trim().toLowerCase() === "true"
 
-if (!supabaseUrl || !supabaseAnonKey || !razorpayKeyId || !razorpayKeySecret) {
+if (!supabaseUrl || !supabaseAnonKey || (!e2eMockPaymentEnabled && (!razorpayKeyId || !razorpayKeySecret))) {
   throw new Error("Missing required environment variables for razorpay-create-order function.")
 }
 
@@ -79,7 +80,7 @@ Deno.serve(async (req) => {
 
   const { data: orderRow, error: orderError } = await auth.client
     .from("orders")
-    .select("id, total_amount, payment_status")
+    .select("id, total_amount, final_amount_paise, payment_status")
     .eq("id", appOrderId)
     .eq("user_id", auth.user!.id)
     .maybeSingle()
@@ -96,9 +97,18 @@ Deno.serve(async (req) => {
     return jsonResponse({ error: "Order is already paid." }, 409)
   }
 
-  const expectedAmountPaise = Math.round(Number(orderRow.total_amount ?? 0) * 100)
+  const expectedAmountPaise = Number(orderRow.final_amount_paise ?? Math.round(Number(orderRow.total_amount ?? 0) * 100))
   if (!Number.isFinite(expectedAmountPaise) || expectedAmountPaise < 100 || expectedAmountPaise !== Math.round(amount)) {
     return jsonResponse({ error: "Amount mismatch for this order." }, 400)
+  }
+
+  if (e2eMockPaymentEnabled && req.headers.get("x-e2e-mock-payment") === "1") {
+    return jsonResponse({
+      order_id: `order_mock_${Date.now()}`,
+      amount,
+      currency,
+      message: "Mock payment order created.",
+    })
   }
 
   const gatewayResponse = await fetch("https://api.razorpay.com/v1/orders", {

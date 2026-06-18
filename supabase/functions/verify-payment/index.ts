@@ -29,6 +29,10 @@ type OrderRow = {
   payment_status: string
   status: string
   created_at: string
+  is_test?: boolean | null
+  test_run_id?: string | null
+  test_scenario?: string | null
+  test_created_by?: string | null
 }
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL")
@@ -36,8 +40,9 @@ const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")
 const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")
 const razorpayKeyId = Deno.env.get("RAZORPAY_KEY_ID")
 const razorpayKeySecret = Deno.env.get("RAZORPAY_KEY_SECRET")
+const e2eMockPaymentEnabled = String(Deno.env.get("E2E_MOCK_PAYMENT") ?? "").trim().toLowerCase() === "true"
 
-if (!supabaseUrl || !supabaseAnonKey || !supabaseServiceRoleKey || !razorpayKeyId || !razorpayKeySecret) {
+if (!supabaseUrl || !supabaseAnonKey || !supabaseServiceRoleKey || (!e2eMockPaymentEnabled && (!razorpayKeyId || !razorpayKeySecret))) {
   throw new Error("Missing required environment variables for verify-payment function.")
 }
 
@@ -114,6 +119,37 @@ function mapGatewayStatus(status: string) {
   return "created"
 }
 
+function resolveMockOutcome(req: Request) {
+  const raw = String(req.headers.get("x-e2e-payment-outcome") ?? "").trim().toLowerCase()
+  if (raw === "pending" || raw === "failed" || raw === "failed_then_reverted") {
+    return raw
+  }
+
+  return "success"
+}
+
+function readE2ETestMetaHeaders(req: Request) {
+  const runId = String(req.headers.get("x-e2e-test-run-id") ?? "").trim()
+  const scenario = String(req.headers.get("x-e2e-test-scenario") ?? "").trim().toLowerCase()
+  const createdBy = String(req.headers.get("x-e2e-test-created-by") ?? "").trim().toLowerCase()
+
+  if (!runId) {
+    return {
+      isTest: false,
+      runId: undefined,
+      scenario: undefined,
+      createdBy: undefined,
+    }
+  }
+
+  return {
+    isTest: true,
+    runId,
+    scenario: scenario || undefined,
+    createdBy: createdBy || "playwright",
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders })
@@ -133,35 +169,22 @@ Deno.serve(async (req) => {
   const razorpayOrderId = String(payload.razorpay_order_id ?? "").trim()
   const razorpayPaymentId = String(payload.razorpay_payment_id ?? "").trim()
   const razorpaySignature = String(payload.razorpay_signature ?? "").trim()
+  const usingMockPayment = e2eMockPaymentEnabled && req.headers.get("x-e2e-mock-payment") === "1"
+  const mockOutcome = resolveMockOutcome(req)
+  const e2eMeta = readE2ETestMetaHeaders(req)
 
   if (!appOrderId) {
     return jsonResponse({ error: "appOrderId is required for payment verification." }, 400)
   }
 
-  if (!razorpayOrderId || !razorpayPaymentId || !razorpaySignature) {
+  if (!usingMockPayment && (!razorpayOrderId || !razorpayPaymentId || !razorpaySignature)) {
     return jsonResponse({ error: "Missing required payment verification fields." }, 400)
-  }
-
-  const expected = await signHmacSha256(`${razorpayOrderId}|${razorpayPaymentId}`, razorpayKeySecret!)
-  if (!signaturesEqual(expected, razorpaySignature)) {
-    return jsonResponse({ verified: false, error: "Signature mismatch." }, 400)
-  }
-
-  const paymentResponse = await fetch(`https://api.razorpay.com/v1/payments/${razorpayPaymentId}`, {
-    headers: {
-      Authorization: `Basic ${btoa(`${razorpayKeyId}:${razorpayKeySecret}`)}`,
-    },
-  })
-  const paymentPayload = await paymentResponse.json().catch(() => ({}))
-
-  if (!paymentResponse.ok) {
-    return jsonResponse({ error: "Unable to fetch payment details from Razorpay." }, 500)
   }
 
   const serviceClient = createClient(supabaseUrl!, supabaseServiceRoleKey!)
   const { data: existingOrder, error: existingOrderError } = await serviceClient
     .from("orders")
-    .select("id, user_id, total_amount, payment_status")
+    .select("id, user_id, total_amount, final_amount_paise, payment_status, is_test, test_run_id, test_scenario, test_created_by")
     .eq("id", appOrderId)
     .eq("user_id", auth.user!.id)
     .maybeSingle()
@@ -174,11 +197,54 @@ Deno.serve(async (req) => {
     return jsonResponse({ error: "Order not found for the signed-in user." }, 404)
   }
 
-  const gatewayStatus = mapGatewayStatus(String((paymentPayload as { status?: string }).status ?? ""))
-  const amount = Number((paymentPayload as { amount?: number }).amount ?? 0)
-  const currency = String((paymentPayload as { currency?: string }).currency ?? "INR").toUpperCase()
+  let paymentPayload: Record<string, unknown> = {}
+  let gatewayStatus = "created"
+  let amount = 0
+  let currency = "INR"
 
-  const expectedAmountPaise = Math.round(Number(existingOrder.total_amount ?? 0) * 100)
+  if (usingMockPayment) {
+    amount = Number(existingOrder.final_amount_paise ?? Math.round(Number(existingOrder.total_amount ?? 0) * 100))
+    currency = "INR"
+
+    gatewayStatus =
+      mockOutcome === "success" || mockOutcome === "failed_then_reverted"
+        ? "paid"
+        : mockOutcome === "failed"
+        ? "failed"
+        : "created"
+
+    paymentPayload = {
+      id: razorpayPaymentId || `pay_mock_${Date.now()}`,
+      order_id: razorpayOrderId || `order_mock_${Date.now()}`,
+      amount,
+      currency,
+      status: gatewayStatus === "paid" ? "captured" : gatewayStatus,
+      mock_outcome: mockOutcome,
+      mock_payment: true,
+    }
+  } else {
+    const expected = await signHmacSha256(`${razorpayOrderId}|${razorpayPaymentId}`, razorpayKeySecret!)
+    if (!signaturesEqual(expected, razorpaySignature)) {
+      return jsonResponse({ verified: false, error: "Signature mismatch." }, 400)
+    }
+
+    const paymentResponse = await fetch(`https://api.razorpay.com/v1/payments/${razorpayPaymentId}`, {
+      headers: {
+        Authorization: `Basic ${btoa(`${razorpayKeyId}:${razorpayKeySecret}`)}`,
+      },
+    })
+    paymentPayload = await paymentResponse.json().catch(() => ({}))
+
+    if (!paymentResponse.ok) {
+      return jsonResponse({ error: "Unable to fetch payment details from Razorpay." }, 500)
+    }
+
+    gatewayStatus = mapGatewayStatus(String((paymentPayload as { status?: string }).status ?? ""))
+    amount = Number((paymentPayload as { amount?: number }).amount ?? 0)
+    currency = String((paymentPayload as { currency?: string }).currency ?? "INR").toUpperCase()
+  }
+
+  const expectedAmountPaise = Number(existingOrder.final_amount_paise ?? Math.round(Number(existingOrder.total_amount ?? 0) * 100))
   if (!Number.isFinite(expectedAmountPaise) || expectedAmountPaise < 100 || expectedAmountPaise !== Math.round(amount)) {
     return jsonResponse({ error: "Payment amount does not match order total." }, 400)
   }
@@ -188,10 +254,14 @@ Deno.serve(async (req) => {
     user_id: auth.user!.id,
     amount,
     currency,
-    razorpay_order_id: razorpayOrderId,
-    razorpay_payment_id: razorpayPaymentId,
+    razorpay_order_id: razorpayOrderId || String((paymentPayload as { order_id?: string }).order_id ?? ""),
+    razorpay_payment_id: razorpayPaymentId || String((paymentPayload as { id?: string }).id ?? ""),
     status: gatewayStatus,
     raw: paymentPayload,
+    is_test: e2eMeta.isTest,
+    test_run_id: e2eMeta.runId ?? existingOrder.test_run_id ?? null,
+    test_scenario: e2eMeta.scenario ?? existingOrder.test_scenario ?? null,
+    test_created_by: e2eMeta.createdBy ?? existingOrder.test_created_by ?? null,
   }
 
   const { error: paymentInsertError } = await serviceClient
@@ -204,13 +274,22 @@ Deno.serve(async (req) => {
 
   const isPaid = gatewayStatus === "paid"
   if (isPaid && appOrderId) {
+    const orderUpdatePayload: Record<string, unknown> = {
+      payment_status: "paid",
+      status: "processing",
+      updated_at: new Date().toISOString(),
+    }
+
+    if (e2eMeta.isTest || existingOrder.is_test) {
+      orderUpdatePayload.is_test = true
+      orderUpdatePayload.test_run_id = e2eMeta.runId ?? existingOrder.test_run_id ?? null
+      orderUpdatePayload.test_scenario = e2eMeta.scenario ?? existingOrder.test_scenario ?? null
+      orderUpdatePayload.test_created_by = e2eMeta.createdBy ?? existingOrder.test_created_by ?? null
+    }
+
     const { error: orderUpdateError } = await serviceClient
       .from("orders")
-      .update({
-        payment_status: "paid",
-        status: "processing",
-        updated_at: new Date().toISOString(),
-      })
+      .update(orderUpdatePayload)
       .eq("id", appOrderId)
       .eq("user_id", auth.user!.id)
 
@@ -220,7 +299,7 @@ Deno.serve(async (req) => {
 
     const { data: orderRow, error: orderFetchError } = await serviceClient
       .from("orders")
-      .select("id, customer_name, customer_email, customer_phone, customer_address, customer_city, customer_pincode, total_amount, payment_status, status, created_at")
+      .select("id, customer_name, customer_email, customer_phone, customer_address, customer_city, customer_pincode, total_amount, payment_status, status, created_at, is_test, test_run_id, test_scenario, test_created_by")
       .eq("id", appOrderId)
       .eq("user_id", auth.user!.id)
       .maybeSingle()
@@ -246,6 +325,10 @@ Deno.serve(async (req) => {
         paymentStatus: "paid",
         status: "processing",
         createdAt: orderRow.created_at,
+        isTest: Boolean(orderRow.is_test),
+        testRunId: orderRow.test_run_id ?? undefined,
+        testScenario: orderRow.test_scenario ?? undefined,
+        testCreatedBy: orderRow.test_created_by ?? undefined,
       }
 
       const notificationResult = await sendOrderNotifications({
@@ -298,6 +381,11 @@ Deno.serve(async (req) => {
     verified: true,
     paymentStatus: isPaid ? "paid" : "pending",
     orderStatus: isPaid ? "processing" : "pending",
-    message: isPaid ? "Payment verified successfully." : "Payment is not captured yet.",
+    message:
+      usingMockPayment && mockOutcome === "failed_then_reverted"
+        ? "Mock payment recovered and verified successfully."
+        : isPaid
+        ? "Payment verified successfully."
+        : "Payment is not captured yet.",
   })
 })

@@ -22,6 +22,10 @@ type PaidOrder = {
   }
   items: PaidOrderItem[]
   totalAmount: number
+  isTest?: boolean
+  testRunId?: string
+  testScenario?: string
+  testCreatedBy?: string
 }
 
 type ShipmentAttemptResult = {
@@ -32,6 +36,17 @@ type ShipmentAttemptResult = {
   shipmentId?: string
   awbCode?: string
   trackingUrl?: string
+}
+
+const e2eMockShiprocketEnabled = String(Deno.env.get("E2E_MOCK_SHIPROCKET") ?? "").trim().toLowerCase() === "true"
+
+function resolveMockShipmentLifecycleStatus() {
+  const raw = String(Deno.env.get("E2E_MOCK_SHIPROCKET_STATUS") ?? "").trim().toLowerCase()
+  if (raw === "pending_assignment" || raw === "assigned" || raw === "in_transit" || raw === "shipped" || raw === "delivered") {
+    return raw
+  }
+
+  return "assigned"
 }
 
 function parsePrefixList(raw: string | undefined) {
@@ -99,6 +114,10 @@ async function persistShipmentResult(client: SupabaseClient, input: {
   trackingUrl?: string
   errorMessage?: string
   rawResponse?: unknown
+  isTest?: boolean
+  testRunId?: string
+  testScenario?: string
+  testCreatedBy?: string
 }) {
   await client.from("order_shipments").insert({
     order_id: input.orderId,
@@ -109,6 +128,10 @@ async function persistShipmentResult(client: SupabaseClient, input: {
     tracking_url: input.trackingUrl,
     error_message: input.errorMessage,
     raw_response: input.rawResponse,
+    is_test: Boolean(input.isTest),
+    test_run_id: input.testRunId ?? null,
+    test_scenario: input.testScenario ?? null,
+    test_created_by: input.testCreatedBy ?? null,
     updated_at: new Date().toISOString(),
   })
 }
@@ -137,6 +160,39 @@ async function getExistingCreatedShipment(client: SupabaseClient, orderId: strin
 }
 
 export async function createShipmentForPaidOrder(client: SupabaseClient, order: PaidOrder): Promise<ShipmentAttemptResult> {
+  if (e2eMockShiprocketEnabled) {
+    const lifecycleStatus = resolveMockShipmentLifecycleStatus()
+    const shipmentId = `mock_shipment_${order.id}`
+    const awbCode = `MOCKAWB${String(order.id).replace(/[^a-zA-Z0-9]/g, "").slice(-10).toUpperCase()}`
+    const trackingUrl = `https://mock-shiprocket.local/track/${encodeURIComponent(order.id)}`
+
+    await persistShipmentResult(client, {
+      orderId: order.id,
+      provider: "shiprocket",
+      status: "created",
+      shipmentId,
+      awbCode,
+      trackingUrl,
+      isTest: order.isTest,
+      testRunId: order.testRunId,
+      testScenario: order.testScenario,
+      testCreatedBy: order.testCreatedBy,
+      rawResponse: {
+        mock_provider: true,
+        lifecycle_status: lifecycleStatus,
+      },
+    })
+
+    return {
+      attempted: true,
+      created: true,
+      provider: "shiprocket",
+      shipmentId,
+      awbCode,
+      trackingUrl,
+    }
+  }
+
   const featureEnabled = await isFeatureEnabled(client, "enable_shiprocket_integration")
   if (!featureEnabled) {
     return { attempted: false, created: false, reason: "feature_disabled" }
@@ -148,6 +204,10 @@ export async function createShipmentForPaidOrder(client: SupabaseClient, order: 
       provider: "shiprocket",
       status: "skipped",
       errorMessage: "self_delivery_zone",
+      isTest: order.isTest,
+      testRunId: order.testRunId,
+      testScenario: order.testScenario,
+      testCreatedBy: order.testCreatedBy,
     })
 
     return {
@@ -169,6 +229,10 @@ export async function createShipmentForPaidOrder(client: SupabaseClient, order: 
       provider: activeProvider,
       status: "skipped",
       errorMessage: `Active provider ${activeProvider} adapter not implemented yet.`,
+      isTest: order.isTest,
+      testRunId: order.testRunId,
+      testScenario: order.testScenario,
+      testCreatedBy: order.testCreatedBy,
     })
     return {
       attempted: false,
@@ -199,6 +263,10 @@ export async function createShipmentForPaidOrder(client: SupabaseClient, order: 
       provider: "shiprocket",
       status: "failed",
       errorMessage: shiprocketResult.error,
+      isTest: order.isTest,
+      testRunId: order.testRunId,
+      testScenario: order.testScenario,
+      testCreatedBy: order.testCreatedBy,
       rawResponse: shiprocketResult.rawResponse,
     })
     return {
@@ -216,6 +284,10 @@ export async function createShipmentForPaidOrder(client: SupabaseClient, order: 
     shipmentId: shiprocketResult.shipmentId,
     awbCode: shiprocketResult.awbCode,
     trackingUrl: shiprocketResult.trackingUrl,
+    isTest: order.isTest,
+    testRunId: order.testRunId,
+    testScenario: order.testScenario,
+    testCreatedBy: order.testCreatedBy,
     rawResponse: shiprocketResult.rawResponse,
   })
 

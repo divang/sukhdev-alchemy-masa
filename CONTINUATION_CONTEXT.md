@@ -319,6 +319,157 @@ order by tablename, policyname;
 - Cart drawer bottom/actions adjusted for mobile safe-area.
 - Mobile My Orders visibility was improved for signed-in users.
 
+## Order Flow E2E Automation Plan (New)
+
+Last updated: 2026-06-18 UTC
+Status: Planned (implementation-ready)
+
+### Goal
+Create a repeatable E2E framework for Order Flow that can:
+1. Use test users.
+2. Skip sign-in for automation.
+3. Execute full add-to-cart -> checkout -> payment -> tracking flows.
+4. Use mock payment and mock shipping providers.
+5. Persist all test records in DB.
+6. Mark records as test data for safe cleanup.
+7. Simulate all required payment/shipping states in UI.
+
+### Core Design
+
+#### A) Test Identity and Login Bypass
+- Use localhost-only dev auth bypass already added in app URL params:
+  - `?mode=dev&devAuth=customer&devView=tracking`
+  - `?mode=dev&devAuth=admin&devView=admin`
+- Add Playwright fixture helpers:
+  - `loginAsTestCustomer()` -> navigates with dev bypass.
+  - `loginAsTestAdmin()` -> navigates with dev bypass.
+- Keep bypass strictly disabled in production.
+
+#### B) Test Users
+- Define deterministic test identities for automation only:
+  - `e2e-customer@sukhdevialchemy.local`
+  - `e2e-admin@sukhdevialchemy.local`
+- Store in test config only, not in production seeds.
+
+#### C) Payment Gateway Mock (Razorpay)
+- Add test mode switch (`E2E_MOCK_PAYMENT=true`) for automation runs.
+- In mock mode:
+  - `create-order` returns synthetic gateway order id.
+  - `verify-payment` accepts signed mock payload or deterministic token.
+  - allow forced outcomes via param/header:
+    - `success`
+    - `pending`
+    - `failed`
+    - `failed_then_reverted`
+
+#### D) Delivery Platform Mock (ShipRocket)
+- Add mock shipping adapter behind flag (`E2E_MOCK_SHIPROCKET=true`).
+- Mock adapter should:
+  - create synthetic shipment ids/tracking URLs.
+  - support status transitions: `pending_assignment`, `assigned`, `in_transit`, `shipped`, `delivered`.
+  - expose deterministic tracking link format so button/link assertions are stable.
+
+#### E) Test Data Tagging in DB
+- All records created by E2E should be tagged for cleanup and reporting.
+- Recommended fields (orders/payments/shipments):
+  - `is_test boolean default false`
+  - `test_run_id text null`
+  - `test_scenario text null`
+  - `test_created_by text null` (example: `playwright`)
+- Also tag related notifications/webhook/audit rows where possible.
+
+#### F) Test Data Cleanup Strategy
+- Implement `scripts/e2e/cleanup-test-data.sql` with retention window guard.
+- Default cleanup policy:
+  - delete by `is_test=true` and `created_at <= now() - interval 'N hours'`
+  - optional targeted cleanup by `test_run_id`
+- Never run cleanup without a test-only filter.
+
+### Scenario Coverage Matrix (Order Flow)
+
+Implement one test per scenario (or grouped where efficient):
+1. Test user exists and can start flow without manual sign-in.
+2. Skip sign-in and access customer order surfaces.
+3. Add multiple products and validate cart totals.
+4. Mock Razorpay payment success path.
+5. Verify DB inserts exist for order/payment/cart transitions.
+6. Verify all inserted records are marked `is_test=true` with `test_run_id`.
+7. Mock ShipRocket tracking generation and tracking link behavior.
+8. Pending payment UI state.
+9. Payment done + shipping pending UI state.
+10. Payment done + shipping assigned UI state.
+11. Payment done + in-transit UI state.
+12. Payment done + shipped UI state.
+13. Payment done + shipped + order-again link behavior.
+14. Payment failed UI state.
+15. Payment failed then reverted/recovered UI state.
+
+### Execution Plan (Framework Buildout)
+
+#### Phase 1: Test Harness Foundation
+1. Add Playwright fixtures for dev bypass users.
+2. Add reusable page objects for Store, Cart, Checkout, Payment, My Orders.
+3. Add test run metadata utility (`testRunId`, scenario tags).
+
+#### Phase 2: Mock Infrastructure
+1. Introduce payment mock adapter and force-outcome controls.
+2. Introduce shipping mock adapter with deterministic tracking URLs.
+3. Add env-gated wiring so mocks are active only in E2E mode.
+
+#### Phase 3: Data Tagging and Cleanup
+1. Add DB migration for `is_test/test_run_id/test_scenario/test_created_by`.
+2. Update create/verify/shipping flows to write tags.
+3. Add cleanup scripts and optional nightly cleanup task.
+
+#### Phase 4: Scenario Implementation (1-15)
+1. Write spec files by domain:
+  - `tests/e2e/order-flow.payment.spec.ts`
+  - `tests/e2e/order-flow.shipping.spec.ts`
+  - `tests/e2e/order-flow.recovery.spec.ts`
+2. Assert both UI states and DB state for each scenario.
+
+#### Phase 5: CI Integration
+1. Add dedicated workflow (example: `e2e-order-flow.yml`).
+2. Boot app in test mode with mocks enabled.
+3. Run Playwright with artifacts (video/traces/screenshots).
+4. On completion, run cleanup by `test_run_id`.
+
+#### Phase 5 Status (Implemented)
+- Added CI workflow: `.github/workflows/e2e-order-flow.yml`
+  - Triggers on `workflow_dispatch`, `pull_request`, and pushes to `develop`.
+  - Runs order-flow Playwright suite in development environment.
+  - Enables frontend mock payment mode for deterministic automation.
+  - Uploads artifacts from `test-results` and `playwright-report`.
+  - Supports optional cleanup of tagged test data on manual dispatch using `SUPABASE_DB_URL`.
+- Added executable runner: `scripts/e2e/run-order-flow-e2e.mjs`
+- Added npm command: `npm run test:e2e:order-flow`
+
+### Proposed Repo Structure
+- `tests/e2e/fixtures/`
+- `tests/e2e/pages/`
+- `tests/e2e/order-flow/`
+- `tests/e2e/utils/test-run.ts`
+- `scripts/e2e/cleanup-test-data.sql`
+- `scripts/e2e/run-order-flow-e2e.mjs`
+
+### Acceptance Criteria (Order Flow E2E)
+- All 15 scenarios run in CI with deterministic outcomes.
+- Every E2E-created record is queryable by `is_test=true` and `test_run_id`.
+- Cleanup removes only tagged test data.
+- No production auth bypass or mock adapter leakage.
+
+### Extension Plan (Future E2E Domains)
+After Order Flow is stable, extend the same harness to:
+1. Auth Flow E2E (email/password, OTP, Google callback resilience).
+2. Product Listing E2E (search, category filters, pricing badges, details page).
+3. Admin Operations E2E (order buckets, status transitions, exports, notifications).
+
+Use the same standards across domains:
+- deterministic fixtures
+- test data tagging
+- mockable external dependencies
+- CI artifacts + cleanup discipline
+
 ### Brand Image Consistency
 - Use a single shared logo asset across all pages: `/branding/logo-header-256.png`.
 - Avoid mixing `/images/products/SDA-Logo.png` and `/branding/logo-header-256.png` so header, auth, payment, and tracking screens stay visually consistent.

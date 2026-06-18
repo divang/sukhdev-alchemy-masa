@@ -4,6 +4,7 @@ import { isSupabaseConfigured, supabase } from "@/lib/supabase"
 const rawApiBaseUrl = String(import.meta.env.VITE_API_BASE_URL ?? "").trim()
 const apiBaseUrl = rawApiBaseUrl.replace(/\/$/, "")
 const razorpayKeyId = String(import.meta.env.VITE_RAZORPAY_KEY_ID ?? "").trim()
+const e2eMockPaymentEnabled = String(import.meta.env.VITE_E2E_MOCK_PAYMENT ?? "").trim().toLowerCase() === "true"
 
 declare global {
   interface Window {
@@ -80,6 +81,48 @@ type GatewayCheckoutResult = {
   error?: string
 }
 
+type E2EMockPaymentOutcome = "success" | "pending" | "failed" | "failed_then_reverted"
+
+type E2ETestMetaHeaders = {
+  runId?: string
+  scenario?: string
+  createdBy?: string
+}
+
+function resolveE2EMockPaymentOutcome(): E2EMockPaymentOutcome {
+  if (typeof window === "undefined") {
+    return "success"
+  }
+
+  const search = new URLSearchParams(window.location.search)
+  const outcome = String(search.get("e2ePaymentOutcome") ?? "").trim().toLowerCase()
+  if (outcome === "pending" || outcome === "failed" || outcome === "failed_then_reverted") {
+    return outcome
+  }
+
+  return "success"
+}
+
+function resolveE2ETestMetaHeaders(): E2ETestMetaHeaders {
+  if (typeof window === "undefined") {
+    return {}
+  }
+
+  const search = new URLSearchParams(window.location.search)
+  const runId = String(search.get("e2eRunId") ?? "").trim()
+  const scenario = String(search.get("e2eScenario") ?? "").trim().toLowerCase()
+
+  if (!runId) {
+    return {}
+  }
+
+  return {
+    runId,
+    scenario: scenario || undefined,
+    createdBy: "playwright",
+  }
+}
+
 function hasGatewayConfig() {
   return Boolean(razorpayKeyId) && (Boolean(apiBaseUrl) || isSupabaseConfigured)
 }
@@ -127,6 +170,22 @@ async function postJson<TResponse>(
 
   if (token) {
     headers.Authorization = `Bearer ${token}`
+  }
+
+  if (e2eMockPaymentEnabled) {
+    headers["x-e2e-mock-payment"] = "1"
+    headers["x-e2e-payment-outcome"] = resolveE2EMockPaymentOutcome()
+
+    const testMeta = resolveE2ETestMetaHeaders()
+    if (testMeta.runId) {
+      headers["x-e2e-test-run-id"] = testMeta.runId
+    }
+    if (testMeta.scenario) {
+      headers["x-e2e-test-scenario"] = testMeta.scenario
+    }
+    if (testMeta.createdBy) {
+      headers["x-e2e-test-created-by"] = testMeta.createdBy
+    }
   }
 
   try {
@@ -266,6 +325,38 @@ export async function startRazorpayCheckout(order: Order): Promise<GatewayChecko
     return {
       verified: false,
       error: "Payment gateway is not configured. Add VITE_RAZORPAY_KEY_ID and backend payment endpoints.",
+    }
+  }
+
+  if (e2eMockPaymentEnabled) {
+    const orderResult = await createGatewayOrderForCheckout(order)
+    if (orderResult.error || !orderResult.order_id) {
+      return { verified: false, error: orderResult.error || "Failed to create mock payment order." }
+    }
+
+    const mockPayload: RazorpayCheckoutSuccessPayload = {
+      razorpay_order_id: orderResult.order_id,
+      razorpay_payment_id: `pay_mock_${Date.now()}`,
+      razorpay_signature: "mock_signature",
+    }
+
+    const verification = await requestPaymentVerification(order, mockPayload)
+    if (verification.error) {
+      return {
+        verified: false,
+        razorpayOrderId: mockPayload.razorpay_order_id,
+        razorpayPaymentId: mockPayload.razorpay_payment_id,
+        error: verification.error,
+      }
+    }
+
+    return {
+      verified: Boolean(verification.verified),
+      razorpayPaymentId: mockPayload.razorpay_payment_id,
+      razorpayOrderId: mockPayload.razorpay_order_id,
+      paymentStatus: verification.paymentStatus,
+      orderStatus: verification.orderStatus,
+      error: verification.verified ? undefined : verification.message || "Mock payment verification failed.",
     }
   }
 

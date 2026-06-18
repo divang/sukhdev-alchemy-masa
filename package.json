@@ -13,6 +13,7 @@
         "test:signin-latency": "node scripts/test-signin-latency.mjs",
         "test:auth:integration": "node scripts/test-auth-integration.mjs",
         "test:e2e": "playwright test",
+        "test:e2e:order-flow": "node scripts/e2e/run-order-flow-e2e.mjs",
         "test:auth": "npm run test:auth:integration && npm run test:e2e",
         "optimize": "vite optimize",
         "preview": "vite preview"

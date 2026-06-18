@@ -5,7 +5,7 @@ import { loadCatalogFromSupabase } from '@/lib/catalog'
 import { CATALOG_SEED_CATEGORIES, CATALOG_SEED_PRODUCTS } from '@/lib/catalog-seed'
 
 const CATALOG_CACHE_TTL_MS = 24 * 60 * 60 * 1000
-const CATALOG_CACHE_FALLBACK_BUSTER = 'catalog-v1'
+const CATALOG_CACHE_FALLBACK_BUSTER = 'catalog-v2'
 
 type CatalogCacheMeta = {
   fetchedAt: number
@@ -23,18 +23,23 @@ export function useInitialData() {
 
   useEffect(() => {
     const initializeData = async () => {
-      const currentVersion = 18
+      const currentVersion = 20
+      const isLocalDev = typeof window !== 'undefined' && (
+        window.location.hostname === 'localhost'
+        || window.location.hostname === '127.0.0.1'
+        || window.location.hostname === '::1'
+      )
+      const forceRemoteRefresh = import.meta.env.DEV || isLocalDev
       const cacheBuster = (import.meta.env.VITE_CATALOG_CACHE_BUSTER as string | undefined)?.trim() || CATALOG_CACHE_FALLBACK_BUSTER
       const now = Date.now()
       const hasLocalCatalog = Boolean(categories?.length) && Boolean(products?.length)
       const isVersionCurrent = (dataVersion ?? 0) >= currentVersion
       const isFreshByTtl = Boolean(catalogCacheMeta?.fetchedAt) && now - (catalogCacheMeta?.fetchedAt ?? 0) < CATALOG_CACHE_TTL_MS
       const isBusterCurrent = catalogCacheMeta?.buster === cacheBuster
-      const canUseLocalCache = hasLocalCatalog && isVersionCurrent && isFreshByTtl && isBusterCurrent
+      const canUseLocalCache = hasLocalCatalog && isVersionCurrent && isFreshByTtl && isBusterCurrent && !forceRemoteRefresh
 
       if (canUseLocalCache) {
         setIsHydrated(true)
-        return
       }
       
       if (!categories || categories.length === 0) {
@@ -66,7 +71,9 @@ export function useInitialData() {
             id: 'garam-masala-premium',
             name: 'Mix Masala Premium Blend',
             category: 'premium-masala',
-            price: 210,
+            price: 160,
+            compareAtPrice: 210,
+            discountPercent: 25,
             packGrams: 50,
             image: 'images/products/garam-masala-premium.png',
             rating: 4.8,
@@ -94,13 +101,15 @@ export function useInitialData() {
             ],
             youtubeUrl: 'https://youtu.be/pDOFN9OEKt4?si=RyDFBeFCk1LY0ZHi',
             inStock: true,
-            tags: ['bestseller', 'premium', 'aromatic'],
+            tags: ['bestseller', 'premium', 'aromatic', 'discount-25'],
           },
         {
           id: 'bharwa-masala-premium',
           name: 'Bharwa Masala Premium',
           category: 'premium-masala',
-          price: 125,
+          price: 95,
+          compareAtPrice: 125,
+          discountPercent: 25,
           packGrams: 50,
           image: 'images/products/bharwa-masala-premium.png',
           rating: 4.7,
@@ -117,13 +126,15 @@ export function useInitialData() {
           ],
           youtubeUrl: 'https://youtu.be/pDOFN9OEKt4?si=RyDFBeFCk1LY0ZHi',
           inStock: true,
-          tags: ['premium', 'stuffed-veggies', 'tangy'],
+          tags: ['premium', 'stuffed-veggies', 'tangy', 'discount-25'],
         },
         {
           id: 'chat-masala-premium',
           name: 'Chaat Masala Premium',
           category: 'premium-masala',
-          price: 145,
+          price: 105,
+          compareAtPrice: 145,
+          discountPercent: 25,
           packGrams: 50,
           image: 'images/products/chat-masala-premium.png',
           rating: 4.9,
@@ -146,13 +157,15 @@ export function useInitialData() {
           ],
           youtubeUrl: 'https://youtu.be/pDOFN9OEKt4?si=RyDFBeFCk1LY0ZHi',
           inStock: true,
-          tags: ['bestseller', 'premium', 'tangy', 'street-food'],
+          tags: ['bestseller', 'premium', 'tangy', 'street-food', 'discount-25'],
         },
         {
           id: 'chhole-masala-premium',
           name: 'Chole Masala Premium',
           category: 'premium-masala',
-          price: 160,
+          price: 120,
+          compareAtPrice: 160,
+          discountPercent: 25,
           packGrams: 50,
           image: 'images/products/chhole-masala-premium.png',
           rating: 4.8,
@@ -184,7 +197,7 @@ export function useInitialData() {
           ],
           youtubeUrl: 'https://youtu.be/pDOFN9OEKt4?si=RyDFBeFCk1LY0ZHi',
           inStock: true,
-          tags: ['premium', 'punjabi', 'aromatic'],
+          tags: ['premium', 'punjabi', 'aromatic', 'discount-25'],
         },
         {
           id: 'sukhdevi-combo-pack',
@@ -236,7 +249,7 @@ export function useInitialData() {
         setReviews(remoteCatalog.reviews)
         setTestimonials(remoteCatalog.testimonials)
         setDataVersion(currentVersion)
-        setCatalogCacheMeta({ fetchedAt: now, buster: cacheBuster })
+        setCatalogCacheMeta({ fetchedAt: Date.now(), buster: cacheBuster })
         setIsHydrated(true)
         return
       }
@@ -246,7 +259,7 @@ export function useInitialData() {
       }
 
       setDataVersion(currentVersion)
-      setCatalogCacheMeta({ fetchedAt: now, buster: cacheBuster })
+      setCatalogCacheMeta({ fetchedAt: Date.now(), buster: cacheBuster })
       setIsHydrated(true)
     }
     

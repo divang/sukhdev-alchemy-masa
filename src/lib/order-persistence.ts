@@ -59,6 +59,35 @@ type GoogleSheetsSyncPayload = {
   updatedAt?: string
 }
 
+type E2ETestMeta = {
+  isTest: boolean
+  testRunId?: string
+  testScenario?: string
+  testCreatedBy?: string
+}
+
+function readE2ETestMetaFromLocation(): E2ETestMeta {
+  if (typeof window === "undefined") {
+    return { isTest: false }
+  }
+
+  const params = new URLSearchParams(window.location.search)
+  const mode = String(params.get("mode") ?? "").trim().toLowerCase()
+  const runId = String(params.get("e2eRunId") ?? "").trim()
+  const scenario = String(params.get("e2eScenario") ?? "").trim().toLowerCase()
+
+  if (mode !== "dev" || !runId) {
+    return { isTest: false }
+  }
+
+  return {
+    isTest: true,
+    testRunId: runId,
+    testScenario: scenario || undefined,
+    testCreatedBy: "playwright",
+  }
+}
+
 function assertClient() {
   if (!supabase || !isSupabaseConfigured) {
     return null
@@ -185,6 +214,8 @@ export async function persistOrderToSupabase(order: Order): Promise<PersistenceR
     return { persisted: false, reason: "not-configured" }
   }
 
+  const testMeta = readE2ETestMetaFromLocation()
+
   const payload = {
     id: order.id,
     customer: {
@@ -210,6 +241,25 @@ export async function persistOrderToSupabase(order: Order): Promise<PersistenceR
 
   const rpcResult = await client.rpc("create_order_v2", { p_payload: payload })
   if (!rpcResult.error) {
+    if (testMeta.isTest) {
+      const { error: taggingError } = await client
+        .from("orders")
+        .update({
+          is_test: true,
+          test_run_id: testMeta.testRunId ?? null,
+          test_scenario: testMeta.testScenario ?? null,
+          test_created_by: testMeta.testCreatedBy ?? null,
+        })
+        .eq("id", order.id)
+
+      if (taggingError) {
+        console.warn("[order-e2e-tagging] Failed to mark order as test data", {
+          orderId: order.id,
+          message: taggingError.message,
+        })
+      }
+    }
+
     if (isGoogleSheetsConfigured) {
       syncToGoogleSheetsInBackground("create_order", { order })
     }
