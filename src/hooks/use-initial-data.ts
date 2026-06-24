@@ -23,7 +23,7 @@ export function useInitialData() {
 
   useEffect(() => {
     const initializeData = async () => {
-      const currentVersion = 20
+      const currentVersion = 21
       const isLocalDev = typeof window !== 'undefined' && (
         window.location.hostname === 'localhost'
         || window.location.hostname === '127.0.0.1'
@@ -71,10 +71,10 @@ export function useInitialData() {
             id: 'garam-masala-premium',
             name: 'Mix Masala Premium Blend',
             category: 'premium-masala',
-            price: 160,
-            compareAtPrice: 210,
+            price: 240,
+            compareAtPrice: 315,
             discountPercent: 25,
-            packGrams: 50,
+            packGrams: 75,
             image: 'images/products/garam-masala-premium.png',
             rating: 4.8,
             reviewCount: 0,
@@ -107,10 +107,10 @@ export function useInitialData() {
           id: 'bharwa-masala-premium',
           name: 'Bharwa Masala Premium',
           category: 'premium-masala',
-          price: 95,
-          compareAtPrice: 125,
+          price: 143,
+          compareAtPrice: 188,
           discountPercent: 25,
-          packGrams: 50,
+          packGrams: 75,
           image: 'images/products/bharwa-masala-premium.png',
           rating: 4.7,
           reviewCount: 0,
@@ -132,10 +132,10 @@ export function useInitialData() {
           id: 'chat-masala-premium',
           name: 'Chaat Masala Premium',
           category: 'premium-masala',
-          price: 105,
-          compareAtPrice: 145,
+          price: 158,
+          compareAtPrice: 218,
           discountPercent: 25,
-          packGrams: 50,
+          packGrams: 75,
           image: 'images/products/chat-masala-premium.png',
           rating: 4.9,
           reviewCount: 0,
@@ -163,10 +163,10 @@ export function useInitialData() {
           id: 'chhole-masala-premium',
           name: 'Chole Masala Premium',
           category: 'premium-masala',
-          price: 120,
-          compareAtPrice: 160,
+          price: 180,
+          compareAtPrice: 240,
           discountPercent: 25,
-          packGrams: 50,
+          packGrams: 75,
           image: 'images/products/chhole-masala-premium.png',
           rating: 4.8,
           reviewCount: 0,

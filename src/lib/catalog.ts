@@ -98,6 +98,10 @@ function inferPackGrams(row: Pick<ProductRow, "id" | "tags" | "sku">) {
     return 200
   }
 
+  if (["garam-masala-premium", "bharwa-masala-premium", "chat-masala-premium", "chhole-masala-premium"].includes(row.id)) {
+    return 75
+  }
+
   return 50
 }
 

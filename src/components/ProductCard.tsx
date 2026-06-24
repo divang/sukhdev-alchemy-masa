@@ -22,6 +22,7 @@ export function ProductCard({ product, onViewDetails, onAddToCart, mobileDenseLa
   const imageClassName = product.category === "raw-organic-spices"
     ? "w-full h-full object-cover object-bottom transition-transform hover:scale-105 duration-300"
     : "w-full h-full object-cover transition-transform hover:scale-105 duration-300"
+  const packBadgeLabel = `${getProductPackGrams(product)}g`
   const currentPrice = resolveProductPackPrice(product, getProductPackGrams(product))
   const discountFromTag = (() => {
     for (const tag of product.tags || []) {
@@ -66,7 +67,7 @@ export function ProductCard({ product, onViewDetails, onAddToCart, mobileDenseLa
                 {hasDiscount ? `-${discountPercent}%` : "Best Price"}
               </Badge>
               <Badge className="absolute right-2 top-2 bg-slate-900 px-1.5 py-0 text-[10px] font-semibold text-white hover:bg-slate-900">
-                50g
+                {packBadgeLabel}
               </Badge>
             </button>
 
@@ -118,7 +119,7 @@ export function ProductCard({ product, onViewDetails, onAddToCart, mobileDenseLa
                 </div>
               )}
               <Badge className="absolute right-2 top-2 bg-slate-900 px-1.5 py-0 text-[10px] font-semibold text-white hover:bg-slate-900">
-                50g
+                {packBadgeLabel}
               </Badge>
               {hasDiscount && (
                 <Badge className="absolute left-2 top-2 bg-red-600 px-1.5 py-0 text-[10px] font-semibold text-white hover:bg-red-600">
@@ -191,7 +192,7 @@ export function ProductCard({ product, onViewDetails, onAddToCart, mobileDenseLa
             </div>
           )}
           <Badge className="absolute right-2 top-2 bg-slate-900 px-1.5 py-0 text-[10px] font-semibold text-white hover:bg-slate-900">
-            50g
+            {packBadgeLabel}
           </Badge>
           {hasDiscount && (
             <Badge className="absolute left-2 top-2 bg-red-600 px-1.5 py-0 text-[10px] font-semibold text-white hover:bg-red-600">
