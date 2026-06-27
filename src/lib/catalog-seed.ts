@@ -35,6 +35,7 @@ const BASE_CATALOG_SEED_PRODUCTS: Product[] = [
   {
     id: "garam-masala-premium",
     name: "Mix Masala Premium Blend",
+    amazonUrl: "https://www.amazon.in/dp/B0H6MQP2HT",
     category: "premium-masala",
     price: 240,
     compareAtPrice: 315,

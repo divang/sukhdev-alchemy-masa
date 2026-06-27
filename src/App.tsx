@@ -95,6 +95,12 @@ function buildProductSearchText(product: Product, categoryName?: string) {
   return `${normalizedBase} ${synonyms.join(" ")}`.trim()
 }
 
+function prioritizeAmazonProducts(products: Product[]) {
+  const amazonLinked = products.filter((product) => typeof product.amazonUrl === "string" && product.amazonUrl.trim().length > 0)
+  const remaining = products.filter((product) => !(typeof product.amazonUrl === "string" && product.amazonUrl.trim().length > 0))
+  return [...amazonLinked, ...remaining]
+}
+
 function mergeOrders(primary: Order[], secondary: Order[]) {
   const deduped = new Map<string, Order>()
 
@@ -757,12 +763,12 @@ function App() {
     ? visibleProducts.filter((product) => product.category === selectedCategory)
     : visibleProducts
   const normalizedSearch = normalizeSearchText(searchQuery)
-  const filteredProducts = normalizedSearch
+  const filteredProducts = prioritizeAmazonProducts(normalizedSearch
     ? categoryFilteredProducts.filter((product) => {
       const categoryName = visibleCategories.find((category) => category.id === product.category)?.name
       return buildProductSearchText(product, categoryName).includes(normalizedSearch)
     })
-    : categoryFilteredProducts
+    : categoryFilteredProducts)
 
   const localOrders = orders || []
   const localOrdersForProfile = profile

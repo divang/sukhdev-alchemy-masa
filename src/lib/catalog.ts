@@ -77,6 +77,10 @@ const CANONICAL_PREMIUM_PRODUCT_NAMES: Record<string, string> = {
   "chhole-masala-premium": "Chole Masala Premium",
 }
 
+const AMAZON_PRODUCT_URLS: Record<string, string> = {
+  "garam-masala-premium": "https://www.amazon.in/dp/B0H6MQP2HT",
+}
+
 function normalizeCategoryName(id: string, name: string) {
   if (id === "premium-masala") {
     return "Premium Blended Masala"
@@ -186,6 +190,7 @@ export async function loadCatalogFromSupabase(): Promise<CatalogSnapshot> {
   const products = ((productsData as ProductRow[] | null) ?? []).map((row) => ({
     id: row.id,
     slug: buildFallbackSlug(row),
+    amazonUrl: AMAZON_PRODUCT_URLS[row.id],
     category: row.id === "sukhdevi-combo-pack" || row.sku === "PM-COMBO-001"
       ? "combo-pack-masala"
       : row.category_id,

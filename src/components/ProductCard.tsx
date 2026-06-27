@@ -1,7 +1,7 @@
 import { Card, CardContent, CardFooter } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Eye, Plus, ShoppingCart } from "@phosphor-icons/react"
+import { ArrowSquareOut, Eye, Plus, ShoppingCart } from "@phosphor-icons/react"
 import { StarRating } from "./StarRating"
 import type { Product } from "@/lib/types"
 import { motion } from "framer-motion"
@@ -82,13 +82,25 @@ export function ProductCard({ product, onViewDetails, onAddToCart, mobileDenseLa
             </CardContent>
 
             <CardFooter className="justify-between px-2.5 pb-2 pt-0">
-              <button
-                type="button"
-                onClick={() => onViewDetails(product)}
-                className="text-[12px] leading-none font-medium text-slate-700"
-              >
-                View details
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => onViewDetails(product)}
+                  className="text-[12px] leading-none font-medium text-slate-700"
+                >
+                  View details
+                </button>
+                {product.amazonUrl && (
+                  <a
+                    href={product.amazonUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[12px] leading-none font-semibold text-amber-700 hover:text-amber-800"
+                  >
+                    Buy on Amazon
+                  </a>
+                )}
+              </div>
               <div className="flex items-center gap-2">
                 <Button
                   type="button"
@@ -147,11 +159,11 @@ export function ProductCard({ product, onViewDetails, onAddToCart, mobileDenseLa
                 </div>
                 <span className="text-xs text-muted-foreground">{getProductPackLabel(product)}</span>
               </div>
-              <div className="flex gap-2 w-full">
+              <div className={`grid w-full gap-2 ${product.amazonUrl ? "grid-cols-3" : "grid-cols-2"}`}>
                 <Button
                   variant="outline"
                   size="sm"
-                  className="flex-1"
+                  className="w-full"
                   onClick={() => onViewDetails(product)}
                 >
                   <Eye size={16} className="mr-1" />
@@ -159,12 +171,25 @@ export function ProductCard({ product, onViewDetails, onAddToCart, mobileDenseLa
                 </Button>
                 <Button
                   size="sm"
-                  className="flex-1"
+                  className="w-full"
                   onClick={() => onAddToCart(product)}
                 >
                   <ShoppingCart size={16} className="mr-1" />
                   Add to Cart
                 </Button>
+                {product.amazonUrl && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
+                    asChild
+                  >
+                    <a href={product.amazonUrl} target="_blank" rel="noopener noreferrer">
+                      <ArrowSquareOut size={16} className="mr-1" />
+                      Amazon
+                    </a>
+                  </Button>
+                )}
               </div>
             </CardFooter>
           </Card>
@@ -220,11 +245,11 @@ export function ProductCard({ product, onViewDetails, onAddToCart, mobileDenseLa
             </div>
             <span className="text-xs text-muted-foreground">{getProductPackLabel(product)}</span>
           </div>
-          <div className="flex gap-2 w-full">
+          <div className={`grid w-full gap-2 ${product.amazonUrl ? "grid-cols-3" : "grid-cols-2"}`}>
             <Button
               variant="outline"
               size="sm"
-              className="flex-1"
+              className="w-full"
               onClick={() => onViewDetails(product)}
             >
               <Eye size={16} className="mr-1" />
@@ -232,12 +257,25 @@ export function ProductCard({ product, onViewDetails, onAddToCart, mobileDenseLa
             </Button>
             <Button
               size="sm"
-              className="flex-1"
+              className="w-full"
               onClick={() => onAddToCart(product)}
             >
               <ShoppingCart size={16} className="mr-1" />
               Add to Cart
             </Button>
+            {product.amazonUrl && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full"
+                asChild
+              >
+                <a href={product.amazonUrl} target="_blank" rel="noopener noreferrer">
+                  <ArrowSquareOut size={16} className="mr-1" />
+                  Amazon
+                </a>
+              </Button>
+            )}
           </div>
         </CardFooter>
       </Card>

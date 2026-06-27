@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
-import { ShoppingCart, VideoCamera } from "@phosphor-icons/react"
+import { ArrowSquareOut, ShoppingCart, VideoCamera } from "@phosphor-icons/react"
 import { StarRating } from "./StarRating"
 import type { Product, UserProfile } from "@/lib/types"
 import { useEffect, useState } from "react"
@@ -190,6 +190,14 @@ export function ProductDetailDialog({ product, currentUser, canReview, open, onO
                       Close
                     </Button>
                   </div>
+                  {product.amazonUrl && (
+                    <Button type="button" variant="outline" asChild>
+                      <a href={product.amazonUrl} target="_blank" rel="noopener noreferrer">
+                        <ArrowSquareOut size={18} className="mr-2" />
+                        Buy on Amazon
+                      </a>
+                    </Button>
+                  )}
                   <p className="sm:hidden text-xs text-center text-muted-foreground">
                     💡 Tip: Tap the dimmed background to close
                   </p>
