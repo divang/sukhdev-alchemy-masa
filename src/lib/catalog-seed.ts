@@ -66,7 +66,7 @@ const BASE_CATALOG_SEED_PRODUCTS: Product[] = [
     ],
     youtubeUrl: "https://youtu.be/pDOFN9OEKt4?si=RyDFBeFCk1LY0ZHi",
     inStock: true,
-    tags: ["bestseller", "premium", "aromatic"],
+    tags: ["bestseller", "premium", "aromatic", "discount-25"],
     modelNumber: "SDA-GM-75",
   },
   {

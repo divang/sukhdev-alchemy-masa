@@ -38,11 +38,15 @@ export function ProductCard({ product, onViewDetails, onAddToCart, mobileDenseLa
     return undefined
   })()
   const discountPercent = product.discountPercent ?? discountFromTag
-  const referencePrice = product.compareAtPrice
-    ?? (discountPercent
-      ? Math.ceil((currentPrice / (1 - discountPercent / 100)) / 5) * 5
-      : undefined)
-  const hasDiscount = Boolean(discountPercent && referencePrice && referencePrice > currentPrice)
+  const keepAmazonParityWithoutComparePrice = product.id === "garam-masala-premium"
+  const referencePrice = keepAmazonParityWithoutComparePrice
+    ? product.compareAtPrice
+    : (product.compareAtPrice
+      ?? (discountPercent
+        ? Math.ceil((currentPrice / (1 - discountPercent / 100)) / 5) * 5
+        : undefined))
+  const hasDiscount = Boolean(!keepAmazonParityWithoutComparePrice && discountPercent && referencePrice && referencePrice > currentPrice)
+  const showDiscountBadge = Boolean(discountPercent)
 
   if (mobileDenseLayout) {
     return (
@@ -64,7 +68,7 @@ export function ProductCard({ product, onViewDetails, onAddToCart, mobileDenseLa
                 )}
               </div>
               <Badge className="absolute left-2 top-2 bg-red-600 px-1.5 py-0 text-[10px] font-semibold text-white hover:bg-red-600">
-                {hasDiscount ? `-${discountPercent}%` : "Best Price"}
+                {showDiscountBadge ? `-${discountPercent}%` : "Best Price"}
               </Badge>
               <Badge className="absolute right-2 top-2 bg-slate-900 px-1.5 py-0 text-[10px] font-semibold text-white hover:bg-slate-900">
                 {packBadgeLabel}
@@ -133,7 +137,7 @@ export function ProductCard({ product, onViewDetails, onAddToCart, mobileDenseLa
               <Badge className="absolute right-2 top-2 bg-slate-900 px-1.5 py-0 text-[10px] font-semibold text-white hover:bg-slate-900">
                 {packBadgeLabel}
               </Badge>
-              {hasDiscount && (
+              {showDiscountBadge && (
                 <Badge className="absolute left-2 top-2 bg-red-600 px-1.5 py-0 text-[10px] font-semibold text-white hover:bg-red-600">
                   -{discountPercent}%
                 </Badge>
@@ -219,7 +223,7 @@ export function ProductCard({ product, onViewDetails, onAddToCart, mobileDenseLa
           <Badge className="absolute right-2 top-2 bg-slate-900 px-1.5 py-0 text-[10px] font-semibold text-white hover:bg-slate-900">
             {packBadgeLabel}
           </Badge>
-          {hasDiscount && (
+          {showDiscountBadge && (
             <Badge className="absolute left-2 top-2 bg-red-600 px-1.5 py-0 text-[10px] font-semibold text-white hover:bg-red-600">
               -{discountPercent}%
             </Badge>
