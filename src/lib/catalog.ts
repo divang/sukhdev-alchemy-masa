@@ -81,6 +81,14 @@ const AMAZON_PRODUCT_URLS: Record<string, string> = {
   "garam-masala-premium": "https://www.amazon.in/dp/B0H6MQP2HT",
 }
 
+const COMPARE_AT_PRICES: Record<string, number> = {
+  "garam-masala-premium": 315,
+}
+
+const LISTING_PRICES: Record<string, number> = {
+  "garam-masala-premium": 240,
+}
+
 function normalizeCategoryName(id: string, name: string) {
   if (id === "premium-masala") {
     return "Premium Blended Masala"
@@ -195,7 +203,8 @@ export async function loadCatalogFromSupabase(): Promise<CatalogSnapshot> {
       ? "combo-pack-masala"
       : row.category_id,
     name: normalizeProductName(row.id, row.name),
-    price: Number(row.price_per_100g),
+    price: LISTING_PRICES[row.id] ?? Number(row.price_per_100g),
+    compareAtPrice: COMPARE_AT_PRICES[row.id],
     packGrams: inferPackGrams(row),
     image: row.image_path,
     rating: Number(row.rating_avg),

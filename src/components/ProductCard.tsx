@@ -38,14 +38,11 @@ export function ProductCard({ product, onViewDetails, onAddToCart, mobileDenseLa
     return undefined
   })()
   const discountPercent = product.discountPercent ?? discountFromTag
-  const keepAmazonParityWithoutComparePrice = product.id === "garam-masala-premium"
-  const referencePrice = keepAmazonParityWithoutComparePrice
-    ? product.compareAtPrice
-    : (product.compareAtPrice
-      ?? (discountPercent
-        ? Math.ceil((currentPrice / (1 - discountPercent / 100)) / 5) * 5
-        : undefined))
-  const hasDiscount = Boolean(!keepAmazonParityWithoutComparePrice && discountPercent && referencePrice && referencePrice > currentPrice)
+  const referencePrice = product.compareAtPrice
+    ?? (discountPercent
+      ? Math.ceil((currentPrice / (1 - discountPercent / 100)) / 5) * 5
+      : undefined)
+  const hasDiscount = Boolean(discountPercent && referencePrice && referencePrice > currentPrice)
   const showDiscountBadge = Boolean(discountPercent)
 
   if (mobileDenseLayout) {
