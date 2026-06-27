@@ -81,6 +81,16 @@ const AMAZON_PRODUCT_URLS: Record<string, string> = {
   "garam-masala-premium": "https://www.amazon.in/dp/B0H6MQP2HT",
 }
 
+const FIXED_LISTING_PRICE_PRODUCT_IDS = new Set(["garam-masala-premium"])
+
+function normalizeProductTags(id: string, tags: string[]) {
+  if (!FIXED_LISTING_PRICE_PRODUCT_IDS.has(id)) {
+    return tags
+  }
+
+  return tags.filter((tag) => !/^discount-\d{1,2}$/i.test(tag))
+}
+
 function normalizeCategoryName(id: string, name: string) {
   if (id === "premium-masala") {
     return "Premium Blended Masala"
@@ -204,7 +214,7 @@ export async function loadCatalogFromSupabase(): Promise<CatalogSnapshot> {
     ingredients: Array.isArray(row.ingredients) ? row.ingredients : [],
     youtubeUrl: row.youtube_url ?? undefined,
     inStock: row.in_stock,
-    tags: Array.isArray(row.tags) ? row.tags : [],
+    tags: normalizeProductTags(row.id, Array.isArray(row.tags) ? row.tags : []),
     sku: row.sku,
     brandName: row.brand_name ?? undefined,
     shortDescription: row.short_description ?? undefined,

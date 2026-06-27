@@ -38,8 +38,6 @@ const BASE_CATALOG_SEED_PRODUCTS: Product[] = [
     amazonUrl: "https://www.amazon.in/dp/B0H6MQP2HT",
     category: "premium-masala",
     price: 240,
-    compareAtPrice: 315,
-    discountPercent: 25,
     packGrams: 75,
     image: "images/products/garam-masala-premium.png",
     rating: 4.8,
@@ -68,7 +66,7 @@ const BASE_CATALOG_SEED_PRODUCTS: Product[] = [
     ],
     youtubeUrl: "https://youtu.be/pDOFN9OEKt4?si=RyDFBeFCk1LY0ZHi",
     inStock: true,
-    tags: ["bestseller", "premium", "aromatic", "discount-25"],
+    tags: ["bestseller", "premium", "aromatic"],
     modelNumber: "SDA-GM-75",
   },
   {
