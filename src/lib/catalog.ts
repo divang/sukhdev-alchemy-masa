@@ -75,6 +75,7 @@ const CANONICAL_PREMIUM_PRODUCT_NAMES: Record<string, string> = {
   "bharwa-masala-premium": "Bharwa Masala Premium",
   "chat-masala-premium": "Chaat Masala Premium",
   "chhole-masala-premium": "Chole Masala Premium",
+  "garam-masala-crest": "Garam Masala Crest",
 }
 
 const AMAZON_PRODUCT_URLS: Record<string, string> = {
@@ -82,11 +83,18 @@ const AMAZON_PRODUCT_URLS: Record<string, string> = {
 }
 
 const COMPARE_AT_PRICES: Record<string, number> = {
-  "garam-masala-premium": 315,
+  "garam-masala-premium": 294,
+  "bharwa-masala-premium": 175,
+  "chat-masala-premium": 203,
+  "chhole-masala-premium": 224,
 }
 
 const LISTING_PRICES: Record<string, number> = {
-  "garam-masala-premium": 240,
+  "garam-masala-premium": 225,
+  "bharwa-masala-premium": 135,
+  "chat-masala-premium": 150,
+  "chhole-masala-premium": 170,
+  "garam-masala-crest": 190,
 }
 
 function normalizeCategoryName(id: string, name: string) {
@@ -110,8 +118,8 @@ function inferPackGrams(row: Pick<ProductRow, "id" | "tags" | "sku">) {
     return 200
   }
 
-  if (["garam-masala-premium", "bharwa-masala-premium", "chat-masala-premium", "chhole-masala-premium"].includes(row.id)) {
-    return 75
+  if (["garam-masala-premium", "bharwa-masala-premium", "chat-masala-premium", "chhole-masala-premium", "garam-masala-crest"].includes(row.id)) {
+    return 70
   }
 
   return 50
