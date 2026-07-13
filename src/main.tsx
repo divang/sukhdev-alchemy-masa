@@ -5,6 +5,7 @@ import { Toaster } from "sonner"
 
 import App from './App.tsx'
 import { AmazonProductListingPage } from "@/components/AmazonProductListingPage"
+import { StorefrontV2 } from "@/components/StorefrontV2"
 import { ErrorFallback } from './ErrorFallback.tsx'
 import { getSlugFromProductPath, isProductPath } from "@/lib/product-url"
 
@@ -20,6 +21,10 @@ function RootRouter() {
     window.addEventListener("popstate", handleNavigation)
     return () => window.removeEventListener("popstate", handleNavigation)
   }, [])
+
+  if (pathname === "/v2" || pathname.startsWith("/v2/")) {
+    return <StorefrontV2 />
+  }
 
   if (isProductPath(pathname)) {
     return <AmazonProductListingPage slug={getSlugFromProductPath(pathname)} />

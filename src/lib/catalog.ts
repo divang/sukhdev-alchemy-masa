@@ -71,15 +71,35 @@ type CatalogSnapshot = {
 }
 
 const CANONICAL_PREMIUM_PRODUCT_NAMES: Record<string, string> = {
-  "garam-masala-premium": "Mix Masala Premium Blend",
-  "bharwa-masala-premium": "Bharwa Masala Premium",
-  "chat-masala-premium": "Chaat Masala Premium",
-  "chhole-masala-premium": "Chole Masala Premium",
+  "garam-masala-premium": "Premium Masala Spice Blend",
+  "bharwa-masala-premium": "Bharwa Masala",
+  "chat-masala-premium": "Chat Masala",
+  "chhole-masala-premium": "Chhole Masala",
   "garam-masala-crest": "Garam Masala Crest",
+  "ginger-tea-masala": "Ginger Tea Masala",
+  "elaichi-tea-masala": "Elaichi Tea Masala",
+  "dal-chini-cinnamon-tea-masala": "Dal-Chini Cinnamon Tea Masala",
+  "pav-bhaji-masala": "Pav Bhaji Masala",
+  "rajma-masala": "Rajma Masala",
+  "garam-masala-koppa": "Garam Masala Koppa",
+  "sambhar-masala": "Sambhar Masala",
+  "peri-peri-masala": "Peri-Peri Masala",
 }
 
 const AMAZON_PRODUCT_URLS: Record<string, string> = {
   "garam-masala-premium": "https://www.amazon.in/dp/B0H6MQP2HT",
+  "bharwa-masala-premium": "https://www.amazon.in/dp/B0H8CR4LMC",
+  "chat-masala-premium": "https://www.amazon.in/dp/B0H8CP8NTG",
+  "chhole-masala-premium": "https://www.amazon.in/dp/B0H8CKHSY4",
+  "garam-masala-crest": "https://www.amazon.in/dp/B0H883XH3L",
+  "ginger-tea-masala": "https://www.amazon.in/dp/B0H8CVJWMZ",
+  "elaichi-tea-masala": "https://www.amazon.in/dp/B0H8CLZ5TQ",
+  "dal-chini-cinnamon-tea-masala": "https://www.amazon.in/dp/B0H8CPD5XB",
+  "pav-bhaji-masala": "https://www.amazon.in/dp/B0H8CJ4BL9",
+  "rajma-masala": "https://www.amazon.in/dp/B0H88LDZNM",
+  "garam-masala-koppa": "https://www.amazon.in/dp/B0H88HWY2Z",
+  "sambhar-masala": "https://www.amazon.in/dp/B0H884FS8X",
+  "peri-peri-masala": "https://www.amazon.in/dp/B0H87Q9YRD",
 }
 
 const COMPARE_AT_PRICES: Record<string, number> = {
@@ -90,11 +110,19 @@ const COMPARE_AT_PRICES: Record<string, number> = {
 }
 
 const LISTING_PRICES: Record<string, number> = {
-  "garam-masala-premium": 225,
-  "bharwa-masala-premium": 135,
-  "chat-masala-premium": 150,
-  "chhole-masala-premium": 170,
-  "garam-masala-crest": 190,
+  "garam-masala-premium": 160,
+  "bharwa-masala-premium": 55,
+  "chat-masala-premium": 75,
+  "chhole-masala-premium": 85,
+  "garam-masala-crest": 105,
+  "ginger-tea-masala": 125,
+  "elaichi-tea-masala": 230,
+  "dal-chini-cinnamon-tea-masala": 100,
+  "pav-bhaji-masala": 80,
+  "rajma-masala": 75,
+  "garam-masala-koppa": 115,
+  "sambhar-masala": 65,
+  "peri-peri-masala": 80,
 }
 
 function normalizeCategoryName(id: string, name: string) {
@@ -106,10 +134,20 @@ function normalizeCategoryName(id: string, name: string) {
 }
 
 function normalizeProductName(id: string, name: string) {
-  return CANONICAL_PREMIUM_PRODUCT_NAMES[id] ?? name
+  const candidate = CANONICAL_PREMIUM_PRODUCT_NAMES[id] ?? name
+
+  // Strip accidental ASIN-like prefixes and repeated brand prefixes from display names.
+  return candidate
+    .replace(/^B[0-9A-Z]{8,}\s*[-|:]?\s*/i, "")
+    .replace(/^Sukhdevi\s+Alchemy\s+/i, "")
+    .trim()
 }
 
-function inferPackGrams(row: Pick<ProductRow, "id" | "tags" | "sku">) {
+function inferPackGrams(row: Pick<ProductRow, "id" | "tags" | "sku" | "net_quantity_value">) {
+  if (typeof row.net_quantity_value === "number" && row.net_quantity_value > 0) {
+    return Number(row.net_quantity_value)
+  }
+
   if (Array.isArray(row.tags) && row.tags.includes("combo-pack")) {
     return 200
   }
@@ -118,8 +156,23 @@ function inferPackGrams(row: Pick<ProductRow, "id" | "tags" | "sku">) {
     return 200
   }
 
-  if (["garam-masala-premium", "bharwa-masala-premium", "chat-masala-premium", "chhole-masala-premium", "garam-masala-crest"].includes(row.id)) {
+  if ([
+    "garam-masala-premium",
+    "bharwa-masala-premium",
+    "chat-masala-premium",
+    "chhole-masala-premium",
+    "garam-masala-crest",
+    "pav-bhaji-masala",
+    "rajma-masala",
+    "garam-masala-koppa",
+    "sambhar-masala",
+    "peri-peri-masala",
+  ].includes(row.id)) {
     return 70
+  }
+
+  if (["ginger-tea-masala", "elaichi-tea-masala", "dal-chini-cinnamon-tea-masala"].includes(row.id)) {
+    return 50
   }
 
   return 50
