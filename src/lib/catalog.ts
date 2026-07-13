@@ -103,10 +103,19 @@ const AMAZON_PRODUCT_URLS: Record<string, string> = {
 }
 
 const COMPARE_AT_PRICES: Record<string, number> = {
-  "garam-masala-premium": 294,
-  "bharwa-masala-premium": 175,
-  "chat-masala-premium": 203,
-  "chhole-masala-premium": 224,
+  "garam-masala-premium": 320,
+  "bharwa-masala-premium": 135,
+  "chat-masala-premium": 150,
+  "chhole-masala-premium": 170,
+  "garam-masala-crest": 200,
+  "ginger-tea-masala": 220,
+  "elaichi-tea-masala": 360,
+  "dal-chini-cinnamon-tea-masala": 260,
+  "pav-bhaji-masala": 180,
+  "rajma-masala": 160,
+  "garam-masala-koppa": 200,
+  "sambhar-masala": 150,
+  "peri-peri-masala": 170,
 }
 
 const LISTING_PRICES: Record<string, number> = {
@@ -256,7 +265,14 @@ export async function loadCatalogFromSupabase(): Promise<CatalogSnapshot> {
     })
   }
 
-  const products = ((productsData as ProductRow[] | null) ?? []).map((row) => ({
+  const products = ((productsData as ProductRow[] | null) ?? []).map((row) => {
+    const currentPrice = LISTING_PRICES[row.id] ?? Number(row.price_per_100g)
+    const compareAtPrice = COMPARE_AT_PRICES[row.id]
+    const discountPercent = compareAtPrice && compareAtPrice > currentPrice
+      ? Math.round((1 - currentPrice / compareAtPrice) * 100)
+      : undefined
+
+    return {
     id: row.id,
     slug: buildFallbackSlug(row),
     amazonUrl: AMAZON_PRODUCT_URLS[row.id],
@@ -264,8 +280,9 @@ export async function loadCatalogFromSupabase(): Promise<CatalogSnapshot> {
       ? "combo-pack-masala"
       : row.category_id,
     name: normalizeProductName(row.id, row.name),
-    price: LISTING_PRICES[row.id] ?? Number(row.price_per_100g),
-    compareAtPrice: COMPARE_AT_PRICES[row.id],
+    price: currentPrice,
+    compareAtPrice,
+    discountPercent,
     packGrams: inferPackGrams(row),
     image: row.image_path,
     rating: Number(row.rating_avg),
@@ -289,7 +306,8 @@ export async function loadCatalogFromSupabase(): Promise<CatalogSnapshot> {
     complianceInfo: Array.isArray(row.compliance_info) ? row.compliance_info : [],
     additionalImages: Array.isArray(row.additional_image_paths) ? row.additional_image_paths : [],
     categoryBreadcrumb: Array.isArray(row.category_breadcrumb) ? row.category_breadcrumb : [],
-  }))
+  }
+  })
 
   const reviews = ((reviewsData as ReviewRow[] | null) ?? []).map((row) => ({
     id: row.id,

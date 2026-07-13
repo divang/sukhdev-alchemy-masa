@@ -19,9 +19,7 @@ type ProductCardProps = {
 export function ProductCard({ product, onViewDetails, onAddToCart, mobileDenseLayout = false }: ProductCardProps) {
   const [productImages] = useKV<Record<string, string>>("product-images", {})
   const imageUrl = getProductImage(product, productImages ?? {})
-  const imageClassName = product.category === "raw-organic-spices"
-    ? "w-full h-full object-cover object-bottom transition-transform hover:scale-105 duration-300"
-    : "w-full h-full object-cover transition-transform hover:scale-105 duration-300"
+  const imageClassName = "w-full h-full object-contain object-center p-2 transition-transform hover:scale-105 duration-300"
   const packBadgeLabel = `${getProductPackGrams(product)}g`
   const currentPrice = resolveProductPackPrice(product, getProductPackGrams(product))
   const discountFromTag = (() => {
@@ -37,13 +35,17 @@ export function ProductCard({ product, onViewDetails, onAddToCart, mobileDenseLa
 
     return undefined
   })()
-  const discountPercent = product.discountPercent ?? discountFromTag
+  const explicitDiscountPercent = product.discountPercent ?? discountFromTag
   const referencePrice = product.compareAtPrice
-    ?? (discountPercent
-      ? Math.ceil((currentPrice / (1 - discountPercent / 100)) / 5) * 5
+    ?? (explicitDiscountPercent
+      ? Math.ceil((currentPrice / (1 - explicitDiscountPercent / 100)) / 5) * 5
       : undefined)
+  const derivedDiscountPercent = referencePrice && referencePrice > currentPrice
+    ? Math.round((1 - currentPrice / referencePrice) * 100)
+    : undefined
+  const discountPercent = explicitDiscountPercent ?? derivedDiscountPercent
   const hasDiscount = Boolean(discountPercent && referencePrice && referencePrice > currentPrice)
-  const showDiscountBadge = Boolean(discountPercent)
+  const showDiscountBadge = hasDiscount
 
   if (mobileDenseLayout) {
     return (
@@ -57,7 +59,7 @@ export function ProductCard({ product, onViewDetails, onAddToCart, mobileDenseLa
             >
               <div className="relative aspect-square overflow-hidden rounded-b-2xl bg-white">
                 {imageUrl ? (
-                  <img src={imageUrl} alt={product.name} className="h-full w-full object-cover" />
+                  <img src={imageUrl} alt={product.name} className="h-full w-full object-contain object-center p-2" />
                 ) : (
                   <div className="flex h-full w-full items-center justify-center bg-muted">
                     <span className="text-muted-foreground">No image</span>
@@ -119,7 +121,7 @@ export function ProductCard({ product, onViewDetails, onAddToCart, mobileDenseLa
 
         <motion.div whileHover={{ y: -4 }} transition={{ duration: 0.2 }} className="hidden md:block">
           <Card className="gap-0 overflow-hidden h-full flex flex-col py-0 transition-shadow hover:shadow-lg">
-            <div className="relative h-48 bg-muted overflow-hidden">
+            <div className="relative aspect-square bg-muted overflow-hidden">
               {imageUrl ? (
                 <img
                   src={imageUrl}
@@ -205,7 +207,7 @@ export function ProductCard({ product, onViewDetails, onAddToCart, mobileDenseLa
       transition={{ duration: 0.2 }}
     >
       <Card className="gap-0 overflow-hidden h-full flex flex-col py-0 transition-shadow hover:shadow-lg">
-        <div className="relative h-48 bg-muted overflow-hidden">
+        <div className="relative aspect-square bg-muted overflow-hidden">
           {imageUrl ? (
             <img
               src={imageUrl}
