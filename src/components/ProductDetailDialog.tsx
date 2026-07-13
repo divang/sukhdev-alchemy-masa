@@ -45,6 +45,28 @@ export function ProductDetailDialog({ product, currentUser, canReview, open, onO
 
   const selectedPackGrams = Number(selectedGrams) || getProductPackGrams(product)
   const selectedPackPrice = resolveProductPackPrice(product, selectedPackGrams)
+  const discountFromTag = (() => {
+    for (const tag of product.tags || []) {
+      const match = /^discount-(\d{1,2})$/i.exec(tag)
+      if (match) {
+        const value = Number(match[1])
+        if (Number.isFinite(value) && value > 0 && value < 100) {
+          return value
+        }
+      }
+    }
+
+    return undefined
+  })()
+  const referencePrice = product.compareAtPrice
+    ?? (product.discountPercent
+      ? Math.ceil((selectedPackPrice / (1 - product.discountPercent / 100)) / 5) * 5
+      : undefined)
+  const derivedDiscountPercent = referencePrice && referencePrice > selectedPackPrice
+    ? Math.round((1 - selectedPackPrice / referencePrice) * 100)
+    : undefined
+  const discountPercent = product.discountPercent ?? derivedDiscountPercent ?? discountFromTag
+  const hasDiscount = Boolean(discountPercent && referencePrice && referencePrice > selectedPackPrice)
   
   const handleAddToCart = () => {
     onAddToCart(product, selectedPackGrams)
@@ -108,12 +130,12 @@ export function ProductDetailDialog({ product, currentUser, canReview, open, onO
 
         <div className="grid md:grid-cols-2 gap-6">
           <div className="space-y-4">
-            <div className="w-full h-64 md:h-80 rounded-lg overflow-hidden bg-muted">
+            <div className="w-full aspect-square rounded-lg overflow-hidden bg-muted">
               {imageUrl ? (
                 <img
                   src={imageUrl}
                   alt={product.name}
-                  className="w-full h-full object-cover"
+                  className="w-full h-full object-contain object-center p-3"
                 />
               ) : (
                 <div className="w-full h-full flex items-center justify-center">
@@ -144,6 +166,12 @@ export function ProductDetailDialog({ product, currentUser, canReview, open, onO
             <div>
               <div className="flex items-baseline gap-2 mb-4">
                 <span className="text-3xl font-bold text-primary">₹{selectedPackPrice}</span>
+                {hasDiscount && (
+                  <>
+                    <span className="text-sm text-muted-foreground line-through">₹{referencePrice}</span>
+                    <Badge className="bg-red-600 text-white hover:bg-red-600">-{discountPercent}%</Badge>
+                  </>
+                )}
                 <span className="text-sm text-muted-foreground">{selectedPackGrams}g pack</span>
               </div>
               

@@ -35,7 +35,7 @@ export function ProductCard({ product, onViewDetails, onAddToCart, mobileDenseLa
 
     return undefined
   })()
-  const explicitDiscountPercent = product.discountPercent ?? discountFromTag
+  const explicitDiscountPercent = product.discountPercent
   const referencePrice = product.compareAtPrice
     ?? (explicitDiscountPercent
       ? Math.ceil((currentPrice / (1 - explicitDiscountPercent / 100)) / 5) * 5
@@ -43,7 +43,7 @@ export function ProductCard({ product, onViewDetails, onAddToCart, mobileDenseLa
   const derivedDiscountPercent = referencePrice && referencePrice > currentPrice
     ? Math.round((1 - currentPrice / referencePrice) * 100)
     : undefined
-  const discountPercent = explicitDiscountPercent ?? derivedDiscountPercent
+  const discountPercent = explicitDiscountPercent ?? derivedDiscountPercent ?? discountFromTag
   const hasDiscount = Boolean(discountPercent && referencePrice && referencePrice > currentPrice)
   const showDiscountBadge = hasDiscount
 
