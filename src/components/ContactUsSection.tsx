@@ -7,6 +7,9 @@ const FOLLOW_US_LINKS = [
 ]
 
 export function ContactUsSection() {
+  const whatsappNumber = "7889480171"
+  const whatsappHref = `https://wa.me/91${whatsappNumber}`
+
   return (
     <section className="border-t bg-card">
       <div className="container mx-auto px-4 py-6 sm:py-8">
@@ -16,6 +19,10 @@ export function ContactUsSection() {
             <p className="mt-2 text-sm text-muted-foreground sm:text-base">
               Reach us for product help, platform support, and delivery updates.
             </p>
+
+            <div className="mt-3 text-sm text-foreground sm:text-base">
+              WhatsApp: <a href={whatsappHref} target="_blank" rel="noopener noreferrer" className="font-semibold underline underline-offset-4 hover:opacity-80">+91 {whatsappNumber}</a>
+            </div>
 
             <div className="mt-4 flex items-center gap-3">
               <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Follow us</p>
