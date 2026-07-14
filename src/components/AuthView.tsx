@@ -293,6 +293,11 @@ export function AuthView({ mode, onBack, onAuthenticated }: AuthViewProps) {
     }
 
     toast.info("Redirecting to Google sign-in...")
+
+    // If navigation is blocked by an iOS/in-app browser policy, let the user retry quickly.
+    window.setTimeout(() => {
+      setIsGoogleRedirecting(false)
+    }, 3000)
   }
 
   const handleOpenGoogleAuthLink = () => {

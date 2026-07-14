@@ -1097,12 +1097,13 @@ export async function signInWithGoogle(): Promise<string | undefined> {
   authDebug("signInWithGoogle started", { redirectTo })
 
   try {
-    const { error } = await withTimeout(
+    const { data, error } = await withTimeout(
       supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
           redirectTo,
           prompt: "select_account",
+          skipBrowserRedirect: true,
         },
       }),
       15000,
@@ -1117,9 +1118,18 @@ export async function signInWithGoogle(): Promise<string | undefined> {
       return mappedError
     }
 
-    // Let Supabase SDK perform the redirect after storing PKCE verifier.
-    // This is more reliable on mobile browsers than manual location.assign.
-    authDebug("signInWithGoogle redirect initiated by SDK", { redirectTo })
+    const authorizeUrl = data?.url ?? getDirectGoogleAuthorizeUrl()
+    if (!authorizeUrl) {
+      return "Unable to start Google sign-in right now. Please retry."
+    }
+
+    authDebug("signInWithGoogle redirecting via authorize URL", {
+      redirectTo,
+      hasSdkUrl: Boolean(data?.url),
+    })
+
+    // Explicit top-level navigation is more reliable on iOS and in-app browsers.
+    window.location.assign(authorizeUrl)
     return undefined
   } catch (error) {
     return mapAuthErrorMessage(error instanceof Error ? error.message : String(error))
