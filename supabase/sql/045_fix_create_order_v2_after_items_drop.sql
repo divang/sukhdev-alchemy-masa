@@ -1,5 +1,5 @@
--- Transactional V2-first order creation.
--- Inserts public.orders and public.order_items in one DB transaction.
+-- Forward fix for environments where orders.items has been dropped.
+-- Recreates create_order_v2 so it no longer inserts into the removed legacy column.
 
 create or replace function public.create_order_v2(p_payload jsonb)
 returns table (

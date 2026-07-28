@@ -1336,6 +1336,7 @@ function App() {
       <OrderTrackingView
         order={trackingOrder}
         orders={trackingOrders}
+        isAdmin={profile.role === "admin"}
         useV2Branding={true}
         onBack={handleBackToStore}
         onSelectOrder={handleViewTracking}

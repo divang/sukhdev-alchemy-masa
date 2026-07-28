@@ -24,6 +24,10 @@ export function ContactUsSection() {
               WhatsApp: <a href={whatsappHref} target="_blank" rel="noopener noreferrer" className="font-semibold underline underline-offset-4 hover:opacity-80">+91 {whatsappNumber}</a>
             </div>
 
+            <div className="mt-2 text-sm text-foreground sm:text-base">
+              Email: <a href="mailto:care@sukhdevialchemy.com" className="font-semibold underline underline-offset-4 hover:opacity-80">care@sukhdevialchemy.com</a>
+            </div>
+
             <div className="mt-4 flex items-center gap-3">
               <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Follow us</p>
               <div className="flex items-center gap-2">

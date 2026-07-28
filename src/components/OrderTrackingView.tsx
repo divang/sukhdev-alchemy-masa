@@ -5,6 +5,7 @@ import { ArrowLeft, Link as LinkIcon, MagnifyingGlass } from "@phosphor-icons/re
 import { Badge } from "@/components/ui/badge"
 import type { Order } from "@/lib/types"
 import { fetchLatestShipmentForOrder, syncShiprocketAwbForOrder, type LatestOrderShipment } from "@/lib/order-shipments"
+import { toast } from "sonner"
 
 type OrderTrackingViewProps = {
   order: Order | null
@@ -14,6 +15,7 @@ type OrderTrackingViewProps = {
   onResumePayment?: (orderId: string) => void
   onAddToCart?: (productId: string) => void
   useV2Branding?: boolean
+  isAdmin?: boolean
 }
 
 function getOrderTimestamp(order: Order) {
@@ -60,7 +62,7 @@ function getOrderSubheadline(order: Order) {
 
 type OrdersTab = "orders" | "buy-again" | "not-yet-shipped"
 
-export function OrderTrackingView({ order, orders, onBack, onSelectOrder, onResumePayment, onAddToCart, useV2Branding = false }: OrderTrackingViewProps) {
+export function OrderTrackingView({ order, orders, onBack, onSelectOrder, onResumePayment, onAddToCart, useV2Branding = false, isAdmin = false }: OrderTrackingViewProps) {
   const [shipment, setShipment] = useState<LatestOrderShipment | null>(null)
   const [isLoadingShipment, setIsLoadingShipment] = useState(false)
   const [isSyncingShipment, setIsSyncingShipment] = useState(false)
@@ -140,7 +142,8 @@ export function OrderTrackingView({ order, orders, onBack, onSelectOrder, onResu
 
       const loadedShipment = result.shipment
       const shouldSyncAwb = Boolean(
-        loadedShipment
+        isAdmin
+        && loadedShipment
         && loadedShipment.providerKey === "shiprocket"
         && !loadedShipment.awbCode
         && loadedShipment.shipmentId
@@ -189,7 +192,7 @@ export function OrderTrackingView({ order, orders, onBack, onSelectOrder, onResu
     return () => {
       isActive = false
     }
-  }, [currentOrder?.id])
+  }, [currentOrder?.id, isAdmin])
   
   if (useV2Branding) {
     return (
@@ -334,10 +337,15 @@ export function OrderTrackingView({ order, orders, onBack, onSelectOrder, onResu
                             variant="outline"
                             className="h-9 w-full"
                             onClick={() => {
-                              if (isSelected && shipment?.trackingUrl) {
+                              if (!isSelected) {
+                                onSelectOrder(entry.id)
+                                return
+                              }
+
+                              if (shipment?.trackingUrl) {
                                 window.open(shipment.trackingUrl, "_blank", "noopener,noreferrer")
                               } else {
-                                onSelectOrder(entry.id)
+                                toast.info("Tracking link is not available yet. Shipment details will appear once carrier assigns tracking.")
                               }
                             }}
                           >
@@ -345,7 +353,16 @@ export function OrderTrackingView({ order, orders, onBack, onSelectOrder, onResu
                           </Button>
                         )}
 
-                        <Button variant="outline" className="h-9 w-full" onClick={() => onSelectOrder(entry.id)}>
+                        <Button
+                          variant="outline"
+                          className="h-9 w-full"
+                          onClick={() => {
+                            onSelectOrder(entry.id)
+                            if (isSelected) {
+                              toast.info("Order details are already open below.")
+                            }
+                          }}
+                        >
                           View order details
                         </Button>
 
