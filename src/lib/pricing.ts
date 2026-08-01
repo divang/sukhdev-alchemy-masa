@@ -123,8 +123,47 @@ export function getProductDisplayPriceLabel(product: Product) {
   return `₹${minPrice} - ₹${maxPrice}`
 }
 
+/** Parse the structured add-ons stored on a cloud kitchen cart item. */
+export function parseCartItemAddOns(selectedAddOns: string[]) {
+  const baseEntry = selectedAddOns.find((a) => a.startsWith("Base:"))
+  const base: "water" | "milk" = baseEntry?.includes("Milk") ? "milk" : "water"
+  const ingredients = selectedAddOns.filter(
+    (a) => !a.startsWith("Base:") && !a.startsWith("Delivery:")
+  )
+  const deliveryEntry = selectedAddOns.find((a) => a.startsWith("Delivery:"))
+  let subDays = 0
+  let subSlots = 0
+  if (deliveryEntry) {
+    const body = deliveryEntry.replace("Delivery: ", "")
+    const [daysStr, ...slotParts] = body.split(" | ")
+    subDays = daysStr.split(",").filter(Boolean).length
+    subSlots = slotParts.filter(Boolean).length
+  }
+  return { base, ingredients, subDays, subSlots }
+}
+
+/** Effective per-serving price including base surcharge + ingredient add-ons. */
+export function calculateCartItemUnitPrice(item: CartItem, product: Product) {
+  const basePrice = resolveProductPackPrice(product, item.grams)
+  if (!isCloudKitchenProduct(product)) return basePrice
+  const { base, ingredients } = parseCartItemAddOns(item.selectedAddOns ?? [])
+  return basePrice + calculateSmoothieAddOnTotal(ingredients, base)
+}
+
+/**
+ * Total for a cart item.
+ * - Regular item: unitPrice × quantity
+ * - Subscription item: unitPrice × subDays × subSlots × quantity (weekly advance)
+ */
 export function calculateCartItemTotal(item: CartItem, product: Product) {
-  return resolveProductPackPrice(product, item.grams) * item.quantity
+  const unitPrice = calculateCartItemUnitPrice(item, product)
+  if (isCloudKitchenProduct(product)) {
+    const { subDays, subSlots } = parseCartItemAddOns(item.selectedAddOns ?? [])
+    if (subDays > 0 && subSlots > 0) {
+      return unitPrice * subDays * subSlots * item.quantity
+    }
+  }
+  return unitPrice * item.quantity
 }
 
 export function calculateCartSubtotal(cartItems: CartItem[], products: Product[]) {

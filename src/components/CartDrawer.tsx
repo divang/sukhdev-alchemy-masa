@@ -6,7 +6,7 @@ import type { CartItem, Product } from "@/lib/types"
 import { useKV } from "@/hooks/use-kv"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { getProductImage } from "@/lib/product-images"
-import { calculateCartItemTotal, calculateCartSubtotal, getCartItemPackLabel } from "@/lib/pricing"
+import { calculateCartItemTotal, calculateCartItemUnitPrice, calculateCartSubtotal, getCartItemPackLabel, parseCartItemAddOns } from "@/lib/pricing"
 
 // Parse selectedAddOns into structured display sections
 function CartAddOnsMeta({ addOns }: { addOns: string[] }) {
@@ -41,6 +41,17 @@ function CartAddOnsMeta({ addOns }: { addOns: string[] }) {
         </div>
       )}
     </div>
+  )
+}
+
+function CartItemPrice({ item, product }: { item: CartItem; product: Product }) {
+  const { subDays, subSlots } = parseCartItemAddOns(item.selectedAddOns ?? [])
+  const isSubscription = subDays > 0 && subSlots > 0
+  const total = calculateCartItemTotal(item, product)
+  return (
+    <span className="font-bold text-primary">
+      ₹{isSubscription ? `${total.toFixed(0)}/wk` : total.toFixed(2)}
+    </span>
   )
 }
 
@@ -168,7 +179,7 @@ export function CartDrawer({
                               <Plus size={12} />
                             </Button>
                           </div>
-                          <span className="font-bold text-primary">₹{calculateCartItemTotal(item, product).toFixed(2)}</span>
+                          <CartItemPrice item={item} product={product} />
                         </div>
                       </div>
                     </div>
@@ -284,7 +295,7 @@ export function CartDrawer({
                               <Plus size={12} />
                             </Button>
                           </div>
-                          <span className="font-bold text-primary">₹{calculateCartItemTotal(item, product).toFixed(2)}</span>
+                          <CartItemPrice item={item} product={product} />
                         </div>
                       </div>
                     </div>
