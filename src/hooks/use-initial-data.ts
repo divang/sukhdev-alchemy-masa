@@ -105,9 +105,22 @@ export function useInitialData() {
       // until the migration is applied to the remote DB).
       const remoteCatalog = await loadCatalogFromSupabase()
       if (remoteCatalog.source === 'supabase' && remoteCatalog.products.length > 0) {
+        // Build a lookup of seed addOnOptions so DB products get the field overlaid
+        // (addOnOptions has no DB column — it lives only in the seed catalog).
+        const seedAddOnMap = new Map(
+          CATALOG_SEED_PRODUCTS
+            .filter((p) => Array.isArray(p.addOnOptions) && p.addOnOptions!.length > 0)
+            .map((p) => [p.id, p.addOnOptions])
+        )
+
         const remoteProductIds = new Set(remoteCatalog.products.map((p) => p.id))
         const seedOnlyProducts = CATALOG_SEED_PRODUCTS.filter((p) => !remoteProductIds.has(p.id))
-        const mergedProducts = [...remoteCatalog.products, ...seedOnlyProducts]
+        const mergedProducts = [
+          ...remoteCatalog.products.map((p) =>
+            seedAddOnMap.has(p.id) ? { ...p, addOnOptions: seedAddOnMap.get(p.id) } : p
+          ),
+          ...seedOnlyProducts,
+        ]
 
         const remoteCategoryIds = new Set(remoteCatalog.categories.map((c) => c.id))
         const seedOnlyCategories = CATALOG_SEED_CATEGORIES.filter((c) => !remoteCategoryIds.has(c.id))
