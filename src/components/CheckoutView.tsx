@@ -9,11 +9,14 @@ import { ArrowLeft } from "@phosphor-icons/react"
 import type { CartItem, Product, Order, UserProfile } from "@/lib/types"
 import { toast } from "sonner"
 import {
+  calculateCloudKitchenShippingAmount,
   calculateCartItemTotal,
   calculateCartSubtotal,
   getCartItemPackLabel,
   calculateShippingAmountByPincode,
   getShippingZoneLabel,
+  isCloudKitchenInstantServiceablePincode,
+  isCloudKitchenProduct,
   resolveProductPackPrice,
 } from "@/lib/pricing"
 import { calculatePromoDiscountAmount, fetchPromoCodeChannelState, type PromoCode, validatePromoCode } from "@/lib/promo-codes"
@@ -30,6 +33,10 @@ type CheckoutViewProps = {
 }
 
 export function CheckoutView({ cartItems, products, accountProfile, runtimeMode = "prod", onBack, onOrderComplete }: CheckoutViewProps) {
+  const subscriptionWeekdays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+  const morningSlots = ["7 AM", "8 AM", "9 AM", "10 AM"]
+  const eveningSlots = ["5 PM", "6 PM", "7 PM", "8 PM", "9 PM"]
+
   const isPromoUiEnabled = import.meta.env.VITE_ENABLE_CHECKOUT_PROMO !== "false"
   const [formData, setFormData] = useState({
     name: "",
@@ -44,6 +51,27 @@ export function CheckoutView({ cartItems, products, accountProfile, runtimeMode 
   const [appliedPromo, setAppliedPromo] = useState<PromoCode | null>(null)
   const [isApplyingPromo, setIsApplyingPromo] = useState(false)
   const [promoEnabledInMode, setPromoEnabledInMode] = useState(runtimeMode === "prod")
+  const [cloudKitchenDeliveryMode, setCloudKitchenDeliveryMode] = useState<"instant" | "subscription">("instant")
+  const [subscriptionDays, setSubscriptionDays] = useState<string[]>([])
+  const [subscriptionSlot, setSubscriptionSlot] = useState("")
+
+  // Pre-fill subscription config from dialog-encoded add-on (format: "Delivery: Mon,Wed | Morning 8 AM")
+  useEffect(() => {
+    const deliveryNote = cartItems
+      .flatMap((item) => item.selectedAddOns ?? [])
+      .find((a) => a.startsWith("Delivery: "))
+    if (!deliveryNote) return
+    const body = deliveryNote.replace("Delivery: ", "")
+    const [daysStr, slotStr] = body.split(" | ")
+    if (!daysStr || !slotStr) return
+    const days = daysStr.split(",").map((d) => d.trim()).filter(Boolean)
+    if (days.length > 0) {
+      setCloudKitchenDeliveryMode("subscription")
+      setSubscriptionDays(days)
+      setSubscriptionSlot(slotStr.trim())
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   useEffect(() => {
     let isActive = true
@@ -77,8 +105,14 @@ export function CheckoutView({ cartItems, products, accountProfile, runtimeMode 
   }, [accountProfile])
   
   const getProduct = (productId: string) => products.find(p => p.id === productId)
+  const hasCloudKitchenItems = cartItems.some((item) => {
+    const product = getProduct(item.productId)
+    return Boolean(product && isCloudKitchenProduct(product))
+  })
   const cartSubtotal = calculateCartSubtotal(cartItems, products)
-  const shippingAmount = calculateShippingAmountByPincode(formData.pincode, cartSubtotal)
+  const shippingAmount = hasCloudKitchenItems
+    ? calculateCloudKitchenShippingAmount(cloudKitchenDeliveryMode)
+    : calculateShippingAmountByPincode(formData.pincode, cartSubtotal)
   const promoDiscountAmount = isPromoUiEnabled && appliedPromo
     ? calculatePromoDiscountAmount(appliedPromo, cartSubtotal, shippingAmount)
     : 0
@@ -117,6 +151,14 @@ export function CheckoutView({ cartItems, products, accountProfile, runtimeMode 
     setPromoInput("")
     toast.info("Promo code removed.")
   }
+
+  const toggleSubscriptionDay = (day: string) => {
+    setSubscriptionDays((current) => (
+      current.includes(day)
+        ? current.filter((entry) => entry !== day)
+        : [...current, day]
+    ))
+  }
   
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -137,19 +179,52 @@ export function CheckoutView({ cartItems, products, accountProfile, runtimeMode 
       return
     }
 
+    if (hasCloudKitchenItems) {
+      if (cloudKitchenDeliveryMode === "instant" && !isCloudKitchenInstantServiceablePincode(formData.pincode)) {
+        toast.error("Instant delivery is currently available only for pincode 560068.")
+        return
+      }
+
+      if (cloudKitchenDeliveryMode === "subscription") {
+        if (subscriptionDays.length === 0) {
+          toast.error("Select at least one weekday for subscription delivery.")
+          return
+        }
+
+        if (!subscriptionSlot) {
+          toast.error("Select one morning or evening slot for subscription delivery.")
+          return
+        }
+      }
+    }
+
+    const deliveryTimeSlot = hasCloudKitchenItems
+      ? cloudKitchenDeliveryMode === "subscription"
+        ? subscriptionSlot
+        : "Instant delivery (within 5 km)"
+      : undefined
+
     const order: Order = {
       id: `ORD-${Date.now()}`,
       items: cartItems.map(item => {
         const product = getProduct(item.productId)!
+        const addOnSummary = (item.selectedAddOns ?? []).join(", ")
+        const productLabel = addOnSummary ? `${product.name} [Add-ons: ${addOnSummary}]` : product.name
         return {
           productId: item.productId,
-          productName: product.name,
+          productName: productLabel,
           quantity: item.quantity,
           grams: item.grams,
-          pricePerUnit: resolveProductPackPrice(product, item.grams)
+          pricePerUnit: resolveProductPackPrice(product, item.grams),
+          selectedAddOns: item.selectedAddOns,
         }
       }),
-      customer: formData,
+      customer: {
+        ...formData,
+        deliveryMode: hasCloudKitchenItems ? cloudKitchenDeliveryMode : "standard",
+        deliveryWeekdays: hasCloudKitchenItems && cloudKitchenDeliveryMode === "subscription" ? subscriptionDays : undefined,
+        deliveryTimeSlot,
+      },
       subtotalAmount: cartSubtotal,
       shippingAmount,
       discountAmount: promoDiscountAmount,
@@ -274,8 +349,84 @@ export function CheckoutView({ cartItems, products, accountProfile, runtimeMode 
                     </div>
                   </div>
 
+                  {hasCloudKitchenItems && (
+                    <div className="space-y-4 rounded-lg border border-emerald-200 bg-emerald-50/60 p-4">
+                      <div>
+                        <p className="text-sm font-semibold text-emerald-900">Cloud Kitchen Delivery</p>
+                        <p className="text-xs text-emerald-800">Choose instant delivery or a weekly subscription plan.</p>
+                      </div>
+
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        <button
+                          type="button"
+                          onClick={() => setCloudKitchenDeliveryMode("instant")}
+                          className={`rounded-md border px-3 py-2 text-left text-sm ${cloudKitchenDeliveryMode === "instant" ? "border-emerald-700 bg-white text-emerald-900" : "border-emerald-200 bg-white/70 text-emerald-800"}`}
+                        >
+                          <p className="font-medium">Instant Delivery</p>
+                          <p className="text-xs">Within 5 km, pincode 560068, charge ₹30</p>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setCloudKitchenDeliveryMode("subscription")}
+                          className={`rounded-md border px-3 py-2 text-left text-sm ${cloudKitchenDeliveryMode === "subscription" ? "border-emerald-700 bg-white text-emerald-900" : "border-emerald-200 bg-white/70 text-emerald-800"}`}
+                        >
+                          <p className="font-medium">Weekly Subscription</p>
+                          <p className="text-xs">Pay weekly in advance, delivery free</p>
+                        </button>
+                      </div>
+
+                      {cloudKitchenDeliveryMode === "subscription" && (
+                        <div className="space-y-3 rounded-md border border-emerald-200 bg-white p-3">
+                          <div>
+                            <p className="text-xs font-medium text-emerald-900">Weekdays</p>
+                            <div className="mt-2 flex flex-wrap gap-2">
+                              {subscriptionWeekdays.map((day) => (
+                                <button
+                                  key={day}
+                                  type="button"
+                                  onClick={() => toggleSubscriptionDay(day)}
+                                  className={`rounded-full border px-3 py-1 text-xs ${subscriptionDays.includes(day) ? "border-emerald-700 bg-emerald-100 text-emerald-900" : "border-emerald-200 text-emerald-700"}`}
+                                >
+                                  {day}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+
+                          <div>
+                            <Label htmlFor="subscription-slot">Time Slot</Label>
+                            <select
+                              id="subscription-slot"
+                              value={subscriptionSlot}
+                              onChange={(event) => setSubscriptionSlot(event.target.value)}
+                              className="mt-1 h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                            >
+                              <option value="">Select delivery slot</option>
+                              <optgroup label="Morning">
+                                {morningSlots.map((slot) => (
+                                  <option key={`morning-${slot}`} value={`Morning ${slot}`}>
+                                    Morning {slot}
+                                  </option>
+                                ))}
+                              </optgroup>
+                              <optgroup label="Evening">
+                                {eveningSlots.map((slot) => (
+                                  <option key={`evening-${slot}`} value={`Evening ${slot}`}>
+                                    Evening {slot}
+                                  </option>
+                                ))}
+                              </optgroup>
+                            </select>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   <div className="rounded-lg border bg-muted/40 p-3 text-xs text-muted-foreground">
-                    Shipping policy: Karnataka pincodes are charged ₹60. Rest of India is charged ₹120.
+                    {hasCloudKitchenItems
+                      ? "Cloud Kitchen policy: Instant delivery is available only for pincode 560068 at ₹30. Weekly subscription delivery is free."
+                      : "Shipping policy: Karnataka pincodes are charged ₹60. Rest of India is charged ₹120."}
                   </div>
                   
                   <Button type="submit" className="w-full mt-6" size="lg">
@@ -297,12 +448,15 @@ export function CheckoutView({ cartItems, products, accountProfile, runtimeMode 
                   if (!product) return null
                   
                   return (
-                    <div key={`${item.productId}-${item.grams}`} className="flex justify-between items-start text-sm">
+                    <div key={`${item.productId}-${item.grams}-${(item.selectedAddOns ?? []).join("|")}`} className="flex justify-between items-start text-sm">
                       <div className="flex-1">
                         <p className="font-medium">{product.name}</p>
                         <p className="text-muted-foreground text-xs">
                           {getCartItemPackLabel(product, item.grams)} × {item.quantity}
                         </p>
+                        {(item.selectedAddOns ?? []).length > 0 && (
+                          <p className="text-[11px] text-muted-foreground">Add-ons: {(item.selectedAddOns ?? []).join(", ")}</p>
+                        )}
                       </div>
                       <p className="font-semibold">₹{calculateCartItemTotal(item, product).toFixed(2)}</p>
                     </div>
@@ -316,12 +470,20 @@ export function CheckoutView({ cartItems, products, accountProfile, runtimeMode 
                   <span>₹{cartSubtotal.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between items-center text-sm text-muted-foreground">
-                  <span>Shipping across India</span>
+                  <span>{hasCloudKitchenItems ? "Delivery" : "Shipping across India"}</span>
                   <span>{shippingAmount === 0 ? "Free" : `₹${shippingAmount.toFixed(2)}`}</span>
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  Shipping zone: {formData.pincode.length >= 2 ? getShippingZoneLabel(formData.pincode) : "Enter pincode to confirm zone"}
-                </p>
+                {hasCloudKitchenItems ? (
+                  <p className="text-xs text-muted-foreground">
+                    {cloudKitchenDeliveryMode === "instant"
+                      ? "Instant mode: available only in pincode 560068 (within 5 km radius)."
+                      : `Subscription mode: ${subscriptionDays.length > 0 ? subscriptionDays.join(", ") : "Select weekdays"}${subscriptionSlot ? ` • ${subscriptionSlot}` : ""}`}
+                  </p>
+                ) : (
+                  <p className="text-xs text-muted-foreground">
+                    Shipping zone: {formData.pincode.length >= 2 ? getShippingZoneLabel(formData.pincode) : "Enter pincode to confirm zone"}
+                  </p>
+                )}
 
                 {isPromoUiEnabled ? (
                   <div className="space-y-2 rounded-lg border border-dashed p-3">

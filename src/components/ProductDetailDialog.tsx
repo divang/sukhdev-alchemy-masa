@@ -6,6 +6,8 @@ import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
+import { Checkbox } from "@/components/ui/checkbox"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { ArrowSquareOut, ShoppingCart, VideoCamera } from "@phosphor-icons/react"
 import { StarRating } from "./StarRating"
 import type { Product, UserProfile } from "@/lib/types"
@@ -15,7 +17,7 @@ import type { Review } from "@/lib/types"
 import { getProductImage } from "@/lib/product-images"
 import { submitProductReview } from "@/lib/catalog"
 import { toast } from "sonner"
-import { getProductPackGrams, getProductPackLabel, getProductPackOptions, resolveProductPackPrice } from "@/lib/pricing"
+import { getProductPackGrams, getProductPackLabel, getProductPackOptions, resolveProductPackPrice, SMOOTHIE_ADDON_PRICES, SMOOTHIE_DEFAULT_ADDONS, CLOUD_KITCHEN_MILK_SURCHARGE, calculateSmoothieAddOnTotal } from "@/lib/pricing"
 
 type ProductDetailDialogProps = {
   product: Product
@@ -23,7 +25,7 @@ type ProductDetailDialogProps = {
   canReview: boolean
   open: boolean
   onOpenChange: (open: boolean) => void
-  onAddToCart: (product: Product, grams: number) => void
+  onAddToCart: (product: Product, grams: number, selectedAddOns?: string[]) => void
 }
 
 export function ProductDetailDialog({ product, currentUser, canReview, open, onOpenChange, onAddToCart }: ProductDetailDialogProps) {
@@ -33,6 +35,15 @@ export function ProductDetailDialog({ product, currentUser, canReview, open, onO
   const [reviewComment, setReviewComment] = useState("")
   const [isSubmittingReview, setIsSubmittingReview] = useState(false)
   const [expandedReviewIds, setExpandedReviewIds] = useState<string[]>([])
+  const isSmoothie = product.tags.includes("smoothie")
+  const [selectedAddOns, setSelectedAddOns] = useState<string[]>(
+    isSmoothie ? [...SMOOTHIE_DEFAULT_ADDONS] : []
+  )
+  const [smoothieBase, setSmoothieBase] = useState<"water" | "milk">("water")
+  const [deliveryPreview, setDeliveryPreview] = useState<"instant" | "subscription">("instant")
+  const [subDays, setSubDays] = useState<string[]>([])
+  const [subMorningTime, setSubMorningTime] = useState("")
+  const [subEveningTime, setSubEveningTime] = useState("")
   const packOptions = getProductPackOptions(product)
   const [selectedGrams, setSelectedGrams] = useState<string>(String(packOptions[0] ?? getProductPackGrams(product)))
   
@@ -41,10 +52,18 @@ export function ProductDetailDialog({ product, currentUser, canReview, open, onO
 
   useEffect(() => {
     setSelectedGrams(String(packOptions[0] ?? getProductPackGrams(product)))
+    setSelectedAddOns(isSmoothie ? [...SMOOTHIE_DEFAULT_ADDONS] : [])
+    setSmoothieBase("water")
+    setDeliveryPreview("instant")
+    setSubDays([])
+    setSubMorningTime("")
+    setSubEveningTime("")
   }, [product.id])
 
   const selectedPackGrams = Number(selectedGrams) || getProductPackGrams(product)
-  const selectedPackPrice = resolveProductPackPrice(product, selectedPackGrams)
+  const basePackPrice = resolveProductPackPrice(product, selectedPackGrams)
+  const smoothieAddOnExtra = isSmoothie ? calculateSmoothieAddOnTotal(selectedAddOns, smoothieBase) : 0
+  const selectedPackPrice = basePackPrice + smoothieAddOnExtra
   const discountFromTag = (() => {
     for (const tag of product.tags || []) {
       const match = /^discount-(\d{1,2})$/i.exec(tag)
@@ -68,9 +87,38 @@ export function ProductDetailDialog({ product, currentUser, canReview, open, onO
   const discountPercent = product.discountPercent ?? derivedDiscountPercent ?? discountFromTag
   const hasDiscount = Boolean(discountPercent && referencePrice && referencePrice > selectedPackPrice)
   
+  const toggleSubDay = (day: string) => {
+    setSubDays((cur) => cur.includes(day) ? cur.filter((d) => d !== day) : [...cur, day])
+  }
+
+  const subSlotsSelected = [subMorningTime, subEveningTime].filter(Boolean).length
+  const subDeliveriesPerWeek = subDays.length * subSlotsSelected
+  const subWeeklyTotal = subDeliveriesPerWeek * selectedPackPrice
+
   const handleAddToCart = () => {
-    onAddToCart(product, selectedPackGrams)
+    const slotParts = [
+      subMorningTime ? `Morning ${subMorningTime}` : null,
+      subEveningTime ? `Evening ${subEveningTime}` : null,
+    ].filter(Boolean).join(" & ")
+    const addOnsWithBase = isSmoothie
+      ? [
+          `Base: ${smoothieBase === "milk" ? "Milk" : "Water"}`,
+          ...selectedAddOns,
+          ...(deliveryPreview === "subscription" && subDays.length > 0 && slotParts
+            ? [`Delivery: ${subDays.join(",")} | ${slotParts}`]
+            : []),
+        ]
+      : selectedAddOns
+    onAddToCart(product, selectedPackGrams, addOnsWithBase)
     onOpenChange(false)
+  }
+
+  const toggleAddOn = (option: string) => {
+    setSelectedAddOns((current) => (
+      current.includes(option)
+        ? current.filter((entry) => entry !== option)
+        : [...current, option]
+    ))
   }
 
   const toggleExpandedReview = (reviewId: string) => {
@@ -197,6 +245,217 @@ export function ProductDetailDialog({ product, currentUser, canReview, open, onO
                   <p className="text-sm text-muted-foreground">
                     Fixed pack size: {getProductPackLabel(product)}
                   </p>
+                )}
+
+                {isSmoothie && (
+                  <div className="space-y-3 rounded-lg border p-3 bg-muted/30">
+                    {/* Base choice */}
+                    <div>
+                      <p className="text-sm font-medium mb-2">Base liquid</p>
+                      <RadioGroup
+                        value={smoothieBase}
+                        onValueChange={(v) => setSmoothieBase(v as "water" | "milk")}
+                        className="flex gap-4"
+                      >
+                        <label className="flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm hover:bg-muted/50 has-[:checked]:border-primary has-[:checked]:bg-primary/5">
+                          <RadioGroupItem value="water" id={`${product.id}-base-water`} />
+                          <span>Water <span className="text-xs text-muted-foreground">(default)</span></span>
+                        </label>
+                        <label className="flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm hover:bg-muted/50 has-[:checked]:border-primary has-[:checked]:bg-primary/5">
+                          <RadioGroupItem value="milk" id={`${product.id}-base-milk`} />
+                          <span>Milk <span className="text-xs text-emerald-700">+₹{CLOUD_KITCHEN_MILK_SURCHARGE}</span></span>
+                        </label>
+                      </RadioGroup>
+                    </div>
+
+                    {/* Ingredients */}
+                    {Array.isArray(product.addOnOptions) && product.addOnOptions.length > 0 && (
+                      <div>
+                        <p className="text-sm font-medium mb-1">Ingredients <span className="text-xs text-muted-foreground font-normal">(Almonds, Cashews & Walnuts selected by default)</span></p>
+                        <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+                          {product.addOnOptions.map((option) => {
+                            const checkboxId = `${product.id}-${option.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`
+                            const price = SMOOTHIE_ADDON_PRICES[option]
+                            return (
+                              <label key={option} htmlFor={checkboxId} className={`flex cursor-pointer items-center justify-between gap-2 rounded-md border px-2 py-1.5 text-sm hover:bg-muted/50 ${selectedAddOns.includes(option) ? "border-primary bg-primary/5" : ""}`}>
+                                <div className="flex items-center gap-2">
+                                  <Checkbox
+                                    id={checkboxId}
+                                    checked={selectedAddOns.includes(option)}
+                                    onCheckedChange={() => toggleAddOn(option)}
+                                  />
+                                  <span>{option}</span>
+                                </div>
+                                {price != null && (
+                                  <span className="text-xs text-muted-foreground">+₹{price}</span>
+                                )}
+                              </label>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Live price breakdown */}
+                    <div className="rounded-md bg-white border px-3 py-2 text-sm flex items-center justify-between">
+                      <span className="text-muted-foreground">Total (smoothie + add-ons)</span>
+                      <span className="font-bold text-primary text-base">₹{selectedPackPrice}</span>
+                    </div>
+
+                    {/* Delivery Planner */}
+                    <div className="space-y-2 rounded-md border border-emerald-200 bg-emerald-50/50 p-3">
+                      <p className="text-sm font-semibold text-emerald-900">Delivery</p>
+
+                      {/* Mode picker */}
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setDeliveryPreview("instant")}
+                          className={`rounded-md border px-3 py-2 text-left text-sm transition-colors ${deliveryPreview === "instant" ? "border-emerald-700 bg-white shadow-sm" : "border-emerald-200 bg-white/60 text-emerald-800"}`}
+                        >
+                          <p className="font-medium">⚡ Instant</p>
+                          <p className="text-xs text-muted-foreground">₹30 · Pincode 560068</p>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setDeliveryPreview("subscription")}
+                          className={`rounded-md border px-3 py-2 text-left text-sm transition-colors ${deliveryPreview === "subscription" ? "border-emerald-700 bg-white shadow-sm" : "border-emerald-200 bg-white/60 text-emerald-800"}`}
+                        >
+                          <p className="font-medium">📅 Weekly Plan</p>
+                          <p className="text-xs text-muted-foreground">Free delivery, prepay weekly</p>
+                        </button>
+                      </div>
+
+                      {/* Subscription builder */}
+                      {deliveryPreview === "subscription" && (
+                        <div className="space-y-3 rounded-md border border-emerald-200 bg-white p-3">
+                          {/* Weekdays */}
+                          <div>
+                            <p className="text-xs font-medium text-emerald-900 mb-2">
+                              Delivery days <span className="text-red-500">*</span>
+                              <span className="ml-1 font-normal text-muted-foreground">(select at least one)</span>
+                            </p>
+                            <div className="flex flex-wrap gap-1.5">
+                              {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((day) => (
+                                <button
+                                  key={day}
+                                  type="button"
+                                  onClick={() => toggleSubDay(day)}
+                                  className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${subDays.includes(day) ? "border-emerald-700 bg-emerald-100 text-emerald-900" : "border-gray-200 text-gray-600 hover:border-emerald-300"}`}
+                                >
+                                  {day}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* Time slots — morning and evening are independent; pick one or both */}
+                          <div>
+                            <p className="text-xs font-medium text-emerald-900 mb-2">
+                              Time slot <span className="text-red-500">*</span>
+                              <span className="ml-1 font-normal text-muted-foreground">(select morning, evening, or both)</span>
+                            </p>
+                            <div className="space-y-2">
+                              {/* Morning */}
+                              <div className={`rounded-md border px-3 py-2 ${subMorningTime ? "border-emerald-400 bg-emerald-50" : "border-gray-200"}`}>
+                                <div className="flex items-center justify-between mb-2">
+                                  <p className="text-xs font-medium text-gray-700">🌅 Morning</p>
+                                  {subMorningTime && (
+                                    <button type="button" onClick={() => setSubMorningTime("")} className="text-[10px] text-muted-foreground hover:text-red-500 underline">
+                                      Clear
+                                    </button>
+                                  )}
+                                </div>
+                                <RadioGroup
+                                  value={subMorningTime}
+                                  onValueChange={setSubMorningTime}
+                                  className="flex flex-wrap gap-3"
+                                >
+                                  {["7 AM", "8 AM", "9 AM", "10 AM"].map((t) => (
+                                    <label key={t} className="flex cursor-pointer items-center gap-1.5 text-xs">
+                                      <RadioGroupItem value={t} id={`${product.id}-morning-${t.replace(" ", "")}`} />
+                                      <span>{t}</span>
+                                    </label>
+                                  ))}
+                                </RadioGroup>
+                              </div>
+
+                              {/* Evening */}
+                              <div className={`rounded-md border px-3 py-2 ${subEveningTime ? "border-emerald-400 bg-emerald-50" : "border-gray-200"}`}>
+                                <div className="flex items-center justify-between mb-2">
+                                  <p className="text-xs font-medium text-gray-700">🌇 Evening</p>
+                                  {subEveningTime && (
+                                    <button type="button" onClick={() => setSubEveningTime("")} className="text-[10px] text-muted-foreground hover:text-red-500 underline">
+                                      Clear
+                                    </button>
+                                  )}
+                                </div>
+                                <RadioGroup
+                                  value={subEveningTime}
+                                  onValueChange={setSubEveningTime}
+                                  className="flex flex-wrap gap-3"
+                                >
+                                  {["5 PM", "6 PM", "7 PM", "8 PM", "9 PM"].map((t) => (
+                                    <label key={t} className="flex cursor-pointer items-center gap-1.5 text-xs">
+                                      <RadioGroupItem value={t} id={`${product.id}-evening-${t.replace(" ", "")}`} />
+                                      <span>{t}</span>
+                                    </label>
+                                  ))}
+                                </RadioGroup>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Weekly total */}
+                          {subDays.length > 0 && subSlotsSelected > 0 ? (
+                            <div className="rounded-md bg-emerald-100 border border-emerald-300 px-3 py-2 space-y-1">
+                              <div className="flex items-center justify-between">
+                                <span className="text-xs text-emerald-800">
+                                  {subDays.length} day{subDays.length > 1 ? "s" : ""}
+                                  {subSlotsSelected === 2 ? " × 2 slots" : ""} × ₹{selectedPackPrice}
+                                </span>
+                                <span className="font-bold text-emerald-900 text-base">
+                                  ₹{subWeeklyTotal} / week
+                                </span>
+                              </div>
+                              <p className="text-xs text-emerald-700">
+                                💳 Pay ₹{subWeeklyTotal} in advance · Free delivery
+                                {subMorningTime ? ` · 🌅 ${subMorningTime}` : ""}
+                                {subEveningTime ? ` · 🌇 ${subEveningTime}` : ""}
+                              </p>
+                            </div>
+                          ) : (
+                            <p className="text-xs text-amber-600">
+                              {subDays.length === 0
+                                ? "Select at least one day"
+                                : "Select at least one time slot"} to see your weekly total.
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {!isSmoothie && Array.isArray(product.addOnOptions) && product.addOnOptions.length > 0 && (
+                  <div className="space-y-2 rounded-lg border p-3">
+                    <p className="text-sm font-medium">Optional add-ons</p>
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                      {product.addOnOptions.map((option) => {
+                        const checkboxId = `${product.id}-${option.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`
+                        return (
+                          <label key={option} htmlFor={checkboxId} className="flex cursor-pointer items-center gap-2 rounded-md border px-2 py-1.5 text-sm hover:bg-muted/50">
+                            <Checkbox
+                              id={checkboxId}
+                              checked={selectedAddOns.includes(option)}
+                              onCheckedChange={() => toggleAddOn(option)}
+                            />
+                            <span>{option}</span>
+                          </label>
+                        )
+                      })}
+                    </div>
+                  </div>
                 )}
                 
                 <div className="flex flex-col gap-2">

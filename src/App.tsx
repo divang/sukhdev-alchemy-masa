@@ -33,7 +33,7 @@ import {
   updateSupabaseOrderPayment,
 } from "@/lib/order-persistence"
 import { isSupabaseConfigured } from "@/lib/supabase"
-import { getProductPackGrams, hasPurchasedProduct, MAX_PRODUCT_GRAMS_PER_CART } from "@/lib/pricing"
+import { getProductPackGrams, hasPurchasedProduct, isCloudKitchenProduct, MAX_PRODUCT_GRAMS_PER_CART } from "@/lib/pricing"
 import { defaultFeatureFlags, fetchFeatureFlags } from "@/lib/feature-flags"
 import { fallbackUpiConfig, fetchActiveUpiConfig } from "@/lib/payment-upi"
 import { BRAND_LOGO_PATH } from "@/lib/brand"
@@ -114,7 +114,12 @@ function mergeOrders(primary: Order[], secondary: Order[]) {
 }
 
 function getCartItemKey(item: CartItem) {
-  return `${item.productId}:${item.grams}`
+  const addOnKey = (item.selectedAddOns ?? [])
+    .map((entry) => entry.trim())
+    .filter(Boolean)
+    .sort((left, right) => left.localeCompare(right))
+    .join("|")
+  return `${item.productId}:${item.grams}:${addOnKey}`
 }
 
 function canonicalizeCartItems(cartItems: CartItem[]) {
@@ -125,7 +130,11 @@ function canonicalizeCartItems(cartItems: CartItem[]) {
     const existing = merged.get(key)
 
     if (existing) {
-      merged.set(key, { ...existing, quantity: Math.max(existing.quantity, item.quantity) })
+      merged.set(key, {
+        ...existing,
+        quantity: Math.max(existing.quantity, item.quantity),
+        selectedAddOns: item.selectedAddOns ?? existing.selectedAddOns,
+      })
       continue
     }
 
@@ -150,6 +159,10 @@ function normalizeCartItems(cartItems: CartItem[], products: Product[]) {
       return {
         ...item,
         grams: getProductPackGrams(product),
+        selectedAddOns: (item.selectedAddOns ?? [])
+          .map((entry) => entry.trim())
+          .filter(Boolean)
+          .sort((left, right) => left.localeCompare(right)),
       }
     })
 
@@ -784,14 +797,24 @@ function App() {
       return
     }
 
+    // Existing cart_items schema supports product/grams only.
+    // Keep custom add-on variants local to prevent variant collisions.
+    if ((item.selectedAddOns ?? []).length > 0) {
+      return
+    }
+
     const result = await upsertCartItemForCurrentUser(item)
     if (!result.persisted && result.error) {
       console.error("Failed to save cart item", result.error)
     }
   }
 
-  const persistCartRemoval = async (productId: string, grams: number) => {
+  const persistCartRemoval = async (productId: string, grams: number, selectedAddOns: string[] = []) => {
     if (!profile || !isSupabaseConfigured || shouldUseDevAuthBypass) {
+      return
+    }
+
+    if (selectedAddOns.length > 0) {
       return
     }
 
@@ -801,29 +824,43 @@ function App() {
     }
   }
 
-  const handleAddToCart = (product: Product, grams: number = getProductPackGrams(product)) => {
+  const handleAddToCart = (
+    product: Product,
+    grams: number = getProductPackGrams(product),
+    selectedAddOns: string[] = []
+  ) => {
     let nextItem: CartItem | null = null
     let limitExceeded = false
+    const normalizedAddOns = selectedAddOns
+      .map((entry) => entry.trim())
+      .filter(Boolean)
+      .sort((left, right) => left.localeCompare(right))
 
     setCartItems((current = []) => {
       const normalized = normalizeCartItems(current, products || [])
       const productTotalGrams = getTotalGramsForProduct(normalized, product.id)
-      if (productTotalGrams + grams > MAX_PRODUCT_GRAMS_PER_CART) {
+      if (!isCloudKitchenProduct(product) && productTotalGrams + grams > MAX_PRODUCT_GRAMS_PER_CART) {
         limitExceeded = true
         return normalized
       }
 
-      const existingItem = normalized.find((item) => item.productId === product.id && item.grams === grams)
+      const existingItem = normalized.find((item) => (
+        item.productId === product.id
+        && item.grams === grams
+        && (item.selectedAddOns ?? []).join("|") === normalizedAddOns.join("|")
+      ))
       if (existingItem) {
         nextItem = { ...existingItem, quantity: existingItem.quantity + 1 }
         return normalized.map((item) =>
-          item.productId === product.id && item.grams === grams
-            ? { ...item, quantity: item.quantity + 1, grams }
+          item.productId === product.id
+          && item.grams === grams
+          && (item.selectedAddOns ?? []).join("|") === normalizedAddOns.join("|")
+            ? { ...item, quantity: item.quantity + 1, grams, selectedAddOns: normalizedAddOns }
             : item
         )
       }
 
-      nextItem = { productId: product.id, quantity: 1, grams }
+      nextItem = { productId: product.id, quantity: 1, grams, selectedAddOns: normalizedAddOns }
       return [...normalized, nextItem]
     })
 
@@ -838,17 +875,24 @@ function App() {
 
   }
 
-  const handleUpdateQuantity = (productId: string, grams: number, quantity: number) => {
+  const handleUpdateQuantity = (productId: string, grams: number, quantity: number, selectedAddOns: string[] = []) => {
     if (quantity < 1) return
+
+    const product = (products || []).find((entry) => entry.id === productId)
+    const normalizedAddOns = selectedAddOns.slice().sort((left, right) => left.localeCompare(right))
 
     const current = cartItems || []
     const otherItemsTotalGrams = current
-      .filter((item) => !(item.productId === productId && item.grams === grams))
+      .filter((item) => !(
+        item.productId === productId
+        && item.grams === grams
+        && (item.selectedAddOns ?? []).join("|") === normalizedAddOns.join("|")
+      ))
       .filter((item) => item.productId === productId)
       .reduce((sum, item) => sum + (item.grams * item.quantity), 0)
 
     const requestedTotalGrams = otherItemsTotalGrams + (grams * quantity)
-    if (requestedTotalGrams > MAX_PRODUCT_GRAMS_PER_CART) {
+    if (product && !isCloudKitchenProduct(product) && requestedTotalGrams > MAX_PRODUCT_GRAMS_PER_CART) {
       toast.error(`Maximum ${MAX_PRODUCT_GRAMS_PER_CART}g allowed per product in cart.`)
       return
     }
@@ -856,8 +900,10 @@ function App() {
     let nextItem: CartItem | null = null
     setCartItems((current = []) =>
       current.map((item) =>
-        item.productId === productId && item.grams === grams
-          ? ((nextItem = { ...item, quantity }), { ...item, quantity })
+        item.productId === productId
+        && item.grams === grams
+        && (item.selectedAddOns ?? []).join("|") === normalizedAddOns.join("|")
+          ? ((nextItem = { ...item, quantity, selectedAddOns: normalizedAddOns }), { ...item, quantity, selectedAddOns: normalizedAddOns })
           : item
       )
     )
@@ -867,12 +913,21 @@ function App() {
     }
   }
 
-  const handleRemoveItem = (productId: string, grams: number) => {
-    const targetItem = (cartItems || []).find((item) => item.productId === productId && item.grams === grams)
-    setCartItems((current = []) => current.filter((item) => !(item.productId === productId && item.grams === grams)))
+  const handleRemoveItem = (productId: string, grams: number, selectedAddOns: string[] = []) => {
+    const normalizedAddOns = selectedAddOns.slice().sort((left, right) => left.localeCompare(right))
+    const targetItem = (cartItems || []).find((item) => (
+      item.productId === productId
+      && item.grams === grams
+      && (item.selectedAddOns ?? []).join("|") === normalizedAddOns.join("|")
+    ))
+    setCartItems((current = []) => current.filter((item) => !(
+      item.productId === productId
+      && item.grams === grams
+      && (item.selectedAddOns ?? []).join("|") === normalizedAddOns.join("|")
+    )))
 
     if (targetItem) {
-      void persistCartRemoval(targetItem.productId, targetItem.grams)
+      void persistCartRemoval(targetItem.productId, targetItem.grams, targetItem.selectedAddOns ?? [])
     }
 
   }

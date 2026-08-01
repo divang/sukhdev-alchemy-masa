@@ -8,14 +8,50 @@ import { useIsMobile } from "@/hooks/use-mobile"
 import { getProductImage } from "@/lib/product-images"
 import { calculateCartItemTotal, calculateCartSubtotal, getCartItemPackLabel } from "@/lib/pricing"
 
+// Parse selectedAddOns into structured display sections
+function CartAddOnsMeta({ addOns }: { addOns: string[] }) {
+  if (!addOns.length) return null
+  const delivery = addOns.find((a) => a.startsWith("Delivery:"))
+  const base = addOns.find((a) => a.startsWith("Base:"))
+  const ingredients = addOns.filter((a) => !a.startsWith("Delivery:") && !a.startsWith("Base:"))
+
+  return (
+    <div className="mt-1 space-y-1">
+      {base && (
+        <p className="text-[11px] text-muted-foreground">
+          Base: <span className="font-medium">{base.replace("Base: ", "")}</span>
+          {ingredients.length > 0 && ` · ${ingredients.join(", ")}`}
+        </p>
+      )}
+      {!base && ingredients.length > 0 && (
+        <p className="text-[11px] text-muted-foreground">Add-ons: {ingredients.join(", ")}</p>
+      )}
+      {delivery && (
+        <div className="rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1">
+          <p className="text-[11px] font-medium text-emerald-800">📅 Weekly subscription</p>
+          {(() => {
+            const body = delivery.replace("Delivery: ", "")
+            const [days, ...slots] = body.split(" | ")
+            return (
+              <p className="text-[11px] text-emerald-700">
+                {days} · {slots.join(" & ")}
+              </p>
+            )
+          })()}
+        </div>
+      )}
+    </div>
+  )
+}
+
 type CartDrawerProps = {
   open: boolean
   onOpenChange: (open: boolean) => void
   cartItems: CartItem[]
   products: Product[]
   isSyncing?: boolean
-  onUpdateQuantity: (productId: string, grams: number, quantity: number) => void
-  onRemoveItem: (productId: string, grams: number) => void
+  onUpdateQuantity: (productId: string, grams: number, quantity: number, selectedAddOns?: string[]) => void
+  onRemoveItem: (productId: string, grams: number, selectedAddOns?: string[]) => void
   onCheckout: () => void
 }
 
@@ -92,7 +128,7 @@ export function CartDrawer({
                   const imageUrl = getProductImage(product, productImages ?? {})
 
                   return (
-                    <div key={`${item.productId}-${item.grams}`} className="flex gap-3 rounded-lg border p-3">
+                    <div key={`${item.productId}-${item.grams}-${(item.selectedAddOns ?? []).join("|")}`} className="flex gap-3 rounded-lg border p-3">
                       <div
                         className="h-16 w-16 flex-shrink-0 rounded-md bg-cover bg-center"
                         style={{ backgroundImage: `url(${imageUrl})` }}
@@ -104,20 +140,21 @@ export function CartDrawer({
                             variant="ghost"
                             size="sm"
                             className="-mt-1 h-6 w-6 p-0"
-                            onClick={() => onRemoveItem(item.productId, item.grams)}
+                            onClick={() => onRemoveItem(item.productId, item.grams, item.selectedAddOns ?? [])}
                           >
                             <X size={14} />
                           </Button>
                         </div>
 
                         <p className="mt-1 text-xs text-muted-foreground">{getCartItemPackLabel(product, item.grams)}</p>
+                        <CartAddOnsMeta addOns={item.selectedAddOns ?? []} />
                         <div className="mt-2 flex items-center justify-between">
                           <div className="flex items-center gap-2">
                             <Button
                               variant="outline"
                               size="sm"
                               className="h-7 w-7 p-0"
-                              onClick={() => onUpdateQuantity(item.productId, item.grams, Math.max(1, item.quantity - 1))}
+                              onClick={() => onUpdateQuantity(item.productId, item.grams, Math.max(1, item.quantity - 1), item.selectedAddOns ?? [])}
                             >
                               <Minus size={12} />
                             </Button>
@@ -126,7 +163,7 @@ export function CartDrawer({
                               variant="outline"
                               size="sm"
                               className="h-7 w-7 p-0"
-                              onClick={() => onUpdateQuantity(item.productId, item.grams, item.quantity + 1)}
+                              onClick={() => onUpdateQuantity(item.productId, item.grams, item.quantity + 1, item.selectedAddOns ?? [])}
                             >
                               <Plus size={12} />
                             </Button>
@@ -205,7 +242,7 @@ export function CartDrawer({
                 const imageUrl = getProductImage(product, productImages ?? {})
                 
                 return (
-                  <div key={`${item.productId}-${item.grams}`} className="flex gap-4 p-4 border rounded-lg">
+                  <div key={`${item.productId}-${item.grams}-${(item.selectedAddOns ?? []).join("|")}`} className="flex gap-4 p-4 border rounded-lg">
                     <div 
                       className="w-20 h-20 rounded-md bg-cover bg-center flex-shrink-0"
                       style={{ backgroundImage: `url(${imageUrl})` }}
@@ -217,7 +254,7 @@ export function CartDrawer({
                           variant="ghost"
                           size="sm"
                           className="h-6 w-6 p-0 -mt-1"
-                          onClick={() => onRemoveItem(item.productId, item.grams)}
+                          onClick={() => onRemoveItem(item.productId, item.grams, item.selectedAddOns ?? [])}
                         >
                           <X size={14} />
                         </Button>
@@ -225,6 +262,7 @@ export function CartDrawer({
                       
                       <div className="mt-2 space-y-2">
                         <p className="text-xs text-muted-foreground">{getCartItemPackLabel(product, item.grams)}</p>
+                        <CartAddOnsMeta addOns={item.selectedAddOns ?? []} />
                         
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
@@ -232,7 +270,7 @@ export function CartDrawer({
                               variant="outline"
                               size="sm"
                               className="h-7 w-7 p-0"
-                              onClick={() => onUpdateQuantity(item.productId, item.grams, Math.max(1, item.quantity - 1))}
+                              onClick={() => onUpdateQuantity(item.productId, item.grams, Math.max(1, item.quantity - 1), item.selectedAddOns ?? [])}
                             >
                               <Minus size={12} />
                             </Button>
@@ -241,7 +279,7 @@ export function CartDrawer({
                               variant="outline"
                               size="sm"
                               className="h-7 w-7 p-0"
-                              onClick={() => onUpdateQuantity(item.productId, item.grams, item.quantity + 1)}
+                              onClick={() => onUpdateQuantity(item.productId, item.grams, item.quantity + 1, item.selectedAddOns ?? [])}
                             >
                               <Plus size={12} />
                             </Button>

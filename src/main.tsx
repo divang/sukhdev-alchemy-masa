@@ -6,6 +6,7 @@ import { Toaster } from "sonner"
 import App from './App.tsx'
 import { AmazonProductListingPage } from "@/components/AmazonProductListingPage"
 import { StorefrontV2 } from "@/components/StorefrontV2"
+import { CloudKitchenPage } from "@/components/CloudKitchenPage"
 import { ErrorFallback } from './ErrorFallback.tsx'
 import { getSlugFromProductPath, isProductPath } from "@/lib/product-url"
 
@@ -24,6 +25,10 @@ function RootRouter() {
 
   if (pathname === "/v2" || pathname.startsWith("/v2/")) {
     return <StorefrontV2 />
+  }
+
+  if (pathname === "/cloudkitchen" || pathname.startsWith("/cloudkitchen/")) {
+    return <CloudKitchenPage />
   }
 
   if (isProductPath(pathname)) {

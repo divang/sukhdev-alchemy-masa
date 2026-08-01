@@ -23,7 +23,7 @@ export function useInitialData() {
 
   useEffect(() => {
     const initializeData = async () => {
-      const currentVersion = 25
+      const currentVersion = 26
       const isLocalDev = typeof window !== 'undefined' && (
         window.location.hostname === 'localhost'
         || window.location.hostname === '127.0.0.1'
@@ -54,6 +54,12 @@ export function useInitialData() {
             id: 'tea-masala',
             name: 'Tea Masala',
             slug: 'tea-masala',
+            enabled: true,
+          },
+          {
+            id: 'cloud-kitchen',
+            name: 'Cloud Kitchen',
+            slug: 'cloud-kitchen',
             enabled: true,
           },
           {
@@ -95,10 +101,20 @@ export function useInitialData() {
       }
 
       // After a fast local/fallback paint, refresh from DB and replace if remote data is available.
+      // Merge: always include seed-only products/categories not returned by Supabase (e.g. cloud-kitchen smoothies
+      // until the migration is applied to the remote DB).
       const remoteCatalog = await loadCatalogFromSupabase()
       if (remoteCatalog.source === 'supabase' && remoteCatalog.products.length > 0) {
-        setCategories(remoteCatalog.categories)
-        setProducts(remoteCatalog.products)
+        const remoteProductIds = new Set(remoteCatalog.products.map((p) => p.id))
+        const seedOnlyProducts = CATALOG_SEED_PRODUCTS.filter((p) => !remoteProductIds.has(p.id))
+        const mergedProducts = [...remoteCatalog.products, ...seedOnlyProducts]
+
+        const remoteCategoryIds = new Set(remoteCatalog.categories.map((c) => c.id))
+        const seedOnlyCategories = CATALOG_SEED_CATEGORIES.filter((c) => !remoteCategoryIds.has(c.id))
+        const mergedCategories = [...remoteCatalog.categories, ...seedOnlyCategories]
+
+        setCategories(mergedCategories)
+        setProducts(mergedProducts)
         setReviews(remoteCatalog.reviews)
         setTestimonials(remoteCatalog.testimonials)
         setDataVersion(currentVersion)

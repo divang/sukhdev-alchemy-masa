@@ -20,7 +20,13 @@ export function ProductCard({ product, onViewDetails, onAddToCart, mobileDenseLa
   const [productImages] = useKV<Record<string, string>>("product-images", {})
   const imageUrl = getProductImage(product, productImages ?? {})
   const imageClassName = "w-full h-full object-contain object-center p-2 transition-transform hover:scale-105 duration-300"
-  const packBadgeLabel = `${getProductPackGrams(product)}g`
+  const packBadgeLabel = (
+    typeof product.netQuantityValue === "number"
+    && typeof product.netQuantityUnit === "string"
+    && product.netQuantityUnit.trim().length > 0
+  )
+    ? `${product.netQuantityValue}${product.netQuantityUnit.trim()}`
+    : `${getProductPackGrams(product)}g`
   const currentPrice = resolveProductPackPrice(product, getProductPackGrams(product))
   const discountFromTag = (() => {
     for (const tag of product.tags || []) {

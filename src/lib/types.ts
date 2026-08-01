@@ -37,6 +37,7 @@ export type Product = {
   complianceInfo?: string[]
   additionalImages?: string[]
   categoryBreadcrumb?: string[]
+  addOnOptions?: string[]
 }
 
 export type Review = {
@@ -54,7 +55,10 @@ export type CartItem = {
   productId: string
   quantity: number
   grams: number
+  selectedAddOns?: string[]
 }
+
+export type DeliveryMode = "standard" | "instant" | "subscription"
 
 export type Order = {
   id: string
@@ -65,6 +69,7 @@ export type Order = {
     quantity: number
     grams: number
     pricePerUnit: number
+    selectedAddOns?: string[]
   }>
   customer: {
     name: string
@@ -74,6 +79,9 @@ export type Order = {
     city: string
     pincode: string
     country?: string
+    deliveryMode?: DeliveryMode
+    deliveryWeekdays?: string[]
+    deliveryTimeSlot?: string
   }
   subtotalAmount?: number
   shippingAmount?: number

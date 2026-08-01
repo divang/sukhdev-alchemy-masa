@@ -7,6 +7,7 @@ const DEFAULT_FSSAI = "21226010003872"
 const CATEGORY_LABELS: Record<string, string> = {
   "premium-masala": "Premium Blended Masala",
   "tea-masala": "Tea Masala",
+  "cloud-kitchen": "Cloud Kitchen",
   "combo-pack-masala": "Combo Pack Masala",
   "raw-organic-spices": "Raw Organic Spices",
 }
@@ -22,6 +23,12 @@ export const CATALOG_SEED_CATEGORIES: Category[] = [
     id: "tea-masala",
     name: "Tea Masala",
     slug: "tea-masala",
+    enabled: true,
+  },
+  {
+    id: "cloud-kitchen",
+    name: "Cloud Kitchen",
+    slug: "cloud-kitchen",
     enabled: true,
   },
   {
@@ -309,6 +316,114 @@ const BASE_CATALOG_SEED_PRODUCTS: Product[] = [
     modelNumber: "WW-E8W9-Z01T",
   },
   {
+    id: "apple-smoothie-cloud-kitchen",
+    name: "Apple Smoothie",
+    sku: "SDA-CK-APPLE-230",
+    category: "cloud-kitchen",
+    price: 180,
+    packGrams: 230,
+    image: "https://images.unsplash.com/photo-1514995669114-6081e934b693?auto=format&fit=crop&w=900&q=80",
+    rating: 5,
+    reviewCount: 0,
+    description: "Fresh apple smoothie prepared to order. 230ml serving with optional healthy add-ons.",
+    ingredients: ["Apple", "Milk/Water Base (as selected in kitchen)"],
+    addOnOptions: [
+      "Almonds",
+      "Cashews",
+      "Chia Seeds",
+      "Pumpkin Seeds",
+      "Flax Seeds",
+      "Peanuts",
+      "Roasted Chickpeas",
+      "Walnuts",
+      "Sunflower Seeds",
+    ],
+    inStock: true,
+    tags: ["cloud-kitchen", "smoothie", "fresh-made"],
+    netQuantityValue: 230,
+    netQuantityUnit: "ml",
+    variantData: ["Serving: 230ml"],
+    materialInfo: "Fresh beverage",
+    complianceInfo: [
+      "Made fresh after order confirmation",
+      "Best consumed immediately",
+      "Contains optional nuts and seeds based on customer selection",
+    ],
+    categoryBreadcrumb: ["Home", "Cloud Kitchen", "Smoothies", "Apple Smoothie"],
+  },
+  {
+    id: "banana-smoothie-cloud-kitchen",
+    name: "Banana Smoothie",
+    sku: "SDA-CK-BANANA-230",
+    category: "cloud-kitchen",
+    price: 150,
+    packGrams: 230,
+    image: "https://images.unsplash.com/photo-1638176066666-ffb2f013c7dd?auto=format&fit=crop&w=900&q=80",
+    rating: 5,
+    reviewCount: 0,
+    description: "Creamy banana smoothie prepared to order with optional healthy add-ons.",
+    ingredients: ["Banana", "Milk/Water Base (as selected in kitchen)"],
+    addOnOptions: [
+      "Almonds",
+      "Cashews",
+      "Chia Seeds",
+      "Pumpkin Seeds",
+      "Flax Seeds",
+      "Peanuts",
+      "Roasted Chickpeas",
+      "Walnuts",
+      "Sunflower Seeds",
+    ],
+    inStock: true,
+    tags: ["cloud-kitchen", "smoothie", "fresh-made"],
+    netQuantityValue: 230,
+    netQuantityUnit: "ml",
+    variantData: ["Serving: 230ml"],
+    materialInfo: "Fresh beverage",
+    complianceInfo: [
+      "Made fresh after order confirmation",
+      "Best consumed immediately",
+      "Contains optional nuts and seeds based on customer selection",
+    ],
+    categoryBreadcrumb: ["Home", "Cloud Kitchen", "Smoothies", "Banana Smoothie"],
+  },
+  {
+    id: "blueberry-smoothie-cloud-kitchen",
+    name: "Blueberry Smoothie",
+    sku: "SDA-CK-BLUEBERRY-230",
+    category: "cloud-kitchen",
+    price: 210,
+    packGrams: 230,
+    image: "https://images.unsplash.com/photo-1553530666-ba11a7da3888?auto=format&fit=crop&w=900&q=80",
+    rating: 5,
+    reviewCount: 0,
+    description: "Blueberry smoothie prepared to order with optional healthy add-ons.",
+    ingredients: ["Blueberry", "Milk/Water Base (as selected in kitchen)"],
+    addOnOptions: [
+      "Almonds",
+      "Cashews",
+      "Chia Seeds",
+      "Pumpkin Seeds",
+      "Flax Seeds",
+      "Peanuts",
+      "Roasted Chickpeas",
+      "Walnuts",
+      "Sunflower Seeds",
+    ],
+    inStock: true,
+    tags: ["cloud-kitchen", "smoothie", "fresh-made"],
+    netQuantityValue: 230,
+    netQuantityUnit: "ml",
+    variantData: ["Serving: 230ml"],
+    materialInfo: "Fresh beverage",
+    complianceInfo: [
+      "Made fresh after order confirmation",
+      "Best consumed immediately",
+      "Contains optional nuts and seeds based on customer selection",
+    ],
+    categoryBreadcrumb: ["Home", "Cloud Kitchen", "Smoothies", "Blueberry Smoothie"],
+  },
+  {
     id: "pav-bhaji-masala",
     name: "Pav Bhaji Masala",
     sku: "9N-JF7B-0JTS",
@@ -582,12 +697,21 @@ function inferShortDescription(description: string) {
 function inferHighlights(product: Product) {
   const packGrams = product.packGrams ?? 50
   const isRawSpice = product.category === "raw-organic-spices"
+  const isCloudKitchen = product.category === "cloud-kitchen"
 
   if (isRawSpice) {
     return [
       "Single-ingredient whole spice",
       `Net quantity: ${packGrams}g`,
       "Packed for freshness and daily kitchen use",
+    ]
+  }
+
+  if (isCloudKitchen) {
+    return [
+      "Prepared fresh after order placement",
+      `Net quantity: ${product.netQuantityValue ?? packGrams}${product.netQuantityUnit ?? "ml"}`,
+      "Choose optional nuts and seeds while adding to cart",
     ]
   }
 
@@ -599,6 +723,10 @@ function inferHighlights(product: Product) {
 }
 
 function inferMaterialInfo(product: Product) {
+  if (product.category === "cloud-kitchen") {
+    return "Fresh beverage"
+  }
+
   if (product.category === "raw-organic-spices") {
     return "Whole spice"
   }

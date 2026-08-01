@@ -4,6 +4,29 @@ export const SHIPPING_AMOUNT = 120
 export const KARNATAKA_SHIPPING_AMOUNT = 60
 export const FREE_SHIPPING_THRESHOLD = 500
 export const MAX_PRODUCT_GRAMS_PER_CART = 500
+export const CLOUD_KITCHEN_INSTANT_DELIVERY_AMOUNT = 30
+export const CLOUD_KITCHEN_INSTANT_SERVICEABLE_PINCODES = ["560068"] as const
+export const CLOUD_KITCHEN_MILK_SURCHARGE = 15
+
+export const SMOOTHIE_ADDON_PRICES: Record<string, number> = {
+  "Almonds": 15,
+  "Cashews": 15,
+  "Chia Seeds": 10,
+  "Pumpkin Seeds": 10,
+  "Flax Seeds": 8,
+  "Peanuts": 8,
+  "Roasted Chickpeas": 8,
+  "Walnuts": 15,
+  "Sunflower Seeds": 8,
+}
+
+export const SMOOTHIE_DEFAULT_ADDONS = ["Almonds", "Cashews", "Walnuts"] as const
+
+export function calculateSmoothieAddOnTotal(selectedAddOns: string[], base: "water" | "milk") {
+  const addOnTotal = selectedAddOns.reduce((sum, addon) => sum + (SMOOTHIE_ADDON_PRICES[addon] ?? 0), 0)
+  const milkSurcharge = base === "milk" ? CLOUD_KITCHEN_MILK_SURCHARGE : 0
+  return addOnTotal + milkSurcharge
+}
 
 const rawPackPriceMap: Record<string, Record<number, number>> = {
   "raw-cardamom-black": { 50: 140 },
@@ -20,6 +43,10 @@ const rawPackPriceMap: Record<string, Record<number, number>> = {
 
 export function isComboPack(product: Product) {
   return product.tags.includes("combo-pack")
+}
+
+export function isCloudKitchenProduct(product: Product) {
+  return product.tags.includes("cloud-kitchen")
 }
 
 function getRawPackPriceConfig(product: Product) {
@@ -41,6 +68,15 @@ export function getProductPackGrams(product: Product) {
 export function getProductPackLabel(product: Product) {
   if (getRawPackPriceConfig(product)) {
     return "50g pack"
+  }
+
+  if (
+    typeof product.netQuantityValue === "number"
+    && product.netQuantityValue > 0
+    && typeof product.netQuantityUnit === "string"
+    && product.netQuantityUnit.trim().length > 0
+  ) {
+    return `${product.netQuantityValue}${product.netQuantityUnit.trim()} serving`
   }
 
   return isComboPack(product) ? "4 x 50g packs" : `${getProductPackGrams(product)}g pack`
@@ -68,6 +104,10 @@ export function resolveProductPackPrice(product: Product, grams: number) {
 }
 
 export function getCartItemPackLabel(product: Product, grams: number) {
+  if (isCloudKitchenProduct(product)) {
+    return `${grams}ml serving`
+  }
+
   return isComboPack(product) ? "4 x 50g packs" : `${grams}g pack`
 }
 
@@ -125,6 +165,15 @@ export function calculateShippingAmountByPincode(pincode: string, subtotal: numb
   }
 
   return isKarnatakaPincode(pincode) ? KARNATAKA_SHIPPING_AMOUNT : SHIPPING_AMOUNT
+}
+
+export function isCloudKitchenInstantServiceablePincode(pincode: string) {
+  const normalized = normalizePincode(pincode)
+  return CLOUD_KITCHEN_INSTANT_SERVICEABLE_PINCODES.includes(normalized as typeof CLOUD_KITCHEN_INSTANT_SERVICEABLE_PINCODES[number])
+}
+
+export function calculateCloudKitchenShippingAmount(deliveryMode: "instant" | "subscription") {
+  return deliveryMode === "subscription" ? 0 : CLOUD_KITCHEN_INSTANT_DELIVERY_AMOUNT
 }
 
 export function getShippingZoneLabel(pincode: string) {

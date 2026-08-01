@@ -1,6 +1,7 @@
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
 import type { Category } from "@/lib/types"
+import { CookingPot } from "@phosphor-icons/react"
 
 type CategorySidebarProps = {
   categories: Category[]
@@ -47,6 +48,16 @@ export function CategorySidebar({ categories, selectedCategory, onSelectCategory
           )}
         </button>
       ))}
+
+      {/* Cloud Kitchen external link */}
+      <a
+        href="/cloudkitchen"
+        className="w-full flex items-center gap-2 px-4 py-3 rounded-lg transition-colors hover:bg-emerald-50 text-emerald-700 hover:text-emerald-900 border border-emerald-100 mt-2"
+      >
+        <CookingPot size={16} weight="duotone" />
+        <span className="flex-1 text-left">Cloud Kitchen</span>
+        <Badge className="text-[10px] bg-emerald-100 text-emerald-800 hover:bg-emerald-100 border-0">New</Badge>
+      </a>
       
       {categories.filter(cat => !cat.enabled).length > 0 && (
         <div className="pt-4 border-t border-border mt-4">
